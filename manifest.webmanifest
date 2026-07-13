@@ -1,0 +1,15 @@
+{
+  "name": "Cuaderno de seguimiento",
+  "short_name": "Cuaderno",
+  "description": "Seguimiento de estudiantes de clases particulares de matemática",
+  "lang": "es-AR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E7E8EB",
+  "theme_color": "#1E2B4D",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cuaderno de seguimiento — clases de matemática</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#1E2B4D">
+<style>
+  :root{
+    --bg:#E7E8EB; --card:#FFFFFF; --ink:#1E2B4D; --muted:#5B6072; --faint:#8B90A0;
+    --line:#D8DAE3; --soft:#E4E4E0; --red:#C43C2B; --redbg:#FAE9E4;
+    --green:#2E9958; --greenbg:#E4F1E9; --amber:#E0A422; --amberbg:#FBF3DC;
+    --blue:#2C4A9A; --bluebg:#E8EDFB; --gray:#C9CCD6;
+    --sans:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,"Roboto Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+       font-size:14px;line-height:1.45;padding:18px 12px 44px}
+  .shell{max-width:860px;margin:0 auto}
+  button{cursor:pointer;font-family:inherit;font-size:13px}
+  input,select,textarea{font-family:inherit;font-size:13.5px;width:100%;
+    border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#FDFDFB;color:var(--ink)}
+  textarea{min-height:64px;resize:vertical}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+    outline:2px solid var(--ink);outline-offset:1px}
+  .header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+  .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  h1{font-size:24px;margin:4px 0 0;letter-spacing:-.01em}
+  h2{font-size:20px;margin:0}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tabbtn{border:1px solid var(--line);background:var(--card);border-radius:8px;
+          padding:7px 14px;font-weight:500;color:var(--muted)}
+  .tabbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tabbtn .n{font-family:var(--mono);font-size:11px;margin-left:4px;opacity:.7}
+  .stats{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .stat{display:flex;align-items:baseline;gap:6px}
+  .stat b{font-family:var(--mono);font-size:25px;font-weight:600}
+  .stat span{font-size:12px;color:var(--faint)}
+  .stat.warn b{color:var(--red)}
+  .primary{background:var(--ink);color:#fff;border:none;border-radius:8px;
+           padding:9px 16px;font-weight:600;margin-left:auto}
+  .danger{background:#fff;color:var(--red);border:1px solid #E0A99E;border-radius:8px;padding:7px 12px}
+  .stitle{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+          color:var(--faint);margin:22px 0 8px;border-bottom:1px solid rgba(30,43,77,.14);padding-bottom:5px}
+  .empty{background:rgba(255,255,255,.7);border:1px dashed var(--gray);border-radius:10px;
+         padding:14px;font-size:13px;color:var(--faint)}
+  .alert{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:var(--card);
+         border:1px solid #E8CFC7;border-left:3px solid var(--red);border-radius:8px;
+         padding:9px 12px;margin-bottom:6px;font-size:13.5px;color:var(--ink)}
+  .alert .dot{width:7px;height:7px;border-radius:99px;background:var(--red);flex-shrink:0}
+  .alert b{margin-right:4px}
+  .alert span.t{color:var(--muted)}
+  .examgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px}
+  .examcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:left;color:var(--ink)}
+  .count{display:inline-block;color:#fff;font-family:var(--mono);font-size:11.5px;
+         font-weight:600;border-radius:6px;padding:4px 9px;background:var(--ink)}
+  .count.urgent{background:var(--red)}
+  .count.big{font-size:13.5px;padding:8px 14px}
+  .chip{border:1px solid var(--line);background:var(--card);border-radius:99px;
+        padding:6px 13px;font-size:12.5px;color:var(--muted);display:inline-block}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .row{display:flex;align-items:center;gap:10px;width:100%;background:var(--card);
+       border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:7px;
+       color:var(--ink);text-align:left}
+  .row .main{flex:1;min-width:0}
+  .row .name{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700}
+  .row .sub{font-size:12.5px;color:var(--muted);margin-top:3px;font-weight:400}
+  .row .right{text-align:right;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+  .pill{font-size:10.5px;font-family:var(--mono);font-weight:600;border-radius:99px;padding:3px 8px}
+  .mini-alert{font-size:10.5px;font-family:var(--mono);color:var(--red)}
+  .sem{border-radius:99px;display:inline-block;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+  .sembtn{border:none;background:none;padding:3px;display:inline-flex;align-items:center}
+  .back{background:none;border:none;color:var(--muted);padding:0;margin-bottom:12px}
+  .dethead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .semlabel{font-size:11.5px;color:var(--faint);margin:2px 0 8px}
+  .topicgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px}
+  .topic{border:1px solid;border-radius:10px;padding:11px 12px;text-align:left}
+  .topic b{font-size:13.5px;display:block}
+  .topic small{font-size:10.5px;font-family:var(--mono);display:block;margin-top:4px}
+  .formcard{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  .ftitle{font-weight:700;font-size:14px;margin-bottom:10px}
+  .frow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .field{flex:1;min-width:150px}
+  .flabel{font-size:11px;font-family:var(--mono);color:var(--faint);margin-bottom:4px}
+  .log{display:flex;gap:10px;align-items:flex-start;background:var(--card);
+       border:1px solid var(--soft);border-radius:8px;padding:9px 12px;margin-bottom:6px}
+  .log .d{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:70px}
+  .log .body{flex:1;min-width:0}
+  .log .note{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .del{border:none;background:none;color:#B4B6BE;font-size:16px;line-height:1;padding:0 2px}
+  .overlay{position:fixed;inset:0;background:rgba(30,43,77,.4);display:flex;
+           align-items:center;justify-content:center;padding:16px;z-index:50}
+  .modal{background:#F2F3F5;border-radius:14px;padding:20px;width:100%;max-width:560px;
+         max-height:90vh;overflow-y:auto}
+  .footer{text-align:center;font-size:11px;color:#B4B6BE;margin-top:30px;font-family:var(--mono)}
+  .saveerr{background:var(--redbg);color:var(--red);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:14px}
+  .hint{font-size:11.5px;color:var(--faint)}
+  .tareatag{font-size:11px;font-family:var(--mono);margin-left:8px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell" id="app"></div>
+
+<script>
+"use strict";
+/* ============ datos ============ */
+const KEY = "tutoria-seguimiento-v1";
+const CFG_KEY = "tutoria-sync-cfg";   // URL + clave del proyecto Supabase (por dispositivo)
+const SES_KEY = "tutoria-sync-ses";   // sesión iniciada (tokens)
+const TOPICS = ["Trigonometría","Funciones","Matrices","Determinantes","Vectores","Límites","Derivadas","Integrales"];
+const TOPIC_CYCLE = ["pendiente","visto","practica","parcial","noentra"];
+const TOPIC_META = {
+  pendiente:{label:"Pendiente",bg:"#FFFFFF",fg:"#8B90A0",bd:"#D8DAE3"},
+  visto:{label:"Visto",bg:"#EEF1F8",fg:"#3D4A6B",bd:"#B9C2D8"},
+  practica:{label:"Práctica",bg:"#FBF3DC",fg:"#8A6410",bd:"#E3C878"},
+  parcial:{label:"Nivel parcial",bg:"#E4F1E9",fg:"#1F6B44",bd:"#8FC4A6"},
+  noentra:{label:"No entra",bg:"#F4F4F2",fg:"#B4B6BE",bd:"#E4E4E0"},
+};
+const STATUS_META = {
+  activo:{label:"Activo",fg:"#1F6B44",bg:"#E4F1E9"},
+  pausado:{label:"Pausado",fg:"#8A6410",bg:"#FBF3DC"},
+  aprobo:{label:"Aprobó",fg:"#2C4A9A",bg:"#E8EDFB"},
+  desaprobo:{label:"A recuperar",fg:"#A23A2A",bg:"#FAE9E4"},
+  dejo:{label:"Dejó",fg:"#8B90A0",bg:"#F0F0EE"},
+};
+const SEM_CYCLE = ["sd","verde","amarillo","rojo"];
+const SEM_META = {
+  sd:{color:"#C9CCD6",label:"Sin evaluar"},
+  verde:{color:"#2E9958",label:"Encaminado: llega bien a su objetivo"},
+  amarillo:{color:"#E0A422",label:"En riesgo: llega ajustado, priorizar temas"},
+  rojo:{color:"#C43C2B",label:"Complicado: difícilmente llegue así"},
+};
+const CAREERS = ["Ingeniería","Licenciatura","Arquitectura","Ingresante"];
+function defaultCatalog(){
+  return { careers:[...CAREERS],
+    subjects:[{ id:"matbasica", name:"Matemática básica", units:[...TOPICS] }],
+    updatedAt:0 };
+}
+const TAREA_META = {hecha:{label:"hecha",fg:"#1F6B44"},intentada:{label:"intentada",fg:"#8A6410"},no:{label:"no hecha",fg:"#A23A2A"}};
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const today = () => new Date().toISOString().slice(0,10);
+const esc = (s) => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function daysTo(ds){ if(!ds) return null;
+  const d=new Date(ds+"T12:00:00"), n=new Date(); n.setHours(12,0,0,0);
+  return Math.round((d-n)/86400000); }
+function fmtDate(ds){ if(!ds) return "—";
+  return new Date(ds+"T12:00:00").toLocaleDateString("es-AR",{day:"numeric",month:"short"}); }
+
+/* ============ estado ============ */
+let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
+              view:"tablero", selId:null, filter:"activo", tab:"temas",
+              showNew:false, confirmDel:false, saveErr:false,
+              syncStatus:"idle", syncMsg:"", lastSync:null };
+
+const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
+function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
+function careerOptions(cur){ const l=[...state.catalog.careers]; if(cur && !l.includes(cur)) l.push(cur); return l; }
+function touchCatalog(){ state.catalog.updatedAt=Date.now(); save(); render(); }
+
+const alive = () => state.students.filter(s => !s.deleted);
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){ const p = JSON.parse(raw);
+      if(Array.isArray(p.students)) state.students = p.students;
+      if(p.catalog && Array.isArray(p.catalog.careers) && Array.isArray(p.catalog.subjects))
+        state.catalog = p.catalog; }
+  }catch(e){}
+  // limpiar marcas de borrado con más de 90 días (ya viajaron a todos los dispositivos)
+  state.students = state.students.filter(s => !(s.deleted && (Date.now()-(s.updatedAt||0)) > 90*86400000));
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify({students:state.students, catalog:state.catalog})); state.saveErr=false; }
+  catch(e){ state.saveErr=true; }
+  scheduleSync();
+}
+const sel = () => state.students.find(s=>s.id===state.selId) || null;
+function update(id, patch){
+  patch = {...patch, updatedAt: Date.now()};
+  state.students = state.students.map(s => s.id===id ? {...s,...patch} : s);
+  save(); render();
+}
+function emptyStudent(){
+  return { id:uid(), name:"", career:(state.catalog.careers[0]||"Ingeniería"), subject:"", subjectId:"",
+    chair:"", status:"activo", semaforo:"sd", examDate:"", startDate:today(), notes:"",
+    updatedAt:Date.now(), topics:{}, sessions:[], simulacros:[] };
+}
+
+/* ============ alertas ============ */
+function studentAlerts(s){
+  const out=[]; if(s.status!=="activo") return out;
+  const d=daysTo(s.examDate);
+  if(d!==null && d>=0 && d<=14 && s.simulacros.length===0)
+    out.push(`Examen en ${d} día${d===1?"":"s"} y todavía no hizo ningún simulacro`);
+  const last2=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);
+  if(last2.length===2 && last2.every(x=>x.tarea==="no"))
+    out.push("Dos clases seguidas sin tarea hecha — momento de la charla");
+  const lastDate = s.sessions.length ? [...s.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0].date : s.startDate;
+  const gap = lastDate ? -daysTo(lastDate) : null;
+  if(gap!==null && gap>=10) out.push(`Sin clases hace ${gap} días — ¿sigue o pasarlo a pausado?`);
+  return out;
+}
+
+/* ============ piezas ============ */
+const semDot = (v,size,btn) => {
+  const m=SEM_META[v||"sd"];
+  const dot=`<span class="sem" title="${esc(m.label)}" style="width:${size}px;height:${size}px;background:${m.color}"></span>`;
+  return btn ? `<button class="sembtn" data-a="cycle-sem" title="${esc(m.label)} — tocá para cambiar">${dot}</button>` : dot;
+};
+const pill = (st) => { const m=STATUS_META[st];
+  return `<span class="pill" style="color:${m.fg};background:${m.bg}">${m.label}</span>`; };
+const tabbtn = (a,on,label) => `<button class="tabbtn ${on?"on":""}" data-a="${a}">${label}</button>`;
+
+/* ============ vistas ============ */
+function vTablero(){
+  const activos = alive().filter(s=>s.status==="activo");
+  const alerts = activos.flatMap(s=>studentAlerts(s).map(t=>({s,t})));
+  const upcoming = activos.filter(s=>s.examDate && daysTo(s.examDate)>=0)
+                          .sort((a,b)=>a.examDate.localeCompare(b.examDate));
+  const enRiesgo = new Set(alerts.map(a=>a.s.id)).size;
+  let h = `<div class="stats">
+    <div class="stat"><b>${activos.length}</b><span>activos</span></div>
+    <div class="stat"><b>${upcoming.length}</b><span>con examen a la vista</span></div>
+    <div class="stat ${enRiesgo?"warn":""}"><b>${enRiesgo}</b><span>con alertas</span></div>
+    <button class="primary" data-a="new">+ Nuevo estudiante</button></div>`;
+
+  h += `<div class="stitle">Alertas</div>`;
+  h += alerts.length===0
+    ? `<div class="empty">Sin alertas. Todo el mundo al día — buen momento para conseguir parciales viejos.</div>`
+    : alerts.map(a=>`<button class="alert" data-a="open" data-id="${a.s.id}">
+        <span class="dot"></span><b>${esc(a.s.name)}</b><span class="t">${esc(a.t)}</span></button>`).join("");
+
+  h += `<div class="stitle">Próximos exámenes</div>`;
+  h += upcoming.length===0
+    ? `<div class="empty">Ningún activo tiene fecha de examen cargada. Cargarla es el paso uno del plan hacia atrás.</div>`
+    : `<div class="examgrid">` + upcoming.map(s=>{
+        const d=daysTo(s.examDate);
+        const sim = s.simulacros.length ? `Simulacro: ${esc(s.simulacros[s.simulacros.length-1].grade||"hecho")}` : "Sin simulacro";
+        return `<button class="examcard" data-a="open" data-id="${s.id}">
+          <span class="count ${d<=7?"urgent":""}">${d===0?"HOY":d+" día"+(d===1?"":"s")}</span>
+          <div style="font-weight:700;font-size:15px;margin:8px 0 2px;display:flex;align-items:center;gap:7px">${esc(s.name)} ${semDot(s.semaforo,11,false)}</div>
+          <div style="font-size:12.5px;color:var(--muted)">${esc(s.subject||"Materia s/d")} · ${fmtDate(s.examDate)}</div>
+          <div style="font-size:11.5px;font-family:var(--mono);margin-top:6px;color:${s.simulacros.length?"#1F6B44":"#A23A2A"}">${sim}</div>
+        </button>`;}).join("") + `</div>`;
+
+  if(alive().length===0)
+    h += `<div class="empty" style="margin-top:24px;text-align:center;padding:32px">
+      El cuaderno está vacío. Cargá tu primer estudiante con el botón de arriba: nombre, materia y fecha de examen alcanzan para arrancar.</div>`;
+
+  h += `<div class="stitle">Respaldo</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="chip" data-a="export">Descargar copia (.json)</button>
+      <label class="chip" style="cursor:pointer">Restaurar desde archivo
+        <input type="file" id="importFile" accept="application/json" style="display:none"></label>
+      <span class="hint">Restaurar reemplaza todos los datos actuales por los del archivo.</span></div>`;
+  return h;
+}
+
+function vLista(){
+  const order=["activo","pausado","desaprobo","aprobo","dejo","todos"];
+  const shown = alive()
+    .filter(s=>state.filter==="todos"||s.status===state.filter)
+    .sort((a,b)=>((a.examDate||"9999").localeCompare(b.examDate||"9999"))||a.name.localeCompare(b.name));
+  let h = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">` +
+    order.map(f=>{
+      const n = f==="todos" ? "" : ` <span style="opacity:.55">${alive().filter(s=>s.status===f).length}</span>`;
+      return `<button class="chip ${state.filter===f?"on":""}" data-a="filter" data-f="${f}">${f==="todos"?"Todos":STATUS_META[f].label}${n}</button>`;
+    }).join("") +
+    `<span style="flex:1"></span><button class="primary" data-a="new">+ Nuevo</button></div>`;
+
+  if(shown.length===0) return h + `<div class="empty">Nadie en esta categoría por ahora.</div>`;
+
+  h += shown.map(s=>{
+    const d=daysTo(s.examDate);
+    const na=studentAlerts(s).length;
+    const units=unitsFor(s);
+    const seen=units.filter(t=>["visto","practica","parcial"].includes((s.topics||{})[t])).length;
+    const rel=units.filter(t=>(s.topics||{})[t]!=="noentra").length||1;
+    const right = (d!==null&&d>=0&&s.status==="activo")
+      ? `<span style="color:${d<=7?"var(--red)":"var(--ink)"};font-weight:600">examen en ${d}d</span>`
+      : `<span style="color:var(--faint)">${s.examDate?fmtDate(s.examDate):"sin fecha"}</span>`;
+    return `<button class="row" data-a="open" data-id="${s.id}">
+      <div class="main"><div class="name">${esc(s.name)} ${semDot(s.semaforo,13,false)} ${pill(s.status)}
+        ${na?`<span class="mini-alert">${na} alerta${na>1?"s":""}</span>`:""}</div>
+      <div class="sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")} · temas ${seen}/${rel}</div></div>
+      <div class="right">${right}</div></button>`;
+  }).join("");
+  return h;
+}
+
+function vDetalle(){
+  const s = sel(); if(!s) return "";
+  const d = daysTo(s.examDate);
+  const alerts = studentAlerts(s);
+  let h = `<button class="back" data-a="back">← Volver a la lista</button>
+  <div class="dethead">
+    <div style="flex:1;min-width:220px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2>${esc(s.name)}</h2>${semDot(s.semaforo,16,true)}${pill(s.status)}</div>
+      <div class="semlabel">${esc(SEM_META[s.semaforo||"sd"].label)}${(s.semaforo||"sd")==="sd"?" — tocá el círculo para marcar cómo viene":""}</div>
+      <div style="font-size:13px;color:var(--muted)">${esc(s.career)} · ${esc(s.subject||"materia s/d")}${s.chair?" · "+esc(s.chair):""} · desde ${fmtDate(s.startDate)}</div>
+    </div>
+    ${(s.examDate&&d!==null&&d>=0)?`<span class="count big ${d<=7?"urgent":""}">examen: ${d===0?"HOY":d+" día"+(d===1?"":"s")}</span>`:""}
+  </div>`;
+  h += alerts.map(t=>`<div class="alert" style="cursor:default"><span class="dot"></span><span class="t">${esc(t)}</span></div>`).join("");
+  h += `<div class="tabs" style="margin:16px 0 14px">` +
+    tabbtn("tab-temas",state.tab==="temas","Temas") +
+    tabbtn("tab-clases",state.tab==="clases",`Clases (${s.sessions.length})`) +
+    tabbtn("tab-simulacros",state.tab==="simulacros",`Simulacros (${s.simulacros.length})`) +
+    tabbtn("tab-ficha",state.tab==="ficha","Ficha") + `</div>`;
+
+  if(state.tab==="temas"){
+    const units=unitsFor(s);
+    if(units.length===0){
+      h += `<div class="empty">Este alumno no tiene una materia elegida. Entrá a la pestaña «Ficha» y elegí su materia: la grilla de unidades se arma sola. Las materias y sus unidades se administran desde «Materias y carreras».</div>`;
+    } else {
+      h += `<div class="hint" style="margin-bottom:10px">Tocá cada unidad para avanzar el estado: Pendiente → Visto → Práctica → Nivel parcial → No entra. «Nivel parcial» significa que resuelve solo ejercicios de nivel examen.</div>
+      <div class="topicgrid">` + units.map(t=>{
+        const st=(s.topics||{})[t]||"pendiente";
+        const m=TOPIC_META[st];
+        return `<button class="topic" data-a="cycle-topic" data-t="${esc(t)}"
+          style="background:${m.bg};border-color:${m.bd}">
+          <b style="color:${st==="noentra"?"#B4B6BE":"var(--ink)"}">${esc(t)}</b>
+          <small style="color:${m.fg}">${m.label}</small></button>`;
+      }).join("") + `</div>`;
+    }
+  }
+
+  if(state.tab==="clases"){
+    h += `<div class="formcard"><div class="ftitle">Registrar clase (30 segundos, apenas termina)</div>
+      <div class="frow">
+        <div class="field"><div class="flabel">Fecha</div><input type="date" id="c-date" value="${today()}"></div>
+        <div class="field"><div class="flabel">Tema principal</div><select id="c-topic"><option value="">—</option>
+          ${unitsFor(s).map(t=>`<option>${esc(t)}</option>`).join("")}
+          <option>Nivelación</option><option>Repaso / parciales viejos</option></select></div>
+        <div class="field"><div class="flabel">¿Trajo la tarea?</div><select id="c-tarea">
+          <option value="sd">—</option><option value="hecha">Hecha</option>
+          <option value="intentada">Intentada</option><option value="no">No hecha</option></select></div>
+      </div>
+      <div class="field"><div class="flabel">Nota rápida (qué costó, tarea que dejaste)</div>
+        <input id="c-note" placeholder="Ej: se traba en cadena+cociente. Tarea: guía 5, ej. 8-12"></div>
+      <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-session">Guardar clase</button></div>`;
+    const sorted=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date));
+    h += sorted.length===0 ? `<div class="empty">Todavía no hay clases registradas.</div>`
+      : sorted.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
+        <div class="body"><span style="font-weight:600">${esc(c.topic||"Clase")}</span>
+        ${c.tarea&&c.tarea!=="sd"?`<span class="tareatag" style="color:${TAREA_META[c.tarea].fg}">tarea: ${TAREA_META[c.tarea].label}</span>`:""}
+        ${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div>
+        <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar">×</button></div>`).join("");
+  }
+
+  if(state.tab==="simulacros"){
+    h += `<div class="formcard"><div class="ftitle">Registrar simulacro (parcial viejo, cronometrado)</div>
+      <div class="frow">
+        <div class="field"><div class="flabel">Fecha</div><input type="date" id="s-date" value="${today()}"></div>
+        <div class="field"><div class="flabel">Nota</div><input id="s-grade" placeholder="Ej: 5.5 / 10"></div>
+      </div>
+      <div class="field"><div class="flabel">Diagnóstico: errores conceptuales / de cuenta / de tiempo</div>
+        <input id="s-note" placeholder="Ej: 2 conceptuales en límites, 1 de cuenta, le faltó tiempo en el último"></div>
+      <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-sim">Guardar simulacro</button></div>`;
+    const sorted=[...s.simulacros].sort((a,b)=>b.date.localeCompare(a.date));
+    h += sorted.length===0 ? `<div class="empty">Sin simulacros. Idealmente el primero va 10–14 días antes del examen.</div>`
+      : sorted.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
+        <div class="body"><span style="font-weight:700;font-family:var(--mono)">${esc(c.grade||"s/nota")}</span>
+        ${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div>
+        <button class="del" data-a="del-sim" data-id="${c.id}" title="Borrar">×</button></div>`).join("");
+  }
+
+  if(state.tab==="ficha"){
+    const opt=(v,cur,l)=>`<option value="${v}" ${v===cur?"selected":""}>${l}</option>`;
+    h += `<div class="formcard">
+      <div class="frow">
+        <div class="field"><div class="flabel">Nombre</div><input data-f="name" value="${esc(s.name)}"></div>
+        <div class="field"><div class="flabel">Carrera</div><select data-f="career">
+          ${careerOptions(s.career).map(c=>opt(c,s.career,c)).join("")}</select></div></div>
+      <div class="frow">
+        <div class="field"><div class="flabel">Materia</div><select data-f="subjectId">
+          <option value="" ${!s.subjectId?"selected":""}>${s.subjectId?"—":esc(s.subject||"—")}</option>
+          ${state.catalog.subjects.map(m=>`<option value="${m.id}" ${m.id===s.subjectId?"selected":""}>${esc(m.name)}</option>`).join("")}
+        </select></div>
+        <div class="field"><div class="flabel">Cátedra / universidad</div><input data-f="chair" value="${esc(s.chair)}"></div></div>
+      <div class="frow">
+        <div class="field"><div class="flabel">Estado</div><select data-f="status">
+          ${Object.entries(STATUS_META).map(([k,m])=>opt(k,s.status,m.label)).join("")}</select></div>
+        <div class="field"><div class="flabel">Fecha de examen / parcial</div><input type="date" data-f="examDate" value="${esc(s.examDate)}"></div>
+        <div class="field"><div class="flabel">Empezó clases</div><input type="date" data-f="startDate" value="${esc(s.startDate)}"></div></div>
+      <div class="field"><div class="flabel">Notas del alumno (diagnóstico inicial, agujeros de secundaria, cómo estudia)</div>
+        <textarea data-f="notes">${esc(s.notes)}</textarea></div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--soft)">
+        ${!state.confirmDel
+          ? `<button class="danger" data-a="ask-del">Eliminar estudiante…</button>`
+          : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span style="font-size:13px;color:var(--red)">Se borra todo su historial. ¿Seguro?</span>
+              <button class="danger" data-a="confirm-del">Sí, eliminar</button>
+              <button class="chip" data-a="cancel-del">Cancelar</button></div>`}
+        <div class="hint" style="margin-top:8px">Consejo: si dejó o rindió, cambiá el estado en vez de borrarlo — si vuelve (pasa seguido), retomás con todo el historial.</div>
+      </div></div>`;
+  }
+  return h;
+}
+
+function vSync(){
+  const cfg=getCfg(), ses=getSes();
+  let h = `<button class="back" data-a="nav-tablero">← Volver al tablero</button>
+  <div class="formcard"><div class="ftitle">Sincronización entre dispositivos</div>`;
+  if(!cfg){
+    h += `<div class="hint" style="margin-bottom:10px">Pegá acá los dos valores de tu proyecto de Supabase
+      (INSTRUCCIONES, paso 3). Esto se hace <b>una sola vez por dispositivo</b>.</div>
+    <div class="field"><div class="flabel">Project URL (empieza con https:// y termina en .supabase.co)</div>
+      <input id="cfg-url" placeholder="https://abcdefgh.supabase.co"></div>
+    <div class="field" style="margin-top:8px"><div class="flabel">Clave «anon public» (un texto largo que empieza con eyJ o sb_publishable_)</div>
+      <textarea id="cfg-anon" style="min-height:70px" placeholder="eyJhbGciOi..."></textarea></div>
+    <button class="primary" style="margin:10px 0 0;margin-left:0" data-a="sync-save-cfg">Guardar configuración</button>
+    <div class="hint" id="syncFormMsg" style="margin-top:8px;color:var(--red)"></div>`;
+  } else if(!ses){
+    h += `<div class="hint" style="margin-bottom:10px">Configuración guardada. Ahora iniciá sesión con tu correo y contraseña.
+      Si es la primera vez, tocá «Crear cuenta nueva» (se crea una sola vez; en el otro dispositivo solo iniciás sesión).</div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Correo</div><input id="log-email" type="email" autocomplete="username"></div>
+      <div class="field"><div class="flabel">Contraseña (mínimo 6 caracteres)</div><input id="log-pass" type="password" autocomplete="current-password"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <button class="primary" style="margin-left:0" data-a="sync-login">Iniciar sesión</button>
+      <button class="chip" data-a="sync-signup">Crear cuenta nueva</button>
+      <button class="chip" data-a="sync-remove-cfg">Quitar configuración</button>
+    </div>
+    <div class="hint" id="syncFormMsg" style="margin-top:8px;color:var(--red)"></div>`;
+  } else {
+    h += `<div style="font-size:13.5px;margin-bottom:6px">Sesión iniciada como <b>${esc(ses.email||"")}</b></div>
+    <div class="hint" style="margin-bottom:10px">La app funciona siempre, con o sin internet. Cuando hay conexión,
+      los cambios se suben solos y se combinan con los del otro dispositivo. Si un mismo alumno se editó
+      en los dos lados, queda la edición más reciente.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="primary" style="margin-left:0" data-a="sync-now">Sincronizar ahora</button>
+      <button class="chip" data-a="sync-logout">Cerrar sesión</button>
+    </div>
+    <div class="hint" id="syncFormMsg" style="margin-top:8px"></div>`;
+  }
+  return h + `</div>`;
+}
+
+function vCatalog(){
+  const c=state.catalog;
+  let h = `<button class="back" data-a="nav-tablero">← Volver al tablero</button>`;
+  const em = state.editSubjectId ? subjById(state.editSubjectId) : null;
+  if(em){
+    h += `<div class="formcard"><div class="ftitle">Editar materia</div>
+    <div class="field"><div class="flabel">Nombre de la materia</div>
+      <input data-cf="subj-name" value="${esc(em.name)}"></div>
+    <div class="flabel" style="margin-top:12px">Unidades / temas (se muestran en este orden)</div>
+    ${em.units.map((u,i)=>`<div class="log" style="padding:7px 12px"><div class="body">${esc(u)}</div>
+      <button class="del" data-a="cat-del-unit" data-i="${i}" title="Quitar unidad">×</button></div>`).join("") || `<div class="empty">Sin unidades todavía. Agregá la primera acá abajo.</div>`}
+    <div class="frow" style="margin-top:8px;align-items:flex-end">
+      <div class="field"><input id="new-unit" placeholder="Ej: Límites y continuidad"></div>
+      <button class="chip" data-a="cat-add-unit" style="margin-bottom:2px">+ Agregar unidad</button></div>
+    <button class="primary" style="margin:12px 0 0;margin-left:0" data-a="cat-close-edit">Listo</button>
+    <div class="hint" style="margin-top:8px">Los cambios se guardan solos. Si quitás una unidad, los alumnos que ya la tenían registrada no pierden nada; las unidades nuevas les aparecen como «Pendiente».</div>
+    </div>`;
+    return h;
+  }
+  h += `<div class="formcard"><div class="ftitle">Carreras</div>
+  ${c.careers.map((x,i)=>`<div class="log" style="padding:7px 12px"><div class="body">${esc(x)}</div>
+    <button class="del" data-a="cat-del-career" data-i="${i}" title="Quitar">×</button></div>`).join("") || `<div class="empty">Sin carreras cargadas.</div>`}
+  <div class="frow" style="margin-top:8px;align-items:flex-end">
+    <div class="field"><input id="new-career" placeholder="Ej: Contador Público"></div>
+    <button class="chip" data-a="cat-add-career" style="margin-bottom:2px">+ Agregar carrera</button></div>
+  <div class="hint" style="margin-top:6px">Quitar una carrera no afecta a los alumnos que ya la tienen: la conservan en su ficha.</div></div>`;
+  h += `<div class="formcard"><div class="ftitle">Materias y sus unidades</div>
+  ${c.subjects.map(m=>`<div class="log" style="padding:7px 12px;align-items:center">
+    <div class="body"><b>${esc(m.name)}</b><div class="note">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
+    <button class="chip" data-a="cat-edit-subject" data-id="${m.id}">Editar</button>
+    <button class="del" data-a="cat-del-subject" data-id="${m.id}" title="Eliminar materia">×</button></div>`).join("") || `<div class="empty">Sin materias cargadas.</div>`}
+  <div class="frow" style="margin-top:8px;align-items:flex-end">
+    <div class="field"><input id="new-subject" placeholder="Ej: Álgebra y Geometría Analítica"></div>
+    <button class="chip" data-a="cat-add-subject" style="margin-bottom:2px">+ Agregar materia</button></div>
+  <div class="hint" style="margin-top:6px">Al crear una materia se abre su editor para cargarle las unidades. Después, al dar de alta un alumno, la elegís de la lista y su grilla de temas se arma sola. Eliminar una materia no borra el avance de los alumnos que la usaban.</div></div>`;
+  return h;
+}
+
+function vModal(){
+  return `<div class="overlay"><div class="modal">
+    <div class="ftitle" style="font-size:16px">Nuevo estudiante</div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Nombre *</div><input id="n-name" autofocus></div>
+      <div class="field"><div class="flabel">Carrera</div><select id="n-career">
+        ${state.catalog.careers.map(c=>`<option>${esc(c)}</option>`).join("")}</select></div></div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Materia</div><select id="n-subject">
+        ${state.catalog.subjects.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("")}
+        <option value="">Otra / sin materia por ahora</option></select></div>
+      <div class="field"><div class="flabel">Fecha de examen (si ya la sabe)</div><input type="date" id="n-exam"></div></div>
+    <div class="field"><div class="flabel">Notas iniciales (de dónde arranca, qué le cuesta)</div><textarea id="n-notes"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="chip" data-a="cancel-new">Cancelar</button>
+      <button class="primary" style="margin-left:0" data-a="create">Crear</button></div>
+  </div></div>`;
+}
+
+/* ============ render ============ */
+function render(){
+  const activos = alive().filter(s=>s.status==="activo").length;
+  let h = `<div class="header"><div>
+      <div class="eyebrow">Clases particulares · matemática</div>
+      <h1>Cuaderno de seguimiento</h1></div>
+    <div class="tabs">
+      ${tabbtn("nav-tablero",state.view==="tablero","Tablero")}
+      ${tabbtn("nav-lista",state.view==="lista"||state.view==="detalle",`Estudiantes <span class="n">${activos}</span>`)}
+    </div></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:-6px 0 14px">
+    <span class="hint" id="syncStatus">${syncStatusText()}</span>
+    <span style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="chip ${state.view==="catalog"?"on":""}" data-a="nav-catalog">Materias y carreras</button>
+      <button class="chip ${state.view==="sync"?"on":""}" data-a="nav-sync">Sincronización</button>
+    </span>
+  </div>`;
+  if(state.saveErr) h += `<div class="saveerr">No se pudo guardar el último cambio. Descargá una copia de respaldo por las dudas.</div>`;
+  if(state.view==="tablero") h += vTablero();
+  if(state.view==="lista") h += vLista();
+  if(state.view==="detalle") h += vDetalle();
+  if(state.view==="sync") h += vSync();
+  if(state.view==="catalog") h += vCatalog();
+  if(state.showNew) h += vModal();
+  h += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
+  document.getElementById("app").innerHTML = h;
+  const fi = document.getElementById("importFile");
+  if(fi) fi.addEventListener("change", e=>{
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ()=>{ try{
+        const p = JSON.parse(r.result);
+        if(Array.isArray(p.students)){
+          const now=Date.now();
+          state.students = p.students.map(x=>({...x, updatedAt:x.updatedAt||now}));
+          save(); render();
+        }
+      }catch(err){ alert("El archivo no tiene un formato válido."); } };
+    r.readAsText(f);
+  });
+  const nn = document.getElementById("n-name"); if(nn) nn.focus();
+}
+
+/* ============ sincronización (Supabase, prioridad offline) ============ */
+function getCfg(){ try{ return JSON.parse(localStorage.getItem(CFG_KEY))||null }catch(e){ return null } }
+function setCfg(v){ v ? localStorage.setItem(CFG_KEY,JSON.stringify(v)) : localStorage.removeItem(CFG_KEY); }
+function getSes(){ try{ return JSON.parse(localStorage.getItem(SES_KEY))||null }catch(e){ return null } }
+function setSes(v){ v ? localStorage.setItem(SES_KEY,JSON.stringify(v)) : localStorage.removeItem(SES_KEY); }
+
+function jwtSub(tok){
+  try{ return JSON.parse(atob(tok.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).sub; }
+  catch(e){ return null; }
+}
+async function authFetch(path, body){
+  const cfg=getCfg();
+  const r=await fetch(cfg.url+path,{method:"POST",
+    headers:{"Content-Type":"application/json",apikey:cfg.anon},
+    body:JSON.stringify(body)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.msg||j.error_description||j.message||("error "+r.status));
+  return j;
+}
+function storeSession(j,email){
+  setSes({access:j.access_token,refresh:j.refresh_token,
+          exp:Date.now()+((j.expires_in||3600)-60)*1000,email});
+}
+async function doLogin(email,pass){
+  const j=await authFetch("/auth/v1/token?grant_type=password",{email,password:pass});
+  storeSession(j,email);
+}
+async function doSignup(email,pass){
+  const j=await authFetch("/auth/v1/signup",{email,password:pass});
+  if(j.access_token){ storeSession(j,email); return true; }
+  return false; // el proyecto pide confirmar el correo
+}
+async function ensureToken(){
+  let s=getSes(); if(!s) throw new Error("no-session");
+  if(Date.now()<s.exp) return s;
+  const j=await authFetch("/auth/v1/token?grant_type=refresh_token",{refresh_token:s.refresh});
+  storeSession(j,s.email);
+  return getSes();
+}
+function mergeStudents(local,remote){
+  const m=new Map();
+  [...local,...remote].forEach(s=>{
+    const prev=m.get(s.id);
+    if(!prev || (s.updatedAt||0)>(prev.updatedAt||0)) m.set(s.id,s);
+  });
+  return [...m.values()];
+}
+function syncStatusText(){
+  if(!getCfg()) return "Sin sincronización — los datos quedan solo en este dispositivo";
+  if(!getSes()) return "Sincronización: falta iniciar sesión";
+  const st=state.syncStatus;
+  if(st==="sync") return "Sincronizando…";
+  if(st==="offline") return "Sin conexión — trabajando offline; se sincroniza al volver internet";
+  if(st==="error") return "No se pudo sincronizar"+(state.syncMsg?" ("+esc(state.syncMsg)+")":"")+" — se reintenta solo";
+  if(st==="ok" && state.lastSync)
+    return "Sincronizado ✓ "+new Date(state.lastSync).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+  return "Sincronización lista";
+}
+function setStatus(st,msg){
+  state.syncStatus=st; state.syncMsg=msg||"";
+  const el=document.getElementById("syncStatus");
+  if(el) el.innerHTML=syncStatusText();
+}
+let syncTimer=null, syncing=false;
+function scheduleSync(){ clearTimeout(syncTimer); syncTimer=setTimeout(syncNow,1500); }
+
+async function syncNow(){
+  const cfg=getCfg();
+  if(!cfg){ setStatus("idle"); return; }
+  if(!getSes()){ setStatus("nologin"); return; }
+  if(!navigator.onLine){ setStatus("offline"); return; }
+  if(syncing){ scheduleSync(); return; }
+  syncing=true; setStatus("sync");
+  try{
+    const s=await ensureToken();
+    const uid_=jwtSub(s.access);
+    const h={apikey:cfg.anon, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+    const before=JSON.stringify({a:state.students,b:state.catalog});
+    const r=await fetch(cfg.url+"/rest/v1/cuaderno?select=data",{headers:h});
+    if(!r.ok) throw new Error("lectura "+r.status);
+    const rows=await r.json();
+    const rd=(rows[0]&&rows[0].data)?rows[0].data:{};
+    const remote=Array.isArray(rd.students)?rd.students:[];
+    const merged=mergeStudents(state.students,remote);
+    if(rd.catalog && Array.isArray(rd.catalog.subjects) &&
+       (rd.catalog.updatedAt||0) > (state.catalog.updatedAt||0))
+      state.catalog=rd.catalog;
+    const up=await fetch(cfg.url+"/rest/v1/cuaderno",{method:"POST",
+      headers:{...h, Prefer:"resolution=merge-duplicates"},
+      body:JSON.stringify([{user_id:uid_, data:{students:merged, catalog:state.catalog}, updated_at:new Date().toISOString()}])});
+    if(!up.ok) throw new Error("escritura "+up.status);
+    state.students=merged;
+    try{ localStorage.setItem(KEY, JSON.stringify({students:merged, catalog:state.catalog})); }catch(e){}
+    state.lastSync=Date.now();
+    setStatus("ok");
+    // re-dibujar solo si la nube trajo cambios (para no interrumpir si estás escribiendo)
+    if(JSON.stringify({a:state.students,b:state.catalog})!==before && state.view!=="sync" && state.view!=="catalog") render();
+  }catch(e){
+    if(String(e.message).includes("no-session")||String(e.message).toLowerCase().includes("refresh")){
+      setSes(null); setStatus("nologin");
+    }
+    else if(!navigator.onLine) setStatus("offline");
+    else setStatus("error", e.message);
+  }finally{ syncing=false; }
+}
+window.addEventListener("online", ()=>syncNow());
+window.addEventListener("offline", ()=>setStatus("offline"));
+setInterval(()=>{ if(getCfg()&&getSes()) syncNow(); }, 5*60*1000);
+
+function syncMsgShow(t,ok){
+  const el=document.getElementById("syncFormMsg");
+  if(el){ el.textContent=t; el.style.color = ok ? "var(--green)" : "var(--red)"; }
+}
+
+/* ============ eventos ============ */
+document.addEventListener("click", (e)=>{
+  const el = e.target.closest("[data-a]"); if(!el) return;
+  const a = el.dataset.a, s = sel();
+  if(a==="nav-tablero"){ state.view="tablero"; state.selId=null; }
+  else if(a==="nav-lista"){ state.view="lista"; state.selId=null; }
+  else if(a==="nav-sync"){ state.view="sync"; state.selId=null; }
+  else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; }
+  else if(a==="cat-add-career"){
+    const v=(document.getElementById("new-career").value||"").trim(); if(!v) return;
+    if(!state.catalog.careers.includes(v)) state.catalog.careers.push(v);
+    touchCatalog(); return;
+  }
+  else if(a==="cat-del-career"){ state.catalog.careers.splice(+el.dataset.i,1); touchCatalog(); return; }
+  else if(a==="cat-add-subject"){
+    const v=(document.getElementById("new-subject").value||"").trim(); if(!v) return;
+    const m={id:uid(), name:v, units:[]};
+    state.catalog.subjects.push(m); state.editSubjectId=m.id;
+    touchCatalog(); return;
+  }
+  else if(a==="cat-edit-subject"){ state.editSubjectId=el.dataset.id; }
+  else if(a==="cat-del-subject"){
+    state.catalog.subjects=state.catalog.subjects.filter(m=>m.id!==el.dataset.id);
+    touchCatalog(); return;
+  }
+  else if(a==="cat-close-edit"){ state.editSubjectId=null; }
+  else if(a==="cat-add-unit"){
+    const v=(document.getElementById("new-unit").value||"").trim(); if(!v) return;
+    const m=subjById(state.editSubjectId); if(!m) return;
+    if(!m.units.includes(v)) m.units.push(v);
+    touchCatalog(); return;
+  }
+  else if(a==="cat-del-unit"){
+    const m=subjById(state.editSubjectId); if(!m) return;
+    m.units.splice(+el.dataset.i,1); touchCatalog(); return;
+  }
+  else if(a==="sync-save-cfg"){
+    const url=(document.getElementById("cfg-url").value||"").trim().replace(/\/+$/,"");
+    const anon=(document.getElementById("cfg-anon").value||"").trim();
+    if(!url.startsWith("https://")||!anon){ syncMsgShow("Revisá los dos valores: la URL empieza con https:// y la clave no puede estar vacía."); return; }
+    setCfg({url,anon}); render(); return;
+  }
+  else if(a==="sync-login"){
+    const em=(document.getElementById("log-email").value||"").trim();
+    const pw=document.getElementById("log-pass").value||"";
+    if(!em||!pw){ syncMsgShow("Completá correo y contraseña."); return; }
+    syncMsgShow("Iniciando sesión…",true);
+    doLogin(em,pw).then(()=>{ render(); syncNow(); })
+      .catch(err=>syncMsgShow("No se pudo iniciar sesión: "+err.message));
+    return;
+  }
+  else if(a==="sync-signup"){
+    const em=(document.getElementById("log-email").value||"").trim();
+    const pw=document.getElementById("log-pass").value||"";
+    if(!em||pw.length<6){ syncMsgShow("Completá el correo y una contraseña de al menos 6 caracteres."); return; }
+    syncMsgShow("Creando cuenta…",true);
+    doSignup(em,pw).then(ok=>{
+      if(ok){ render(); syncNow(); }
+      else syncMsgShow("Cuenta creada, pero el proyecto pide confirmar el correo. Revisá tu casilla y tocá el enlace, o desactivá «Confirm email» en Supabase (INSTRUCCIONES, paso 2), y después tocá Iniciar sesión.");
+    }).catch(err=>syncMsgShow("No se pudo crear la cuenta: "+err.message));
+    return;
+  }
+  else if(a==="sync-now"){ syncMsgShow("",true); syncNow(); return; }
+  else if(a==="sync-logout"){ setSes(null); render(); return; }
+  else if(a==="sync-remove-cfg"){ setCfg(null); setSes(null); render(); return; }
+  else if(a==="open"){ state.view="detalle"; state.selId=el.dataset.id; state.tab="temas"; state.confirmDel=false; }
+  else if(a==="back"){ state.view="lista"; state.selId=null; }
+  else if(a==="new"){ state.showNew=true; }
+  else if(a==="cancel-new"){ state.showNew=false; }
+  else if(a==="create"){
+    const name=document.getElementById("n-name").value.trim();
+    if(!name){ document.getElementById("n-name").focus(); return; }
+    const st=emptyStudent();
+    st.name=name;
+    st.career=document.getElementById("n-career").value;
+    const _m=subjById(document.getElementById("n-subject").value);
+    st.subjectId=_m?_m.id:""; st.subject=_m?_m.name:"";
+    st.topics=_m?Object.fromEntries(_m.units.map(u=>[u,"pendiente"])):{};
+    st.examDate=document.getElementById("n-exam").value;
+    st.notes=document.getElementById("n-notes").value;
+    state.students.push(st); save();
+    state.showNew=false; state.view="detalle"; state.selId=st.id; state.tab="temas";
+  }
+  else if(a.startsWith("tab-")){ state.tab=a.slice(4); state.confirmDel=false; }
+  else if(a==="filter"){ state.filter=el.dataset.f; }
+  else if(a==="cycle-topic" && s){
+    const t=el.dataset.t, cur=s.topics[t]||"pendiente";
+    const next=TOPIC_CYCLE[(TOPIC_CYCLE.indexOf(cur)+1)%TOPIC_CYCLE.length];
+    update(s.id,{topics:{...s.topics,[t]:next}}); return;
+  }
+  else if(a==="cycle-sem" && s){
+    const next=SEM_CYCLE[(SEM_CYCLE.indexOf(s.semaforo||"sd")+1)%SEM_CYCLE.length];
+    update(s.id,{semaforo:next}); return;
+  }
+  else if(a==="save-session" && s){
+    const date=document.getElementById("c-date").value; if(!date) return;
+    update(s.id,{sessions:[...s.sessions,{id:uid(),date,
+      topic:document.getElementById("c-topic").value,
+      tarea:document.getElementById("c-tarea").value,
+      note:document.getElementById("c-note").value}]}); return;
+  }
+  else if(a==="del-session" && s){
+    update(s.id,{sessions:s.sessions.filter(x=>x.id!==el.dataset.id)}); return;
+  }
+  else if(a==="save-sim" && s){
+    const date=document.getElementById("s-date").value; if(!date) return;
+    update(s.id,{simulacros:[...s.simulacros,{id:uid(),date,
+      grade:document.getElementById("s-grade").value,
+      note:document.getElementById("s-note").value}]}); return;
+  }
+  else if(a==="del-sim" && s){
+    update(s.id,{simulacros:s.simulacros.filter(x=>x.id!==el.dataset.id)}); return;
+  }
+  else if(a==="ask-del"){ state.confirmDel=true; }
+  else if(a==="cancel-del"){ state.confirmDel=false; }
+  else if(a==="confirm-del" && s){
+    state.view="lista"; state.confirmDel=false;
+    const id=s.id; state.selId=null;
+    update(id,{deleted:true}); return;
+  }
+  else if(a==="export"){
+    const blob=new Blob([JSON.stringify({students:state.students},null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url; link.download=`seguimiento-estudiantes-${today()}.json`;
+    link.click(); URL.revokeObjectURL(url); return;
+  }
+  else return;
+  render();
+});
+
+document.addEventListener("change",(e)=>{
+  const cf=e.target.closest("[data-cf]");
+  if(cf && cf.dataset.cf==="subj-name"){
+    const m=subjById(state.editSubjectId); if(!m) return;
+    const v=cf.value.trim(); if(!v) return;
+    m.name=v;
+    state.students=state.students.map(x=>x.subjectId===m.id?{...x,subject:v}:x);
+    touchCatalog(); return;
+  }
+  const el=e.target.closest("[data-f]"); if(!el) return;
+  const s=sel(); if(!s) return;
+  if(el.dataset.f==="subjectId"){
+    const m=subjById(el.value);
+    update(s.id,{subjectId:el.value, subject:m?m.name:s.subject});
+    return;
+  }
+  update(s.id,{[el.dataset.f]:el.value});
+});
+
+load(); render();
+syncNow();
+
+/* PWA: registrar el service worker cuando la app está publicada (no en file://) */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
