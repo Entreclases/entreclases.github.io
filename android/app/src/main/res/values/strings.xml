@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cuaderno de seguimiento</string>
+    <string name="title_activity_main">Cuaderno de seguimiento</string>
+    <string name="package_name">com.manugandini.cuadernoseguimiento</string>
+    <string name="custom_url_scheme">com.manugandini.cuadernoseguimiento</string>
+</resources>

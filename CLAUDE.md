@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-"Cuaderno de seguimiento" — a single-page PWA (in Spanish) for a math tutor to track students: exam dates, topic progress, class logs, and mock-exam ("simulacro") results. No backend server of its own; optional cross-device sync goes directly to a user-configured Supabase project. It also ships as a desktop app via Tauri (see "Desktop packaging (Tauri)" below).
+"Cuaderno de seguimiento" — a single-page PWA (in Spanish) for a math tutor to track students: exam dates, topic progress, class logs, and mock-exam ("simulacro") results. No backend server of its own; optional cross-device sync goes directly to a user-configured Supabase project. It also ships as a desktop app via Tauri (see "Desktop packaging (Tauri)" below) and, in progress, as an Android app via Capacitor (see "Android packaging (Capacitor)" below).
 
 There is no build system, no package manager, and no dependencies for the web app itself. The entire app is `web/index.html` (HTML + CSS + vanilla JS in inline `<style>`/`<script>` tags). `web/sw.js` is the service worker, `web/manifest.webmanifest` is the PWA manifest, `web/icon-*.png` are app icons. These files live in `web/` (rather than the repo root) so that `src-tauri/`'s `frontendDist` can point at a directory containing only the deployable web assets, without sweeping in `node_modules/`, `.git/`, or `src-tauri/target/`.
 
@@ -26,6 +26,14 @@ There is no build, lint, or test tooling for the web app.
 - `npm run tauri build` to produce an installable bundle.
 - `window.__TAURI__` (injected by Tauri) and `window.Capacitor` (injected by Capacitor, if ever added) are detected via `IS_NATIVE` near the top of `web/index.html`'s script — used to skip service worker registration, since a native shell resolves local files itself and doesn't need it.
 - If you regenerate icons from `web/icon-512.png`, run `npx tauri icon web/icon-512.png` from the repo root; it writes into `src-tauri/icons/`.
+
+## Android packaging (Capacitor)
+
+`android/` wraps `web/` as a native Android app via Capacitor. `capacitor.config.json` at the repo root sets `webDir: "web"` — same source files as the PWA and the Tauri build, no separate copy to maintain by hand.
+
+- Capacitor does not serve `web/` live like Tauri does — it **copies** it into `android/app/src/main/assets/public` (gitignored, regenerated) whenever you run `npx cap sync` or `npx cap copy android`. Run that after editing anything in `web/` and before rebuilding the Android app; otherwise the APK ships stale assets.
+- `window.Capacitor` (checked by `IS_NATIVE` in `web/index.html`, alongside `window.__TAURI__`) makes the service worker registration skip itself inside the Android app too.
+- Building an actual APK needs Android Studio (JDK + Android SDK) installed and configured — not yet present in this environment. See the chat history / project notes for the exact remaining steps.
 
 ## Architecture
 
