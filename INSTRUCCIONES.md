@@ -98,13 +98,26 @@ contenido de `web/` en tu dirección pública. Solo falta activar esto una vez.
 
 ### Paso 3.1 — Instalar
 
-**En el celular (Android):** abrí tu dirección en **Chrome** → menú (⋮) →
-**"Instalar aplicación"** (o "Agregar a pantalla principal"). Queda el ícono
-como cualquier app y abre a pantalla completa.
+La dirección del Paso 2.1 (`https://manugandini53-design.github.io/cuaderno-seguimiento/`)
+ahora es la página de presentación del producto, no la app instalable — la app
+en sí vive en la subdirección **`.../cuaderno-seguimiento/app/`** (tocá el botón
+"Abrir la aplicación web" desde esa página, o entrá directo a esa URL). Usá
+siempre esa dirección con `/app/` para instalar — instalar desde la raíz no
+funciona.
 
-**En la PC (Windows 11):** abrí la misma dirección en **Chrome o Edge** →
-en la barra de direcciones aparece un ícono de instalar (monitor con flecha)
-→ **Instalar**. Queda en el menú Inicio y podés anclarla a la barra de tareas.
+**En el celular (Android):** abrí esa dirección (`.../app/`) en **Chrome** →
+menú (⋮) → **"Instalar aplicación"** (o "Agregar a pantalla principal"). Queda
+el ícono como cualquier app y abre a pantalla completa.
+
+**En la PC (Windows 11):** abrí la misma dirección (`.../app/`) en **Chrome o
+Edge** → en la barra de direcciones aparece un ícono de instalar (monitor con
+flecha) → **Instalar**. Queda en el menú Inicio y podés anclarla a la barra de
+tareas.
+
+**Si ya la habías instalado antes** desde la dirección raíz (sin `/app/`):
+desinstalá esa versión vieja (clic derecho sobre el ícono → Desinstalar) y
+volvé a instalarla desde `.../app/` — la instalación anterior va a quedar
+mostrando la página de presentación en vez de la app.
 
 ### Paso 3.2 — Conectar la sincronización (en cada dispositivo)
 

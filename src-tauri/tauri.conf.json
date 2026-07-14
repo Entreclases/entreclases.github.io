@@ -4,7 +4,7 @@
   "version": "1.1.0",
   "identifier": "com.manugandini.cuadernoseguimiento",
   "build": {
-    "frontendDist": "../web"
+    "frontendDist": "../web/app"
   },
   "app": {
     "withGlobalTauri": true,
