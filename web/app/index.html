@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cuaderno de seguimiento — clases de matemática</title>
+<title>Cuaderno de seguimiento</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#1E2B4D">
@@ -115,8 +115,15 @@ const SES_KEY = "tutoria-sync-ses";   // sesión iniciada (tokens)
 // `cuaderno` (cada cuenta solo puede leer/escribir su propia fila; ver supabase-setup.sql).
 const SUPA_URL = "https://iwxsntxkqfqucxhwlfdv.supabase.co";
 const SUPA_ANON_KEY = "sb_publishable_S0zs9qmIRB5RWNZceO5gCg_vI7Hxx1D";
+const APP_VERSION = "1.2.0";
+const ADMIN_EMAIL = "manugandini53@gmail.com";
 // Empaquetado nativo: Tauri inyecta window.__TAURI__, Capacitor inyecta window.Capacitor
 const IS_NATIVE = !!(window.__TAURI__ || window.Capacitor);
+function detectPlatform(){
+  if(window.__TAURI__) return "Windows";
+  if(window.Capacitor) return "Android";
+  return "Web";
+}
 const TOPICS = ["Trigonometría","Funciones","Matrices","Determinantes","Vectores","Límites","Derivadas","Integrales"];
 const TOPIC_CYCLE = ["pendiente","visto","practica","parcial","noentra"];
 const TOPIC_META = {
@@ -163,7 +170,9 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
               view:"tablero", selId:null, filter:"activo", tab:"temas",
               showNew:false, confirmDel:false, saveErr:false,
               syncStatus:"idle", syncMsg:"", lastSync:null,
-              authMode:"login", authEmail:"", recovery:null };
+              authMode:"login", authEmail:"", recovery:null,
+              reportMsg:"", reportStatus:"idle", reportError:"",
+              reportes:[], reportFilter:"pendiente", reportesLoaded:false, reportesError:"" };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
@@ -417,7 +426,7 @@ function vAuth(){
   const mode = state.authMode||"login", isLogin = mode==="login";
   return `<div style="max-width:360px;margin:64px auto 0">
     <div style="text-align:center;margin-bottom:20px">
-      <div class="eyebrow">Clases particulares · matemática</div>
+      <div class="eyebrow">Clases particulares</div>
       <h1 style="font-size:22px">Cuaderno de seguimiento</h1>
     </div>
     <div class="formcard">
@@ -439,7 +448,7 @@ function vAuth(){
 function vSetPassword(){
   return `<div style="max-width:360px;margin:64px auto 0">
     <div style="text-align:center;margin-bottom:20px">
-      <div class="eyebrow">Clases particulares · matemática</div>
+      <div class="eyebrow">Clases particulares</div>
       <h1 style="font-size:22px">Elegí una contraseña nueva</h1>
     </div>
     <div class="formcard">
@@ -463,7 +472,18 @@ function vCuenta(){
       <button class="chip" data-a="sync-now">Sincronizar ahora</button>
       <button class="danger" data-a="auth-logout">Cerrar sesión</button>
     </div>
+  </div>
+  <div class="formcard"><div class="ftitle">Reportar un problema</div>
+    <div class="field"><textarea id="report-msg" placeholder="Contanos qué pasó — cuanto más detalle, mejor.">${esc(state.reportMsg||"")}</textarea></div>
+    <button class="primary" style="margin:10px 0 0;margin-left:0" data-a="send-report" ${state.reportStatus==="sending"?"disabled":""}>Enviar reporte</button>
+    <div class="hint" id="reportMsg" style="margin-top:10px;min-height:16px;color:${state.reportStatus==="error"?"var(--red)":state.reportStatus==="ok"?"var(--green)":"var(--faint)"}">${esc(reportStatusText())}</div>
   </div>`;
+}
+function reportStatusText(){
+  if(state.reportStatus==="sending") return "Enviando…";
+  if(state.reportStatus==="ok") return "¡Gracias! Recibimos tu reporte.";
+  if(state.reportStatus==="error") return state.reportError||"No se pudo enviar el reporte.";
+  return "";
 }
 
 function vCatalog(){
@@ -504,6 +524,34 @@ function vCatalog(){
   return h;
 }
 
+function fmtDateTime(ts){
+  if(!ts) return "—";
+  try{ return new Date(ts).toLocaleString("es-AR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }
+  catch(e){ return "—"; }
+}
+function vReportes(){
+  const filter = state.reportFilter||"pendiente";
+  const list = (state.reportes||[]).filter(r=>filter==="todos"||r.estado===filter);
+  let h = `<button class="back" data-a="nav-tablero">← Volver al tablero</button>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    ${["pendiente","resuelto","todos"].map(f=>
+      `<button class="chip ${filter===f?"on":""}" data-a="reportes-filter" data-f="${f}">${f==="todos"?"Todos":f==="pendiente"?"Pendientes":"Resueltos"}</button>`
+    ).join("")}
+  </div>`;
+  if(state.reportesError) h += `<div class="saveerr">${esc(state.reportesError)}</div>`;
+  else if(!state.reportesLoaded) h += `<div class="empty">Cargando reportes…</div>`;
+  else if(list.length===0) h += `<div class="empty">No hay reportes en esta categoría.</div>`;
+  else h += list.map(r=>`<div class="log" style="align-items:flex-start">
+      <div class="body">
+        <div style="font-weight:600">${esc(r.email||"—")}
+          <span class="hint">· ${esc(r.plataforma||"—")} · v${esc(r.version||"—")} · ${fmtDateTime(r.created_at)}</span></div>
+        <div class="note">${esc(r.mensaje||"")}</div>
+      </div>
+      <button class="chip ${r.estado==="resuelto"?"on":""}" data-a="toggle-reporte" data-id="${esc(r.id)}">${r.estado==="resuelto"?"Resuelto ✓":"Marcar resuelto"}</button>
+    </div>`).join("");
+  return h;
+}
+
 function vModal(){
   return `<div class="overlay"><div class="modal">
     <div class="ftitle" style="font-size:16px">Nuevo estudiante</div>
@@ -536,8 +584,10 @@ function render(){
     return;
   }
   const activos = alive().filter(s=>s.status==="activo").length;
+  const ses = getSes();
+  const isAdmin = !!(ses && ses.email===ADMIN_EMAIL);
   let h = `<div class="header"><div>
-      <div class="eyebrow">Clases particulares · matemática</div>
+      <div class="eyebrow">Clases particulares</div>
       <h1>Cuaderno de seguimiento</h1></div>
     <div class="tabs">
       ${tabbtn("nav-tablero",state.view==="tablero","Tablero")}
@@ -548,6 +598,7 @@ function render(){
     <span style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="chip ${state.view==="catalog"?"on":""}" data-a="nav-catalog">Materias y carreras</button>
       <button class="chip ${state.view==="cuenta"?"on":""}" data-a="nav-cuenta">Cuenta</button>
+      ${isAdmin?`<button class="chip ${state.view==="reportes"?"on":""}" data-a="nav-reportes">Reportes</button>`:""}
     </span>
   </div>`;
   if(state.saveErr) h += `<div class="saveerr">No se pudo guardar el último cambio. Descargá una copia de respaldo por las dudas.</div>`;
@@ -555,6 +606,7 @@ function render(){
   if(state.view==="lista") h += vLista();
   if(state.view==="detalle") h += vDetalle();
   if(state.view==="cuenta") h += vCuenta();
+  if(state.view==="reportes") h += isAdmin ? vReportes() : vTablero();
   if(state.view==="catalog") h += vCatalog();
   if(state.showNew) h += vModal();
   h += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
@@ -717,6 +769,41 @@ window.addEventListener("online", ()=>syncNow());
 window.addEventListener("offline", ()=>setStatus("offline"));
 setInterval(()=>{ if(getSes()) syncNow(); }, 5*60*1000);
 
+/* ============ reportar un problema / panel admin ============ */
+async function sendReport(msg){
+  const ses=getSes(); if(!ses) throw new Error("no-session");
+  const s=await ensureToken();
+  const uid_=jwtSub(s.access);
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
+  const r=await fetch(SUPA_URL+"/rest/v1/reportes",{method:"POST", headers:h,
+    body:JSON.stringify([{user_id:uid_, email:ses.email, mensaje:msg, plataforma:detectPlatform(), version:APP_VERSION}])});
+  if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.msg||("error "+r.status)); }
+}
+async function loadReportes(){
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const r=await fetch(SUPA_URL+"/rest/v1/reportes?select=*&order=created_at.desc",{headers:h});
+    if(!r.ok) throw new Error("error "+r.status);
+    state.reportes=await r.json();
+    state.reportesLoaded=true; state.reportesError="";
+  }catch(e){
+    state.reportesError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar los reportes.";
+  }
+  render();
+}
+async function toggleReporte(id,current){
+  const next = current==="resuelto" ? "pendiente" : "resuelto";
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
+    const r=await fetch(SUPA_URL+"/rest/v1/reportes?id=eq."+encodeURIComponent(id),{method:"PATCH", headers:h, body:JSON.stringify({estado:next})});
+    if(!r.ok) throw new Error("error "+r.status);
+    state.reportes=state.reportes.map(x=>x.id===id?{...x,estado:next}:x);
+    render();
+  }catch(e){ /* se puede reintentar tocando el botón de nuevo */ }
+}
+
 function authMsgShow(t,ok){
   const el=document.getElementById("authMsg");
   if(el){ el.textContent=t; el.style.color = ok ? "var(--green)" : "var(--red)"; }
@@ -730,6 +817,16 @@ document.addEventListener("click", (e)=>{
   else if(a==="nav-lista"){ state.view="lista"; state.selId=null; }
   else if(a==="nav-cuenta"){ state.view="cuenta"; state.selId=null; }
   else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; }
+  else if(a==="nav-reportes"){
+    state.view="reportes"; state.selId=null; state.reportesLoaded=false; state.reportesError="";
+    loadReportes();
+  }
+  else if(a==="reportes-filter"){ state.reportFilter=el.dataset.f; }
+  else if(a==="toggle-reporte"){
+    const r=(state.reportes||[]).find(x=>String(x.id)===el.dataset.id);
+    if(r) toggleReporte(r.id, r.estado);
+    return;
+  }
   else if(a==="cat-add-career"){
     const v=(document.getElementById("new-career").value||"").trim(); if(!v) return;
     if(!state.catalog.careers.includes(v)) state.catalog.careers.push(v);
@@ -803,6 +900,21 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="sync-now"){ syncNow(); return; }
+  else if(a==="send-report"){
+    const msg=(document.getElementById("report-msg").value||"").trim();
+    state.reportMsg=msg;
+    if(!msg){ state.reportStatus="error"; state.reportError="Escribí un mensaje antes de enviar."; render(); return; }
+    if(!navigator.onLine){ state.reportStatus="error"; state.reportError="Se necesita conexión a internet para enviar el reporte."; render(); return; }
+    state.reportStatus="sending"; render();
+    sendReport(msg).then(()=>{
+      state.reportStatus="ok"; state.reportMsg=""; render();
+    }).catch(()=>{
+      state.reportStatus="error";
+      state.reportError = !navigator.onLine ? "Se necesita conexión a internet para enviar el reporte." : "No se pudo enviar el reporte. Probá de nuevo.";
+      render();
+    });
+    return;
+  }
   else if(a==="auth-logout"){ setSes(null); state.view="tablero"; render(); return; }
   else if(a==="open"){ state.view="detalle"; state.selId=el.dataset.id; state.tab="temas"; state.confirmDel=false; }
   else if(a==="back"){ state.view="lista"; state.selId=null; }
