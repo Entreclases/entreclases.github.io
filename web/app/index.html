@@ -113,6 +113,10 @@ const SES_KEY = "tutoria-sync-ses";   // sesión iniciada (tokens): cookie de se
 const EMAILS_KEY = "tutoria-remembered-emails"; // emails con los que se inició sesión con éxito en este dispositivo — no se borra al cerrar sesión
 const BACKUP_DATE_KEY = "tutoria-last-backup-date"; // fecha (YYYY-MM-DD) del último snapshot subido a cuaderno_respaldos, para hacer uno solo por día
 const MAX_BACKUPS = 15;
+const VERSION_CHECK_KEY = "tutoria-last-version-check"; // timestamp del último chequeo de versión (apps nativas)
+const VERSION_CHECK_INTERVAL_MS = 24*60*60*1000;
+const RELEASES_API = "https://api.github.com/repos/manugandini53-design/manugandini53-design.github.io/releases/latest";
+const DOWNLOADS_URL = "https://manugandini53-design.github.io/#descargas";
 // Backend de sincronización: un único proyecto Supabase para todos los usuarios de la app.
 // La anon key es pública por diseño — la seguridad la dan las políticas RLS de la tabla
 // `cuaderno` (cada cuenta solo puede leer/escribir su propia fila; ver supabase-setup.sql).
@@ -178,7 +182,8 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
               reportMsg:"", reportStatus:"idle", reportError:"",
               reportes:[], reportFilter:"pendiente", reportesLoaded:false, reportesError:"",
               backups:[], backupsLoaded:false, backupsError:"",
-              confirmRestoreId:null, restoreStatus:"idle", restoreError:"" };
+              confirmRestoreId:null, restoreStatus:"idle", restoreError:"",
+              newVersionTag:null, updateBannerDismissed:false };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
@@ -650,7 +655,15 @@ function render(){
   const activos = alive().filter(s=>s.status==="activo").length;
   const ses = getSes();
   const isAdmin = !!(ses && ses.email===ADMIN_EMAIL);
-  let h = `<div class="header"><div>
+  let h = "";
+  if(IS_NATIVE && state.newVersionTag && !state.updateBannerDismissed){
+    h += `<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;
+      background:var(--bluebg);border:1px solid #B9C6E8;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px;color:var(--blue)">
+      <span>Hay una versión nueva disponible (${esc(state.newVersionTag)}). <a href="${DOWNLOADS_URL}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">Ir a descargas</a></span>
+      <button data-a="dismiss-update-banner" title="Cerrar aviso" style="background:none;border:none;color:var(--blue);font-size:16px;line-height:1;padding:0 4px">×</button>
+    </div>`;
+  }
+  h += `<div class="header"><div>
       <div class="eyebrow">Clases particulares</div>
       <h1>Cuaderno de seguimiento</h1></div>
     <div class="tabs">
@@ -960,6 +973,34 @@ async function restoreBackup(id){
   }
 }
 
+/* ============ aviso de versión nueva (apps nativas) ============ */
+// Compara por partes numéricas en vez de string-equality para no avisar de una "versión
+// nueva" cuando el tag remoto es igual o más viejo que APP_VERSION (build local adelantado).
+function versionIsNewer(remote, current){
+  const a = String(remote||"").replace(/^v/i,"").split(".").map(n=>parseInt(n,10)||0);
+  const b = String(current||"").replace(/^v/i,"").split(".").map(n=>parseInt(n,10)||0);
+  for(let i=0;i<Math.max(a.length,b.length);i++){
+    const x=a[i]||0, y=b[i]||0;
+    if(x!==y) return x>y;
+  }
+  return false;
+}
+async function checkForNewVersion(){
+  if(!IS_NATIVE) return;
+  const last = parseInt(localStorage.getItem(VERSION_CHECK_KEY)||"0",10);
+  if(Date.now()-last < VERSION_CHECK_INTERVAL_MS) return;
+  try{
+    const r = await fetch(RELEASES_API);
+    localStorage.setItem(VERSION_CHECK_KEY, String(Date.now())); // se marca como hecho aunque r no sea ok (evita pegarle a la API si está caída/rate-limited)
+    if(!r.ok) return;
+    const j = await r.json();
+    if(j.tag_name && versionIsNewer(j.tag_name, APP_VERSION)){
+      state.newVersionTag = j.tag_name;
+      render();
+    }
+  }catch(e){ /* silencioso: sin internet o falla puntual de la API; se reintenta al otro día */ }
+}
+
 /* ============ reportar un problema / panel admin ============ */
 async function sendReport(msg){
   const ses=getSes(); if(!ses) throw new Error("no-session");
@@ -1114,6 +1155,7 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="sync-now"){ syncNow(); return; }
+  else if(a==="dismiss-update-banner"){ state.updateBannerDismissed=true; }
   else if(a==="restore-ask"){ state.confirmRestoreId=el.dataset.id; }
   else if(a==="restore-cancel"){ state.confirmRestoreId=null; }
   else if(a==="restore-confirm"){ restoreBackup(el.dataset.id); return; }
@@ -1222,6 +1264,7 @@ const _recovery = parseRecoveryHash();
 if(_recovery){ state.recovery=_recovery; history.replaceState(null,"",location.pathname+location.search); }
 load(); render();
 syncNow();
+checkForNewVersion();
 
 /* PWA: registrar el service worker cuando la app está publicada (no en file://
    ni dentro de un contenedor nativo como Tauri o Capacitor, que ya resuelven
