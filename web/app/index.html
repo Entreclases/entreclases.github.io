@@ -674,6 +674,11 @@ function getCookie(name){
 function delCookie(name){
   document.cookie = name+"=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
 }
+// Techo a la sesión web: algunos navegadores (Chrome/Edge con "continuar donde lo dejé")
+// preservan las cookies de sesión al reabrir aunque se haya cerrado el navegador entero.
+// Como eso escapa a lo que la página puede controlar, la propia app invalida la sesión
+// si pasó más de este tiempo desde el login, sin cambiar el resto del comportamiento.
+const SES_MAX_AGE_MS = 24*60*60*1000; // 24hs
 function getSes(){
   try{
     if(IS_NATIVE) return JSON.parse(localStorage.getItem(SES_KEY))||null;
@@ -683,7 +688,10 @@ function getSes(){
       const legacy = localStorage.getItem(SES_KEY);
       if(legacy){ setCookie(SES_KEY, legacy); localStorage.removeItem(SES_KEY); raw = legacy; }
     }
-    return raw ? JSON.parse(raw) : null;
+    if(!raw) return null;
+    const ses = JSON.parse(raw);
+    if(ses.loginAt && (Date.now()-ses.loginAt) > SES_MAX_AGE_MS){ delCookie(SES_KEY); return null; }
+    return ses;
   }catch(e){ return null; }
 }
 function setSes(v){
@@ -738,8 +746,10 @@ function friendlyAuthError(err){
   return "Ocurrió un error. Probá de nuevo en un momento.";
 }
 function storeSession(j,email){
+  const prev=getSes();
+  const loginAt = (prev && prev.email===email && prev.loginAt) ? prev.loginAt : Date.now();
   setSes({access:j.access_token,refresh:j.refresh_token,
-          exp:Date.now()+((j.expires_in||3600)-60)*1000,email});
+          exp:Date.now()+((j.expires_in||3600)-60)*1000,email,loginAt});
   rememberEmail(email);
 }
 function isEmailNotConfirmedError(err){
