@@ -111,6 +111,8 @@
 const KEY = "tutoria-seguimiento-v1";
 const SES_KEY = "tutoria-sync-ses";   // sesión iniciada (tokens): cookie de sesión en la web (se borra al cerrar el navegador), localStorage en apps nativas (Tauri/Capacitor)
 const EMAILS_KEY = "tutoria-remembered-emails"; // emails con los que se inició sesión con éxito en este dispositivo — no se borra al cerrar sesión
+const BACKUP_DATE_KEY = "tutoria-last-backup-date"; // fecha (YYYY-MM-DD) del último snapshot subido a cuaderno_respaldos, para hacer uno solo por día
+const MAX_BACKUPS = 15;
 // Backend de sincronización: un único proyecto Supabase para todos los usuarios de la app.
 // La anon key es pública por diseño — la seguridad la dan las políticas RLS de la tabla
 // `cuaderno` (cada cuenta solo puede leer/escribir su propia fila; ver supabase-setup.sql).
@@ -174,7 +176,9 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
               authMode:"login", authEmail:"", recovery:null,
               pendingConfirmEmail:null, confirmStatus:"idle", confirmError:"",
               reportMsg:"", reportStatus:"idle", reportError:"",
-              reportes:[], reportFilter:"pendiente", reportesLoaded:false, reportesError:"" };
+              reportes:[], reportFilter:"pendiente", reportesLoaded:false, reportesError:"",
+              backups:[], backupsLoaded:false, backupsError:"",
+              confirmRestoreId:null, restoreStatus:"idle", restoreError:"" };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
@@ -501,6 +505,10 @@ function vCuenta(){
       <button class="danger" data-a="auth-logout">Cerrar sesión</button>
     </div>
   </div>
+  <div class="formcard"><div class="ftitle">Respaldos automáticos</div>
+    <div class="hint" style="margin-bottom:10px">Se guarda una copia completa una vez por día, en la primera sincronización. Se conservan las últimas ${MAX_BACKUPS}. Esto no reemplaza la copia manual (.json) del tablero — conviven.</div>
+    ${vBackupsList()}
+  </div>
   <div class="formcard"><div class="ftitle">Reportar un problema</div>
     <div class="field"><textarea id="report-msg" placeholder="Contanos qué pasó — cuanto más detalle, mejor.">${esc(state.reportMsg||"")}</textarea></div>
     <button class="primary" style="margin:10px 0 0;margin-left:0" data-a="send-report" ${state.reportStatus==="sending"?"disabled":""}>Enviar reporte</button>
@@ -512,6 +520,30 @@ function reportStatusText(){
   if(state.reportStatus==="ok") return "¡Gracias! Recibimos tu reporte.";
   if(state.reportStatus==="error") return state.reportError||"No se pudo enviar el reporte.";
   return "";
+}
+
+function vBackupsList(){
+  if(state.backupsError) return `<div class="saveerr">${esc(state.backupsError)}</div>`;
+  if(!state.backupsLoaded) return `<div class="empty">Cargando respaldos…</div>`;
+  const list = state.backups||[];
+  if(list.length===0) return `<div class="empty">Todavía no hay respaldos guardados. El primero se crea en la próxima sincronización.</div>`;
+  let h = list.map(b=>{
+    const n = (b.data && Array.isArray(b.data.students)) ? b.data.students.filter(x=>!x.deleted).length : 0;
+    const bid = String(b.id);
+    const confirming = state.confirmRestoreId===bid;
+    return `<div class="log" style="align-items:center;flex-wrap:wrap">
+      <div class="body">${fmtDateTime(b.created_at)}<div class="note">${n} estudiante${n===1?"":"s"}</div></div>
+      ${!confirming
+        ? `<button class="chip" data-a="restore-ask" data-id="${esc(bid)}">Restaurar</button>`
+        : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:100%">
+            <span style="font-size:12.5px;color:var(--red)">Reemplaza tus datos actuales por los de este respaldo (antes se guarda uno extra del estado de ahora). ¿Confirmás?</span>
+            <button class="danger" data-a="restore-confirm" data-id="${esc(bid)}" ${state.restoreStatus==="restoring"?"disabled":""}>Sí, restaurar</button>
+            <button class="chip" data-a="restore-cancel">Cancelar</button>
+          </div>`}
+    </div>`;
+  }).join("");
+  if(state.restoreStatus==="error") h += `<div class="saveerr" style="margin-top:8px">${esc(state.restoreError)}</div>`;
+  return h;
 }
 
 function vCatalog(){
@@ -846,6 +878,7 @@ async function syncNow(){
     setStatus("ok");
     // re-dibujar solo si la nube trajo cambios (para no interrumpir si estás escribiendo)
     if(JSON.stringify({a:state.students,b:state.catalog})!==before && state.view!=="cuenta" && state.view!=="catalog") render();
+    maybeSnapshotBackup(uid_, s);
   }catch(e){
     // offline se chequea primero: una falla de red (incluido el refresh del token) mientras
     // no hay internet nunca debe cerrar la sesión ni bloquear la app — solo degrada el estado.
@@ -859,6 +892,73 @@ async function syncNow(){
 window.addEventListener("online", ()=>syncNow());
 window.addEventListener("offline", ()=>setStatus("offline"));
 setInterval(()=>{ if(getSes()) syncNow(); }, 5*60*1000);
+
+/* ============ respaldos automáticos con historial ============ */
+// Un snapshot completo por día (primera sync exitosa del día), silencioso; se guardan hasta
+// MAX_BACKUPS y se recortan los más viejos. Vive aparte de la exportación manual (.json).
+async function maybeSnapshotBackup(uid_, s){
+  if(localStorage.getItem(BACKUP_DATE_KEY) === today()) return;
+  try{
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
+    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos", {method:"POST", headers:h,
+      body:JSON.stringify([{user_id:uid_, data:{students:state.students, catalog:state.catalog}}])});
+    if(!r.ok) return; // se reintenta en la próxima sync, sin avisar al usuario
+    localStorage.setItem(BACKUP_DATE_KEY, today());
+    await trimBackups(uid_, s);
+  }catch(e){ /* silencioso */ }
+}
+async function trimBackups(uid_, s){
+  try{
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?select=id&order=created_at.desc", {headers:h});
+    if(!r.ok) return;
+    const rows=await r.json();
+    const toDelete=rows.slice(MAX_BACKUPS).map(x=>x.id);
+    if(!toDelete.length) return;
+    await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?id=in.("+toDelete.map(id=>encodeURIComponent(id)).join(",")+")",
+      {method:"DELETE", headers:h});
+  }catch(e){ /* silencioso */ }
+}
+async function loadBackups(){
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?select=id,created_at,data&order=created_at.desc", {headers:h});
+    if(!r.ok) throw new Error("error "+r.status);
+    state.backups=await r.json();
+    state.backupsLoaded=true; state.backupsError="";
+  }catch(e){
+    state.backupsError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar los respaldos.";
+  }
+  render();
+}
+async function restoreBackup(id){
+  const b=(state.backups||[]).find(x=>String(x.id)===String(id));
+  if(!b) return;
+  state.restoreStatus="restoring"; state.restoreError=""; render();
+  try{
+    const s=await ensureToken();
+    const uid_=jwtSub(s.access);
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
+    // respaldo extra del estado actual antes de pisarlo
+    const safety=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos", {method:"POST", headers:h,
+      body:JSON.stringify([{user_id:uid_, data:{students:state.students, catalog:state.catalog}}])});
+    if(!safety.ok) throw new Error("no se pudo guardar el respaldo de seguridad");
+    await trimBackups(uid_, s);
+    // updatedAt fresco: es el campo que decide el merge en syncNow, así el restore
+    // gana la próxima sincronización en vez de que el estado remoto (más reciente) lo pise.
+    const now=Date.now();
+    state.students=(b.data.students||[]).map(x=>({...x, updatedAt:now}));
+    state.catalog={...(b.data.catalog||defaultCatalog()), updatedAt:now};
+    state.confirmRestoreId=null; state.restoreStatus="idle";
+    save(); syncNow(); render();
+    loadBackups();
+  }catch(e){
+    state.restoreStatus="error";
+    state.restoreError = !navigator.onLine ? "Sin conexión a internet." : "No se pudo restaurar. Probá de nuevo.";
+    render();
+  }
+}
 
 /* ============ reportar un problema / panel admin ============ */
 async function sendReport(msg){
@@ -906,7 +1006,10 @@ document.addEventListener("click", (e)=>{
   const a = el.dataset.a, s = sel();
   if(a==="nav-tablero"){ state.view="tablero"; state.selId=null; }
   else if(a==="nav-lista"){ state.view="lista"; state.selId=null; }
-  else if(a==="nav-cuenta"){ state.view="cuenta"; state.selId=null; }
+  else if(a==="nav-cuenta"){
+    state.view="cuenta"; state.selId=null; state.confirmRestoreId=null;
+    state.backupsLoaded=false; state.backupsError=""; loadBackups();
+  }
   else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; }
   else if(a==="nav-reportes"){
     state.view="reportes"; state.selId=null; state.reportesLoaded=false; state.reportesError="";
@@ -1011,6 +1114,9 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="sync-now"){ syncNow(); return; }
+  else if(a==="restore-ask"){ state.confirmRestoreId=el.dataset.id; }
+  else if(a==="restore-cancel"){ state.confirmRestoreId=null; }
+  else if(a==="restore-confirm"){ restoreBackup(el.dataset.id); return; }
   else if(a==="send-report"){
     const msg=(document.getElementById("report-msg").value||"").trim();
     state.reportMsg=msg;
