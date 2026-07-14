@@ -1,0 +1,12 @@
+{
+  "name": "cuaderno-seguimiento",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Cuaderno de seguimiento — empaquetado de escritorio con Tauri",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

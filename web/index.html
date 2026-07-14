@@ -111,6 +111,8 @@
 const KEY = "tutoria-seguimiento-v1";
 const CFG_KEY = "tutoria-sync-cfg";   // URL + clave del proyecto Supabase (por dispositivo)
 const SES_KEY = "tutoria-sync-ses";   // sesión iniciada (tokens)
+// Empaquetado nativo: Tauri inyecta window.__TAURI__, Capacitor inyecta window.Capacitor
+const IS_NATIVE = !!(window.__TAURI__ || window.Capacitor);
 const TOPICS = ["Trigonometría","Funciones","Matrices","Determinantes","Vectores","Límites","Derivadas","Integrales"];
 const TOPIC_CYCLE = ["pendiente","visto","practica","parcial","noentra"];
 const TOPIC_META = {
@@ -813,8 +815,10 @@ document.addEventListener("change",(e)=>{
 load(); render();
 syncNow();
 
-/* PWA: registrar el service worker cuando la app está publicada (no en file://) */
-if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+/* PWA: registrar el service worker cuando la app está publicada (no en file://
+   ni dentro de un contenedor nativo como Tauri o Capacitor, que ya resuelven
+   los archivos locales sin necesidad de cache de service worker) */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http") && !IS_NATIVE) {
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
 </script>

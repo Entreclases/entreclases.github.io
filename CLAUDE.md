@@ -4,18 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-"Cuaderno de seguimiento" — a single-page PWA (in Spanish) for a math tutor to track students: exam dates, topic progress, class logs, and mock-exam ("simulacro") results. No backend server of its own; optional cross-device sync goes directly to a user-configured Supabase project.
+"Cuaderno de seguimiento" — a single-page PWA (in Spanish) for a math tutor to track students: exam dates, topic progress, class logs, and mock-exam ("simulacro") results. No backend server of its own; optional cross-device sync goes directly to a user-configured Supabase project. It also ships as a desktop app via Tauri (see "Desktop packaging (Tauri)" below).
 
-There is no build system, no package manager, and no dependencies. The entire app is `index.html` (HTML + CSS + vanilla JS in inline `<style>`/`<script>` tags). `sw.js` is the service worker, `manifest.webmanifest` is the PWA manifest, `icon-*.png` are app icons.
+There is no build system, no package manager, and no dependencies for the web app itself. The entire app is `web/index.html` (HTML + CSS + vanilla JS in inline `<style>`/`<script>` tags). `web/sw.js` is the service worker, `web/manifest.webmanifest` is the PWA manifest, `web/icon-*.png` are app icons. These files live in `web/` (rather than the repo root) so that `src-tauri/`'s `frontendDist` can point at a directory containing only the deployable web assets, without sweeping in `node_modules/`, `.git/`, or `src-tauri/target/`.
 
 ## Running / testing
 
-There is no build, lint, or test tooling in this repo.
+There is no build, lint, or test tooling for the web app.
 
-- Open `index.html` directly in a browser to run the app. `localStorage` and rendering work over `file://`.
-- The service worker only registers over `http(s)://` (see the guard at the bottom of `index.html`), so to exercise offline/PWA/caching behavior, serve the directory with any static file server (e.g. `python -m http.server`) rather than opening the file directly.
-- After editing `sw.js`, bump `CACHE` (currently `"cuaderno-v3"`) — the service worker only picks up new/changed files on install, and stale caches are only evicted for keys that don't match `CACHE`.
+- Open `web/index.html` directly in a browser to run the app. `localStorage` and rendering work over `file://`.
+- The service worker only registers over `http(s)://` and never inside Tauri/Capacitor (see `IS_NATIVE` and the guard at the bottom of `web/index.html`), so to exercise offline/PWA/caching behavior, serve the `web/` directory with any static file server (e.g. `python -m http.server`) rather than opening the file directly.
+- After editing `web/sw.js`, bump `CACHE` (currently `"cuaderno-v3"`) — the service worker only picks up new/changed files on install, and stale caches are only evicted for keys that don't match `CACHE`.
 - Manual testing only: exercise flows in the browser (create/edit/delete a student, cycle topic/semaforo state, log a class/simulacro, export/import JSON, and — if testing sync — the Supabase config/login flow).
+
+## Desktop packaging (Tauri)
+
+`src-tauri/` wraps `web/` as a native Windows/macOS/Linux app — no bundler, no build step for the web files, which remain the single source of truth. `src-tauri/tauri.conf.json` sets `build.frontendDist` to `../web` directly (no `devUrl`, no `beforeDevCommand`/`beforeBuildCommand`).
+
+- `npm install` once to fetch `@tauri-apps/cli` locally (dev dependency only, no bundler for the app code).
+- `npm run tauri dev` to run the desktop app against the live files in `web/`.
+- `npm run tauri build` to produce an installable bundle.
+- `window.__TAURI__` (injected by Tauri) and `window.Capacitor` (injected by Capacitor, if ever added) are detected via `IS_NATIVE` near the top of `web/index.html`'s script — used to skip service worker registration, since a native shell resolves local files itself and doesn't need it.
+- If you regenerate icons from `web/icon-512.png`, run `npx tauri icon web/icon-512.png` from the repo root; it writes into `src-tauri/icons/`.
 
 ## Architecture
 
