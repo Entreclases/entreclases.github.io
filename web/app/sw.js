@@ -1,5 +1,5 @@
 /* Cuaderno de seguimiento — funcionamiento sin conexión */
-const CACHE = "cuaderno-v13";
+const CACHE = "cuaderno-v14";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
