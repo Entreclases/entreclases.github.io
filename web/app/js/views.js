@@ -447,6 +447,7 @@ function vEstadisticas(){
     : `<div class="empty">Sin simulacros recientes.</div>`;
 
   h += vAula(grupo);
+  h += vTuActividad();
   return h;
 }
 
@@ -503,6 +504,74 @@ function vAula(grupo){
 
   if(resto>0) h += `<button class="chip" data-a="nav-lista" style="margin-top:12px">y ${resto} más — ver en la Lista</button>`;
 
+  return h;
+}
+
+// Barras horizontales con label visible (a diferencia de barRow, pensada para series
+// cronológicas): útil para categorías con nombre propio, como materias.
+function hbarList(dataset){
+  const max=Math.max(1, ...dataset.map(d=>d.v));
+  return dataset.map(d=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <div style="width:130px;flex-shrink:0;font-size:12.5px;color:var(--muted);white-space:nowrap;
+      overflow:hidden;text-overflow:ellipsis" title="${esc(d.label)}">${esc(d.label)}</div>
+    <div style="flex:1;background:var(--soft);border-radius:4px;overflow:hidden;height:14px">
+      <div style="height:100%;width:${Math.max(2,Math.round(d.v/max*100))}%;background:var(--ink);border-radius:4px"></div>
+    </div>
+    <div style="width:22px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted)">${d.v}</div>
+  </div>`).join("");
+}
+
+// "Tu actividad": independiente de la materia elegida arriba — mira todo state.students.
+function vTuActividad(){
+  const students = alive();
+  const sessions = students.flatMap(s=>(s.sessions||[]).map(c=>({...c, studentId:s.id})));
+
+  const weekBuckets=Array.from({length:8},()=>0);
+  const monthBuckets=Array.from({length:6},()=>0);
+  const monthStudentSets=Array.from({length:6},()=>new Set());
+  let hechas=0, intentadas=0, no=0;
+
+  sessions.forEach(c=>{
+    if(!c.date) return;
+    const da=-daysTo(c.date); if(da<0) return; // clases con fecha futura (no debería pasar): se ignoran
+    const wi=Math.floor(da/7); if(wi>=0 && wi<8) weekBuckets[wi]++;
+    const mi=Math.floor(da/30);
+    if(mi>=0 && mi<6){ monthBuckets[mi]++; monthStudentSets[mi].add(c.studentId); }
+    if(da<=30){
+      if(c.tarea==="hecha") hechas++;
+      else if(c.tarea==="intentada") intentadas++;
+      else if(c.tarea==="no") no++;
+    }
+  });
+
+  const weekLabels=Array.from({length:8},(_,i)=>i===0?"Esta semana":`Hace ${i} semana${i===1?"":"s"}`);
+  const monthLabels=Array.from({length:6},(_,i)=>i===0?"Este mes":`Hace ${i} mes${i===1?"":"es"}`);
+  const semanaSet=weekBuckets.map((v,i)=>({label:weekLabels[i], v})).reverse();
+  const mesSet=monthBuckets.map((v,i)=>({label:monthLabels[i], v})).reverse();
+  const alumnosMesSet=monthStudentSets.map((set,i)=>({label:monthLabels[i], v:set.size})).reverse();
+
+  const activos = students.filter(s=>s.status==="activo");
+  const porMateria={};
+  activos.forEach(s=>{
+    const m = s.subjectId ? subjById(s.subjectId) : null;
+    const nombre = m ? m.name : (s.subject||"Materia s/d");
+    porMateria[nombre]=(porMateria[nombre]||0)+1;
+  });
+  const materiasSet = Object.entries(porMateria).map(([label,v])=>({label,v})).sort((a,b)=>b.v-a.v);
+
+  const totalTarea = hechas+intentadas+no;
+  const tasaTarea = totalTarea ? hechas/totalTarea*100 : null;
+
+  let h = `<div class="stitle" style="margin-top:30px">Tu actividad</div>`;
+  h += `<div class="stitle">Clases dadas por semana (últimas 8)</div>` + barRow(semanaSet);
+  h += `<div class="stitle">Clases dadas por mes (últimos 6)</div>` + barRow(mesSet);
+  h += `<div class="stitle">Alumnos activos por mes</div>` + barRow(alumnosMesSet);
+  h += `<div class="stitle">Materias más demandadas (alumnos activos)</div>`;
+  h += materiasSet.length ? hbarList(materiasSet) : `<div class="empty">Sin materias asignadas todavía.</div>`;
+  h += `<div class="stitle">Tareas hechas (últimos 30 días)</div>`;
+  h += tasaTarea===null
+    ? `<div class="empty">Sin clases con tarea registrada en los últimos 30 días.</div>`
+    : `<div class="stats"><div class="stat"><b>${tasaTarea.toFixed(0)}%</b><span>hechas sobre ${totalTarea} clase${totalTarea===1?"":"s"} con tarea registrada</span></div></div>`;
   return h;
 }
 
