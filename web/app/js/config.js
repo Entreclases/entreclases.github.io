@@ -69,6 +69,7 @@ function defaultCatalog(){
   return { careers:[...CAREERS],
     subjects:[{ id:"materia-ejemplo", name:"Materia de ejemplo (tocala para verla)",
       units:["Unidad 1: introducción","Unidad 2: desarrollo","Unidad 3: aplicaciones","Unidad 4: repaso final"] }],
+    packs:[],
     updatedAt:0 };
 }
 const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};

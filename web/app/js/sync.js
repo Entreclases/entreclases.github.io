@@ -76,6 +76,7 @@ async function syncNow(force){
     if(rd.catalog && Array.isArray(rd.catalog.subjects) &&
        (rd.catalog.updatedAt||0) > (state.catalog.updatedAt||0))
       catalog=rd.catalog;
+    if(!Array.isArray(catalog.packs)) catalog.packs=[];
 
     let remoteUpdatedAt=row?row.updated_at:null;
     const needsWrite = dirty || !row || !sameStudents(merged,remote) ||
@@ -203,7 +204,7 @@ async function restoreBackup(id){
     // gana la próxima sincronización en vez de que el estado remoto (más reciente) lo pise.
     const now=Date.now();
     state.students=(b.data.students||[]).map(x=>({...x, updatedAt:now}));
-    state.catalog={...(b.data.catalog||defaultCatalog()), updatedAt:now};
+    state.catalog={packs:[], ...(b.data.catalog||defaultCatalog()), updatedAt:now};
     state.confirmRestoreId=null; state.restoreStatus="idle";
     save(); syncNow(); render();
     loadBackups();

@@ -33,7 +33,8 @@ function fmtBytes(n){
 }
 
 /* ============ estado ============ */
-let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
+let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPackId:null,
+              newPackName:"", newPackSubjects:[], newPackError:"",
               view:"tablero", selId:null, filter:"activo", tab:"temas",
               listSearch:"", listSubject:"todas", listCareer:"todas", listSem:"todos",
               simTimer:null, simTimerLastMin:90, simPrefillNote:"",
@@ -55,6 +56,9 @@ const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
 function careerOptions(cur){ const l=[...state.catalog.careers]; if(cur && !l.includes(cur)) l.push(cur); return l; }
 function touchCatalog(){ state.catalog.updatedAt=Date.now(); save(); render(); }
+// packs: agrupan materias existentes para dar de alta un alumno en todas de una (ver events.js
+// "create"). Catálogos guardados antes de este campo no tienen packs — se completa acá.
+function packsContaining(subjectId){ return (state.catalog.packs||[]).filter(p=>p.subjectIds.includes(subjectId)); }
 
 const alive = () => state.students.filter(s => !s.deleted);
 
@@ -66,6 +70,7 @@ function load(){
       if(p.catalog && Array.isArray(p.catalog.careers) && Array.isArray(p.catalog.subjects))
         state.catalog = p.catalog; }
   }catch(e){}
+  if(!Array.isArray(state.catalog.packs)) state.catalog.packs=[];
   // limpiar marcas de borrado con más de 90 días (ya viajaron a todos los dispositivos)
   state.students = state.students.filter(s => !(s.deleted && (Date.now()-(s.updatedAt||0)) > 90*86400000));
 }

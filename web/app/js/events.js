@@ -57,7 +57,7 @@ document.addEventListener("click", (e)=>{
     state.view="cuenta"; state.selId=null; state.confirmRestoreId=null;
     state.backupsLoaded=false; state.backupsError=""; loadBackups();
   }
-  else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; }
+  else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; state.editPackId=null; }
   else if(a==="nav-stats"){
     state.view="stats"; state.selId=null;
     if(!subjectsWithStudents().some(m=>m.id===state.statsSubjectId)) state.statsSubjectId=defaultStatsSubjectId();
@@ -104,9 +104,10 @@ document.addEventListener("click", (e)=>{
     state.catalog.subjects.push(m); state.editSubjectId=m.id;
     touchCatalog(); return;
   }
-  else if(a==="cat-edit-subject"){ state.editSubjectId=el.dataset.id; }
+  else if(a==="cat-edit-subject"){ state.editSubjectId=el.dataset.id; state.editPackId=null; }
   else if(a==="cat-del-subject"){
     state.catalog.subjects=state.catalog.subjects.filter(m=>m.id!==el.dataset.id);
+    state.catalog.packs=(state.catalog.packs||[]).map(p=>({...p, subjectIds:p.subjectIds.filter(id=>id!==el.dataset.id)}));
     touchCatalog(); return;
   }
   else if(a==="cat-close-edit"){ state.editSubjectId=null; }
@@ -119,6 +120,33 @@ document.addEventListener("click", (e)=>{
   else if(a==="cat-del-unit"){
     const m=subjById(state.editSubjectId); if(!m) return;
     m.units.splice(+el.dataset.i,1); touchCatalog(); return;
+  }
+  else if(a==="cat-edit-pack"){ state.editPackId=el.dataset.id; state.editSubjectId=null; }
+  else if(a==="cat-del-pack"){
+    state.catalog.packs=(state.catalog.packs||[]).filter(p=>p.id!==el.dataset.id);
+    touchCatalog(); return;
+  }
+  else if(a==="cat-close-pack-edit"){ state.editPackId=null; }
+  else if(a==="pack-toggle-subject"){
+    const p=(state.catalog.packs||[]).find(x=>x.id===state.editPackId); if(!p) return;
+    const id=el.dataset.id;
+    p.subjectIds = p.subjectIds.includes(id) ? p.subjectIds.filter(x=>x!==id) : [...p.subjectIds, id];
+    touchCatalog(); return;
+  }
+  else if(a==="toggle-newpack-subject"){
+    const id=el.dataset.id;
+    const set=new Set(state.newPackSubjects||[]);
+    set.has(id) ? set.delete(id) : set.add(id);
+    state.newPackSubjects=[...set]; state.newPackError="";
+  }
+  else if(a==="cat-add-pack"){
+    const name=(document.getElementById("new-pack-name").value||"").trim();
+    const ids=state.newPackSubjects||[];
+    if(!name){ state.newPackError="Ponele un nombre al pack."; render(); return; }
+    if(ids.length<2){ state.newPackError="Elegí al menos 2 materias."; render(); return; }
+    state.catalog.packs=[...(state.catalog.packs||[]), {id:uid(), name, subjectIds:ids}];
+    state.newPackName=""; state.newPackSubjects=[]; state.newPackError="";
+    touchCatalog(); return;
   }
   else if(a==="auth-mode-login"){ state.authMode="login"; }
   else if(a==="auth-mode-signup"){ state.authMode="signup"; }
@@ -227,19 +255,42 @@ document.addEventListener("click", (e)=>{
   else if(a==="create"){
     const name=document.getElementById("n-name").value.trim();
     if(!name){ document.getElementById("n-name").focus(); return; }
-    const subjectId=document.getElementById("n-subject").value;
-    const dup=findDuplicateStudent(name,subjectId,null);
-    if(dup){ state.newStudentError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
-    const st=emptyStudent();
-    st.name=name;
-    st.career=document.getElementById("n-career").value;
-    const _m=subjById(subjectId);
-    st.subjectId=_m?_m.id:""; st.subject=_m?_m.name:"";
-    st.topics=_m?Object.fromEntries(_m.units.map(u=>[u,"pendiente"])):{};
-    st.examDate=document.getElementById("n-exam").value;
-    st.notes=document.getElementById("n-notes").value;
-    state.students.push(st); save();
-    state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=st.id; state.tab="temas";
+    const subjectVal=document.getElementById("n-subject").value;
+    const career=document.getElementById("n-career").value;
+    const examDate=document.getElementById("n-exam").value;
+    const notes=document.getElementById("n-notes").value;
+    const makeStudent=(m)=>{
+      const st=emptyStudent();
+      st.name=name; st.career=career;
+      st.subjectId=m?m.id:""; st.subject=m?m.name:"";
+      st.topics=m?Object.fromEntries(m.units.map(u=>[u,"pendiente"])):{};
+      st.examDate=examDate; st.notes=notes;
+      return st;
+    };
+    if(subjectVal.startsWith("pack:")){
+      const pack=(state.catalog.packs||[]).find(p=>p.id===subjectVal.slice(5));
+      const subjectIds=pack?pack.subjectIds:[];
+      const created=[], skipped=[];
+      subjectIds.forEach(sid=>{
+        const m=subjById(sid); if(!m) return;
+        const dup=findDuplicateStudent(name,sid,null);
+        if(dup){ skipped.push(m.name); return; }
+        const st=makeStudent(m);
+        state.students.push(st); created.push(st);
+      });
+      if(created.length===0){
+        state.newStudentError=`Ya tenés a ${name} en todas las materias de ese pack.`; render(); return;
+      }
+      save();
+      state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=created[0].id; state.tab="temas";
+      if(skipped.length) alert(`Se creó la ficha en ${created.length} materia${created.length===1?"":"s"} del pack. Se salteó ${skipped.join(", ")} porque ya tenías una ficha ahí.`);
+    }else{
+      const dup=findDuplicateStudent(name,subjectVal,null);
+      if(dup){ state.newStudentError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
+      const st=makeStudent(subjById(subjectVal));
+      state.students.push(st); save();
+      state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=st.id; state.tab="temas";
+    }
   }
   else if(a.startsWith("tab-")){ state.tab=a.slice(4); state.confirmDel=false; state.fichaError=""; }
   else if(a==="filter"){ state.filter=el.dataset.f; }
@@ -327,6 +378,12 @@ document.addEventListener("change",(e)=>{
     state.students=state.students.map(x=>x.subjectId===m.id?{...x,subject:v}:x);
     touchCatalog(); return;
   }
+  if(cf && cf.dataset.cf==="pack-name"){
+    const p=(state.catalog.packs||[]).find(x=>x.id===state.editPackId); if(!p) return;
+    const v=cf.value.trim(); if(!v) return;
+    p.name=v; touchCatalog(); return;
+  }
+  if(cf && cf.dataset.cf==="new-pack-name"){ state.newPackName=cf.value; return; }
   if(cf && cf.dataset.cf==="stats-subject"){ state.statsSubjectId=cf.value; render(); return; }
   const lf=e.target.closest("[data-lf]");
   if(lf){

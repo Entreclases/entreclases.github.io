@@ -435,6 +435,21 @@ function vCatalog(){
     </div>`;
     return h;
   }
+  const ep = state.editPackId ? (c.packs||[]).find(p=>p.id===state.editPackId) : null;
+  if(ep){
+    h += `<div class="formcard"><div class="ftitle">Editar pack</div>
+    <div class="field"><div class="flabel">Nombre del pack</div>
+      <input data-cf="pack-name" value="${esc(ep.name)}"></div>
+    <div class="flabel" style="margin-top:12px">Materias incluidas (elegí 2 o más)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">
+      ${c.subjects.map(m=>`<button class="chip ${ep.subjectIds.includes(m.id)?"on":""}" data-a="pack-toggle-subject" data-id="${m.id}">${esc(m.name)}</button>`).join("") || `<div class="empty">Todavía no hay materias creadas.</div>`}
+    </div>
+    ${ep.subjectIds.length<2?`<div class="hint" style="color:var(--red)">Este pack necesita al menos 2 materias para poder usarse al dar de alta un alumno.</div>`:""}
+    <button class="primary" style="margin:12px 0 0;margin-left:0" data-a="cat-close-pack-edit">Listo</button>
+    <div class="hint" style="margin-top:8px">Los cambios se guardan solos. Eliminar el pack no borra las materias que agrupa.</div>
+    </div>`;
+    return h;
+  }
   h += `<div class="formcard"><div class="ftitle">Carreras</div>
   ${c.careers.map((x,i)=>`<div class="log" style="padding:7px 12px"><div class="body">${esc(x)}</div>
     <button class="del" data-a="cat-del-career" data-i="${i}" title="Quitar">×</button></div>`).join("") || `<div class="empty">Sin carreras cargadas.</div>`}
@@ -443,13 +458,34 @@ function vCatalog(){
     <button class="chip" data-a="cat-add-career" style="margin-bottom:2px">+ Agregar carrera</button></div>
   <div class="hint" style="margin-top:6px">Quitar una carrera no afecta a los alumnos que ya la tienen: la conservan en su ficha.</div></div>`;
   h += `<div class="formcard"><div class="ftitle">Materias y sus unidades</div>
-  ${c.subjects.map(m=>`<div class="row" style="cursor:pointer" data-a="cat-edit-subject" data-id="${m.id}">
-    <div class="main"><b>${esc(m.name)}</b><div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
-    <button class="del" data-a="cat-del-subject" data-id="${m.id}" title="Eliminar materia">×</button></div>`).join("") || `<div class="empty">Sin materias cargadas.</div>`}
+  ${c.subjects.map(m=>{
+    const packNames=packsContaining(m.id).map(p=>p.name);
+    return `<div class="row" style="cursor:pointer" data-a="cat-edit-subject" data-id="${m.id}">
+    <div class="main"><b>${esc(m.name)}</b> ${packNames.map(n=>`<span class="pill" style="color:var(--blue);background:var(--bluebg)">${esc(n)}</span>`).join(" ")}
+      <div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
+    <button class="del" data-a="cat-del-subject" data-id="${m.id}" title="Eliminar materia">×</button></div>`;
+  }).join("") || `<div class="empty">Sin materias cargadas.</div>`}
   <div class="frow" style="margin-top:8px;align-items:flex-end">
     <div class="field"><input id="new-subject" placeholder="Ej: Álgebra y Geometría Analítica"></div>
     <button class="chip" data-a="cat-add-subject" style="margin-bottom:2px">+ Agregar materia</button></div>
   <div class="hint" style="margin-top:6px">Al crear una materia se abre su editor para cargarle las unidades. Después, al dar de alta un alumno, la elegís de la lista y su grilla de temas se arma sola. Eliminar una materia no borra el avance de los alumnos que la usaban.</div></div>`;
+  h += `<div class="formcard"><div class="ftitle">Packs</div>
+  <div class="hint" style="margin-bottom:10px">Un pack agrupa varias materias para dar de alta al alumno en todas de una — ej. «Ingreso a Medicina».</div>
+  ${(c.packs||[]).map(p=>{
+    const names=p.subjectIds.map(id=>{const m=subjById(id); return m?m.name:null;}).filter(Boolean);
+    return `<div class="row" style="cursor:pointer" data-a="cat-edit-pack" data-id="${p.id}">
+    <div class="main"><b>${esc(p.name)}</b><div class="sub">${names.length} materia${names.length===1?"":"s"}${names.length?": "+esc(names.join(", ")):""}</div></div>
+    <button class="del" data-a="cat-del-pack" data-id="${p.id}" title="Eliminar pack">×</button></div>`;
+  }).join("") || `<div class="empty">Sin packs todavía.</div>`}
+  <div class="field" style="margin-top:10px"><div class="flabel">Nombre del pack nuevo</div>
+    <input id="new-pack-name" data-cf="new-pack-name" placeholder="Ej: Ingreso a Medicina" value="${esc(state.newPackName||"")}"></div>
+  <div class="flabel" style="margin-top:10px">Materias del pack (elegí 2 o más)</div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px">
+    ${c.subjects.length ? c.subjects.map(m=>`<button class="chip ${(state.newPackSubjects||[]).includes(m.id)?"on":""}" data-a="toggle-newpack-subject" data-id="${m.id}">${esc(m.name)}</button>`).join("") : `<div class="empty">Primero creá alguna materia.</div>`}
+  </div>
+  ${state.newPackError?`<div class="saveerr">${esc(state.newPackError)}</div>`:""}
+  <button class="chip" data-a="cat-add-pack">+ Crear pack</button>
+  <div class="hint" style="margin-top:6px">Eliminar un pack no borra las materias que agrupa.</div></div>`;
   return h;
 }
 
@@ -830,11 +866,16 @@ function vModal(){
         ${state.catalog.careers.map(c=>`<option>${esc(c)}</option>`).join("")}</select></div></div>
     <div class="frow">
       <div class="field"><div class="flabel">Materia</div><select id="n-subject">
-        ${state.catalog.subjects.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("")}
+        <optgroup label="Materias">
+          ${state.catalog.subjects.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("")}
+        </optgroup>
+        ${(state.catalog.packs||[]).filter(p=>p.subjectIds.length>=2).length ? `<optgroup label="Packs">
+          ${state.catalog.packs.filter(p=>p.subjectIds.length>=2).map(p=>`<option value="pack:${p.id}">${esc(p.name)}</option>`).join("")}
+        </optgroup>` : ""}
         <option value="">Otra / sin materia por ahora</option></select></div>
       <div class="field"><div class="flabel">Fecha de examen (si ya la sabe)</div><input type="date" id="n-exam"></div></div>
     <div class="field"><div class="flabel">Notas iniciales (de dónde arranca, qué le cuesta)</div><textarea id="n-notes"></textarea></div>
-    <div class="hint" style="margin-top:8px">¿Cursa más de una materia? Cargalo una vez por cada materia.</div>
+    <div class="hint" style="margin-top:8px">¿Cursa más de una materia? Cargalo una vez por cada materia — o elegí un pack para crear todas sus fichas de una.</div>
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
       <button class="chip" data-a="cancel-new">Cancelar</button>
       <button class="primary" style="margin-left:0" data-a="create">Crear</button></div>
