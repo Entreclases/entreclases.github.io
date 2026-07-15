@@ -16,7 +16,7 @@ const DOWNLOADS_URL = "https://manugandini53-design.github.io/#usala";
 // `cuaderno` (cada cuenta solo puede leer/escribir su propia fila; ver el repo cuaderno-supabase).
 const SUPA_URL = "https://iwxsntxkqfqucxhwlfdv.supabase.co";
 const SUPA_ANON_KEY = "sb_publishable_S0zs9qmIRB5RWNZceO5gCg_vI7Hxx1D";
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 // Empaquetado nativo: Tauri inyecta window.__TAURI__, Capacitor inyecta window.Capacitor
 const IS_NATIVE = !!(window.__TAURI__ || window.Capacitor);
 function detectPlatform(){
