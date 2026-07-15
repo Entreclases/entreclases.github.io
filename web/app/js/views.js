@@ -83,6 +83,12 @@ function vTablero(){
       <span class="dot"></span><span class="t">Tenés ${fmtMoney(totalPend)} pendientes de cobro de ${pendientesMes.length} alumno${pendientesMes.length===1?"":"s"} este mes</span></button>`;
   }
 
+  const examPrompts = pendingExamResults();
+  if(examPrompts.length){
+    h += `<div class="stitle">¿Cómo les fue?</div>`;
+    h += examPrompts.map(vExamResultPrompt).join("");
+  }
+
   h += `<div class="stitle">Alertas</div>`;
   h += alerts.length===0
     ? `<div class="empty">Sin alertas. Todo el mundo al día — buen momento para conseguir parciales viejos.</div>`
@@ -314,6 +320,23 @@ function vDetalle(){
       </div></div>`;
   }
   return h;
+}
+
+/* ============ resultado de examen: se pregunta desde el tablero al llegar la fecha ============ */
+function vExamResultPrompt(s){
+  return `<div class="examresult">
+    <div><b>${esc(s.name)}</b> <span class="hint">· ${esc(s.subject||"materia s/d")} · examen ${esc(fmtDate(s.examDate))}</span></div>
+    <div class="hint" style="margin:2px 0 8px">¿Cómo le fue?</div>
+    <div class="frow" style="align-items:flex-end;margin-bottom:0">
+      <div class="field" style="max-width:140px"><div class="flabel">Nota (opcional)</div>
+        <input id="examgrade-${s.id}" placeholder="Ej: 7/10"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+        <button class="chip" style="background:var(--greenbg);color:var(--green)" data-a="exam-result" data-id="${s.id}" data-r="aprobo">Aprobó</button>
+        <button class="chip" style="background:var(--redbg);color:var(--red)" data-a="exam-result" data-id="${s.id}" data-r="desaprobo">No aprobó</button>
+        <button class="chip" data-a="exam-result" data-id="${s.id}" data-r="norindio">No rindió</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 /* ============ WhatsApp: mensajes pre-armados, solo links wa.me (sin API) ============ */
@@ -859,9 +882,51 @@ function vEstadisticas(){
     ? `<div class="stats"><div class="stat"><b>${(notas.reduce((a,b)=>a+b,0)/notas.length).toFixed(1)}</b><span>promedio (${notas.length} simulacro${notas.length===1?"":"s"})</span></div></div>`
     : `<div class="empty">Sin simulacros recientes.</div>`;
 
+  h += `<div class="stitle">Tasa de aprobación de esta materia</div>`;
+  const materiaResult = examResultCounts(alive().filter(s=>s.subjectId===curId));
+  h += materiaResult.total===0
+    ? `<div class="empty">Sin resultados de examen registrados en esta materia todavía.</div>`
+    : `<div class="stats"><div class="stat"><b>${(materiaResult.aprobo/materiaResult.total*100).toFixed(0)}%</b><span>aprobados sobre ${materiaResult.total} examen${materiaResult.total===1?"":"es"} rendido${materiaResult.total===1?"":"s"}</span></div></div>`;
+
   h += vAula(grupo);
   h += vTuActividad();
+  h += vTasaAprobacionGeneral();
   return h;
+}
+
+// Tasa de aprobación general (todas las materias) + desglose por materia — independiente
+// de la materia seleccionada arriba, como "Tu actividad".
+function vTasaAprobacionGeneral(){
+  let h = `<div class="stitle" style="margin-top:30px">Tasa de aprobación (todas las materias)</div>`;
+  const students = alive();
+  const general = examResultCounts(students);
+  if(general.total===0) return h + `<div class="empty">Todavía no hay resultados de examen registrados.</div>`;
+  const pct = general.aprobo/general.total*100;
+  h += `<div class="stats" style="margin-bottom:8px"><div class="stat"><b>${pct.toFixed(0)}%</b><span>aprobados sobre ${general.total} examen${general.total===1?"":"es"} rendido${general.total===1?"":"s"}</span></div></div>
+  <div style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:16px">
+    <div style="height:100%;width:${pct.toFixed(1)}%;background:var(--green);border-radius:99px"></div>
+  </div>`;
+
+  const bySubject = state.catalog.subjects
+    .map(m=>({label:m.name, c:examResultCounts(students.filter(s=>s.subjectId===m.id))}))
+    .filter(x=>x.c.total>0);
+  const sinMateria = examResultCounts(students.filter(s=>!s.subjectId));
+  if(sinMateria.total>0) bySubject.push({label:"Materia s/d", c:sinMateria});
+  if(bySubject.length>1) h += tasaAprobacionBars(bySubject);
+  return h;
+}
+function tasaAprobacionBars(entries){
+  return entries.map(({label,c})=>{
+    const pct=Math.round(c.aprobo/c.total*100);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="width:130px;flex-shrink:0;font-size:12.5px;color:var(--muted);white-space:nowrap;
+        overflow:hidden;text-overflow:ellipsis" title="${esc(label)}">${esc(label)}</div>
+      <div style="flex:1;background:var(--soft);border-radius:4px;overflow:hidden;height:14px">
+        <div style="height:100%;width:${pct}%;background:var(--green);border-radius:4px"></div>
+      </div>
+      <div style="width:70px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted)">${pct}% (${c.total})</div>
+    </div>`;
+  }).join("");
 }
 
 // Orden de "el aula": examen más próximo primero; sin fecha, al final.
@@ -879,12 +944,14 @@ function deskHtml(s){
   const pctVal = pct===null ? 0 : Math.round(pct);
   const d = s.examDate ? daysTo(s.examDate) : null;
   const showBadge = d!==null && d>=0 && d<=14;
+  const done = hasCurrentExamResult(s);
   const firstName = (s.name||"").trim().split(/\s+/)[0] || "—";
-  const title = `${s.name||"—"} — ${SEM_META[sem].label} — avance: ${pctVal}%`;
+  const title = `${s.name||"—"} — ${SEM_META[sem].label} — avance: ${pctVal}%${done?" — ya rindió":""}`;
   return `<button class="desk" data-a="open" data-id="${esc(s.id)}" title="${esc(title)}">
     <div class="desk-top"><div class="desk-progress" style="width:${pctVal}%"></div></div>
     <div class="desk-body" style="background:${color}">
       ${showBadge?`<span class="desk-badge">${d===0?"hoy":d+"d"}</span>`:""}
+      ${done?`<span class="desk-done" title="Ya rindió este examen">✓</span>`:""}
     </div>
     <div class="desk-name">${esc(firstName)}</div>
   </button>`;
@@ -900,6 +967,7 @@ function vAula(grupo){
     <span><span class="sw" style="background:${SEM_META.sd.color}"></span>${SEM_META.sd.label}</span>
     <span>Barra arriba del banco: % de temas en nivel parcial</span>
     <span>Puntito: días para el examen (14 o menos)</span>
+    <span><span class="desk-done-legend">✓</span> ya rindió el examen cargado</span>
   </div>`;
 
   const ordered = aulaOrder(grupo);

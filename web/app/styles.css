@@ -107,6 +107,8 @@
   .wa-quick{flex-shrink:0;width:32px;height:32px;border-radius:99px;border:1px solid var(--greenline,var(--line));
             background:var(--greenbg);color:var(--green);display:flex;align-items:center;justify-content:center;
             font-size:15px;line-height:1;text-decoration:none}
+  .examresult{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
+              border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13.5px}
   .examgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px}
   .examcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:left;color:var(--ink)}
   .count{display:inline-block;color:#fff;font-family:var(--mono);font-size:11.5px;
@@ -167,6 +169,10 @@
   .desk-body{position:relative;width:100%;height:38px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--shadow-ring2)}
   .desk-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;font-size:9px;
               font-family:var(--mono);border-radius:99px;padding:1px 4px;min-width:14px;text-align:center;line-height:1.3}
+  .desk-done{position:absolute;top:-6px;left:-6px;background:var(--green);color:#fff;font-size:9px;
+             font-weight:700;border-radius:99px;width:14px;height:14px;display:flex;align-items:center;justify-content:center;line-height:1}
+  .desk-done-legend{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;
+                     border-radius:99px;background:var(--green);color:#fff;font-size:9px;font-weight:700;margin-right:4px;vertical-align:middle}
   .desk-name{font-size:10px;color:var(--muted);margin-top:4px;max-width:56px;white-space:nowrap;
              overflow:hidden;text-overflow:ellipsis}
   @media (max-width:480px){

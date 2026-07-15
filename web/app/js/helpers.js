@@ -107,7 +107,7 @@ function emptyStudent(){
   return { id:uid(), name:"", career:(state.catalog.careers[0]||"Ingeniería"), subject:"", subjectId:"",
     chair:"", status:"activo", semaforo:"sd", examDate:"", startDate:today(), notes:"",
     updatedAt:Date.now(), topics:{}, sessions:[], simulacros:[],
-    tarifa:"", modalidad:"", pagos:[], informeComment:"", phone:"" };
+    tarifa:"", modalidad:"", pagos:[], informeComment:"", phone:"", examResults:[] };
 }
 
 /* ============ regla: una ficha = un alumno en una materia ============
@@ -181,6 +181,25 @@ function studentAlerts(s){
   const gap = lastDate ? -daysTo(lastDate) : null;
   if(gap!==null && gap>=10) out.push({text:`Sin clases hace ${gap} días — ¿sigue o pasarlo a pausado?`, wa:"clase"});
   return out;
+}
+
+/* ============ resultado de examen: pregunta desde el tablero, alimenta estado y estadísticas ============
+   Se identifica por (alumno, examDate exacta) — si el profesor carga una fecha
+   de examen nueva más adelante (recuperatorio, próximo parcial), vuelve a
+   preguntar porque esa fecha todavía no tiene resultado registrado. */
+function hasCurrentExamResult(s){ return !!(s.examDate && (s.examResults||[]).some(r=>r.date===s.examDate)); }
+function pendingExamResults(){
+  return alive().filter(s => s.status==="activo" && s.examDate
+    && daysTo(s.examDate)!==null && daysTo(s.examDate)<=0 && !hasCurrentExamResult(s));
+}
+// aprobo/desaprobo cuentan para la tasa; "no rindió" no cuenta como examen rendido.
+function examResultCounts(students){
+  let aprobo=0, desaprobo=0;
+  students.forEach(s=>(s.examResults||[]).forEach(r=>{
+    if(r.result==="aprobo") aprobo++;
+    else if(r.result==="desaprobo") desaprobo++;
+  }));
+  return { aprobo, desaprobo, total:aprobo+desaprobo };
 }
 
 /* ============ pagos: opcional por alumno (tarifa + modalidad) ============

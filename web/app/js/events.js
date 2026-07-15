@@ -316,6 +316,16 @@ document.addEventListener("click", (e)=>{
     }
   }
   else if(a.startsWith("tab-")){ state.tab=a.slice(4); state.confirmDel=false; state.fichaError=""; }
+  else if(a==="exam-result"){
+    const id=el.dataset.id, result=el.dataset.r;
+    const st=state.students.find(x=>x.id===id); if(!st) return;
+    const gradeEl=document.getElementById("examgrade-"+id);
+    const grade=gradeEl ? gradeEl.value.trim() : "";
+    const entry={id:uid(), date:st.examDate, result, grade};
+    const newStatus = result==="aprobo" ? "aprobo" : result==="desaprobo" ? "desaprobo" : st.status;
+    update(id,{examResults:[...(st.examResults||[]), entry], status:newStatus});
+    return;
+  }
   else if(a==="wa-free-send" && s){
     const text=(document.getElementById("wa-free-text").value||"").trim();
     if(!text) return;

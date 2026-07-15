@@ -1,5 +1,5 @@
 /* Cuaderno de seguimiento — funcionamiento sin conexión */
-const CACHE = "cuaderno-v40";
+const CACHE = "cuaderno-v41";
 const FILES = ["./", "./index.html", "./styles.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",
   "./js/config.js", "./js/helpers.js", "./js/auth.js", "./js/sync.js", "./js/views.js", "./js/events.js"];
 
