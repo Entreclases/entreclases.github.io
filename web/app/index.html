@@ -125,7 +125,6 @@ const DOWNLOADS_URL = "https://manugandini53-design.github.io/#usala";
 const SUPA_URL = "https://iwxsntxkqfqucxhwlfdv.supabase.co";
 const SUPA_ANON_KEY = "sb_publishable_S0zs9qmIRB5RWNZceO5gCg_vI7Hxx1D";
 const APP_VERSION = "1.2.0";
-const ADMIN_EMAIL = "manugandini53@gmail.com";
 // Empaquetado nativo: Tauri inyecta window.__TAURI__, Capacitor inyecta window.Capacitor
 const IS_NATIVE = !!(window.__TAURI__ || window.Capacitor);
 function detectPlatform(){
@@ -509,6 +508,7 @@ function vCuenta(){
   return `<button class="back" data-a="nav-tablero">← Volver al tablero</button>
   <div class="formcard"><div class="ftitle">Cuenta</div>
     <div style="font-size:13.5px;margin-bottom:6px">Conectado como <b>${esc(ses?ses.email:"")}</b></div>
+    <div class="hint" style="margin-bottom:6px">${sesIsAdmin(ses)?"Cuenta de administrador":"Cuenta de profesor"}</div>
     <div class="hint" style="margin-bottom:14px">${esc(syncStatusText())}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="chip" data-a="sync-now">Sincronizar ahora</button>
@@ -659,7 +659,7 @@ function render(){
   }
   const activos = alive().filter(s=>s.status==="activo").length;
   const ses = getSes();
-  const isAdmin = !!(ses && ses.email===ADMIN_EMAIL);
+  const isAdmin = sesIsAdmin(ses);
   let h = "";
   if(IS_NATIVE && state.newVersionTag && !state.updateBannerDismissed){
     h += `<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;
@@ -751,6 +751,9 @@ function setSes(v){
     v ? setCookie(SES_KEY,JSON.stringify(v)) : delCookie(SES_KEY);
   }
 }
+// rol cacheado en la propia sesión (ver storeSession/loadRole) para que ande offline;
+// sin rol conocido todavía se degrada a "profesor" — nunca admin por defecto.
+function sesIsAdmin(ses){ return !!(ses && ses.role==="admin"); }
 function getRememberedEmails(){
   try{ const a=JSON.parse(localStorage.getItem(EMAILS_KEY)); return Array.isArray(a)?a:[]; }
   catch(e){ return []; }
@@ -798,9 +801,32 @@ function friendlyAuthError(err){
 function storeSession(j,email){
   const prev=getSes();
   const loginAt = (prev && prev.email===email && prev.loginAt) ? prev.loginAt : Date.now();
+  // el rol cacheado sobrevive a un refresh de token de la misma cuenta; si es una cuenta
+  // distinta (o nunca se leyó) arranca sin rol hasta que loadRole() lo confirme
+  const role = (prev && prev.email===email) ? prev.role : undefined;
   setSes({access:j.access_token,refresh:j.refresh_token,
-          exp:Date.now()+((j.expires_in||3600)-60)*1000,email,loginAt});
+          exp:Date.now()+((j.expires_in||3600)-60)*1000,email,loginAt,role});
   rememberEmail(email);
+  loadRole();
+}
+// Lee el rol propio (tabla perfiles) una vez por login/refresh de sesión y lo cachea
+// dentro de la sesión guardada, para que isAdmin ande offline con el último rol visto.
+// Si falla (sin internet, error puntual) se degrada en silencio al rol ya cacheado, o a
+// "profesor" si todavía no se leyó nunca — nunca bloquea ni rompe el resto de la app.
+async function loadRole(){
+  try{
+    const s=getSes(); if(!s) return;
+    const uid_=jwtSub(s.access);
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=rol&user_id=eq."+encodeURIComponent(uid_), {headers:h});
+    if(!r.ok) return;
+    const rows=await r.json();
+    const rol=rows[0]&&rows[0].rol;
+    if(rol){
+      const cur=getSes();
+      if(cur && cur.email===s.email){ setSes({...cur, role:rol}); render(); }
+    }
+  }catch(e){ /* silencioso: offline o falla puntual — sigue con el rol cacheado */ }
 }
 function isEmailNotConfirmedError(err){
   const m=String((err&&err.message)||err||"").toLowerCase();
