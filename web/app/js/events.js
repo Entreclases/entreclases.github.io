@@ -206,8 +206,11 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="auth-logout"){ setSes(null); state.view="tablero"; render(); return; }
-  else if(a==="open"){ state.view="detalle"; state.selId=el.dataset.id; state.tab="temas"; state.confirmDel=false; }
-  else if(a==="back"){ state.view="lista"; state.selId=null; }
+  else if(a==="open"){
+    state.view="detalle"; state.selId=el.dataset.id; state.tab="temas"; state.confirmDel=false;
+    state.simTimer=null; state.simPrefillNote="";
+  }
+  else if(a==="back"){ state.view="lista"; state.selId=null; state.simTimer=null; state.simPrefillNote=""; }
   else if(a==="new"){ state.showNew=true; }
   else if(a==="load-sample"){
     const st=sampleStudent();
@@ -258,11 +261,26 @@ document.addEventListener("click", (e)=>{
     const date=document.getElementById("s-date").value; if(!date) return;
     update(s.id,{simulacros:[...s.simulacros,{id:uid(),date,
       grade:document.getElementById("s-grade").value,
-      note:document.getElementById("s-note").value}]}); return;
+      note:document.getElementById("s-note").value}]});
+    state.simPrefillNote=""; return;
   }
   else if(a==="del-sim" && s){
     update(s.id,{simulacros:s.simulacros.filter(x=>x.id!==el.dataset.id)}); return;
   }
+  else if(a==="sim-timer-start"){
+    const min=Math.max(1, parseInt(document.getElementById("sim-timer-min").value,10)||90);
+    state.simTimerLastMin=min;
+    state.simTimer={durationMin:min, remainingSec:min*60, paused:false, alerted:false};
+  }
+  else if(a==="sim-timer-toggle" && state.simTimer){
+    state.simTimer.paused=!state.simTimer.paused;
+  }
+  else if(a==="sim-timer-finish" && state.simTimer){
+    const usedMin=Math.round((state.simTimer.durationMin*60-state.simTimer.remainingSec)/60);
+    state.simPrefillNote=`Tiempo usado: ${usedMin} min. `;
+    state.simTimer=null;
+  }
+  else if(a==="dismiss-backup-reminder"){ dismissBackupReminder(); }
   else if(a==="ask-del"){ state.confirmDel=true; }
   else if(a==="cancel-del"){ state.confirmDel=false; }
   else if(a==="confirm-del" && s){
@@ -275,7 +293,8 @@ document.addEventListener("click", (e)=>{
     const url=URL.createObjectURL(blob);
     const link=document.createElement("a");
     link.href=url; link.download=`seguimiento-estudiantes-${today()}.json`;
-    link.click(); URL.revokeObjectURL(url); return;
+    link.click(); URL.revokeObjectURL(url);
+    markExported();
   }
   else return;
   render();
@@ -320,6 +339,22 @@ document.addEventListener("input", (e)=>{
     if(ne){ ne.focus(); ne.setSelectionRange(pos,pos); }
   }
 });
+
+/* ============ cronómetro de simulacro: tick de 1s ============
+   No hace nada (ni re-renderiza) salvo que haya un cronómetro corriendo,
+   así que no cuesta nada en el resto de la app. */
+setInterval(()=>{
+  const t = state.simTimer;
+  if(!t || t.paused || t.remainingSec<=0) return;
+  t.remainingSec--;
+  if(t.remainingSec<=0 && !t.alerted){
+    t.alerted=true;
+    render();
+    alert("¡Se acabó el tiempo del simulacro!");
+    return;
+  }
+  render();
+},1000);
 
 /* ============ arranque ============ */
 const _recovery = parseRecoveryHash();

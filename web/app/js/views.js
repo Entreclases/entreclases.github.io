@@ -25,6 +25,43 @@ function vTips(){
     <button class="del" style="font-size:20px" data-a="dismiss-tips" title="Descartar">×</button>
   </div>`;
 }
+function vSimTimer(){
+  const t = state.simTimer;
+  if(!t){
+    return `<div class="formcard">
+      <div class="ftitle">Simulacro cronometrado</div>
+      <div class="frow" style="align-items:flex-end">
+        <div class="field" style="max-width:160px"><div class="flabel">Duración (minutos)</div>
+          <input type="number" id="sim-timer-min" min="1" value="${state.simTimerLastMin||90}"></div>
+        <button class="primary" style="margin-left:0" data-a="sim-timer-start">Iniciar simulacro cronometrado</button>
+      </div>
+    </div>`;
+  }
+  const done = t.remainingSec<=0;
+  const mm = String(Math.floor(t.remainingSec/60)).padStart(2,"0");
+  const ss = String(t.remainingSec%60).padStart(2,"0");
+  return `<div class="formcard" style="text-align:center">
+    <div class="ftitle">Simulacro cronometrado</div>
+    <div style="font-family:var(--mono);font-size:56px;font-weight:700;margin:10px 0;color:${done?"var(--red)":"var(--ink)"}">${mm}:${ss}</div>
+    ${done
+      ? `<div style="color:var(--red);font-weight:600;margin-bottom:10px">¡Tiempo cumplido!</div>`
+      : `<div class="hint" style="margin-bottom:10px">${t.paused?"En pausa":"Corriendo…"}</div>`}
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      ${!done?`<button class="chip" data-a="sim-timer-toggle">${t.paused?"Reanudar":"Pausar"}</button>`:""}
+      <button class="danger" data-a="sim-timer-finish">Finalizar</button>
+    </div>
+  </div>`;
+}
+function vBackupReminder(){
+  if(!shouldShowBackupReminder()) return "";
+  return `<div class="formcard" style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap">
+    <div style="font-size:13px;color:var(--muted)">Hace más de ${BACKUP_REMINDER_DAYS} días que no descargás una copia (.json) del cuaderno — es tu respaldo aparte de la sincronización.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+      <button class="chip" data-a="export">Descargar copia ahora</button>
+      <button class="del" style="font-size:20px" data-a="dismiss-backup-reminder" title="Descartar">×</button>
+    </div>
+  </div>`;
+}
 function vTablero(){
   const activos = alive().filter(s=>s.status==="activo");
   const alerts = activos.flatMap(s=>studentAlerts(s).map(t=>({s,t})));
@@ -32,6 +69,7 @@ function vTablero(){
                           .sort((a,b)=>a.examDate.localeCompare(b.examDate));
   const enRiesgo = new Set(alerts.map(a=>a.s.id)).size;
   let h = vTips();
+  h += vBackupReminder();
   h += `<div class="stats">
     <div class="stat"><b>${activos.length}</b><span>activos</span></div>
     <div class="stat"><b>${upcoming.length}</b><span>con examen a la vista</span></div>
@@ -196,13 +234,14 @@ function vDetalle(){
   }
 
   if(state.tab==="simulacros"){
+    h += vSimTimer();
     h += `<div class="formcard"><div class="ftitle">Registrar simulacro (parcial viejo, cronometrado)</div>
       <div class="frow">
         <div class="field"><div class="flabel">Fecha</div><input type="date" id="s-date" value="${today()}"></div>
         <div class="field"><div class="flabel">Nota</div><input id="s-grade" placeholder="Ej: 5.5 / 10"></div>
       </div>
       <div class="field"><div class="flabel">Diagnóstico: errores conceptuales / de cuenta / de tiempo</div>
-        <input id="s-note" placeholder="Ej: 2 conceptuales en límites, 1 de cuenta, le faltó tiempo en el último"></div>
+        <input id="s-note" placeholder="Ej: 2 conceptuales en límites, 1 de cuenta, le faltó tiempo en el último" value="${esc(state.simPrefillNote||"")}"></div>
       <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-sim">Guardar simulacro</button></div>`;
     const sorted=[...s.simulacros].sort((a,b)=>b.date.localeCompare(a.date));
     h += sorted.length===0 ? `<div class="empty">Sin simulacros. Idealmente el primero va 10–14 días antes del examen.</div>`

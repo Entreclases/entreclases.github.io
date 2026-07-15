@@ -10,6 +10,10 @@ const LAST_REMOTE_KEY = "tutoria-last-remote-updated"; // último updated_at de 
 const VERSION_CHECK_KEY = "tutoria-last-version-check"; // timestamp del último chequeo de versión (apps nativas)
 const VERSION_CHECK_INTERVAL_MS = 24*60*60*1000;
 const ONBOARDING_TIPS_KEY = "tutoria-onboarding-tips-dismissed"; // "1" una vez que el usuario descarta la guía de primeros pasos
+const LAST_EXPORT_KEY = "tutoria-last-export"; // timestamp de la última descarga manual del .json
+const BACKUP_REMINDER_DISMISS_KEY = "tutoria-backup-reminder-dismissed-at"; // timestamp del último "descartar" del aviso de respaldo
+const BACKUP_REMINDER_DAYS = 30; // a partir de cuántos días sin exportar se sugiere hacerlo
+const BACKUP_REMINDER_SNOOZE_DAYS = 7; // cada cuánto reaparece el aviso si se descarta
 const THEME_KEY = "tutoria-theme"; // "light" | "dark" | "system" (default)
 function getTheme(){ return localStorage.getItem(THEME_KEY) || "system"; }
 function applyTheme(theme){

@@ -36,6 +36,7 @@ function fmtBytes(n){
 let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
               view:"tablero", selId:null, filter:"activo", tab:"temas",
               listSearch:"", listSubject:"todas", listCareer:"todas", listSem:"todos",
+              simTimer:null, simTimerLastMin:90, simPrefillNote:"",
               statsSubjectId:null,
               showNew:false, confirmDel:false, saveErr:false,
               syncStatus:"idle", syncMsg:"", lastSync:null,
@@ -119,6 +120,20 @@ function sampleStudent(){
 /* ============ guía de primeros pasos ============ */
 function tipsDismissed(){ return localStorage.getItem(ONBOARDING_TIPS_KEY)==="1"; }
 function dismissTips(){ localStorage.setItem(ONBOARDING_TIPS_KEY,"1"); }
+
+/* ============ recordatorio de copia manual (.json) ============ */
+function getLastExport(){ const v=localStorage.getItem(LAST_EXPORT_KEY); return v?parseInt(v,10):null; }
+function markExported(){ localStorage.setItem(LAST_EXPORT_KEY, String(Date.now())); }
+function dismissBackupReminder(){ localStorage.setItem(BACKUP_REMINDER_DISMISS_KEY, String(Date.now())); }
+function shouldShowBackupReminder(){
+  if(alive().length===0) return false;
+  const last = getLastExport();
+  const daysSince = last ? (Date.now()-last)/86400000 : Infinity;
+  if(daysSince < BACKUP_REMINDER_DAYS) return false;
+  const dismissedAt = parseInt(localStorage.getItem(BACKUP_REMINDER_DISMISS_KEY)||"0",10);
+  if(dismissedAt && (Date.now()-dismissedAt)/86400000 < BACKUP_REMINDER_SNOOZE_DAYS) return false;
+  return true;
+}
 
 /* ============ alertas ============ */
 function studentAlerts(s){
