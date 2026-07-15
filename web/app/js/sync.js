@@ -269,6 +269,19 @@ async function loadActividad(){
   }
   render();
 }
+async function loadRecursos(){
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+    const r=await fetch(SUPA_URL+"/rest/v1/rpc/admin_stats", {method:"POST", headers:h, body:"{}"});
+    if(!r.ok) throw new Error("error "+r.status);
+    state.recursos=await r.json();
+    state.recursosLoaded=true; state.recursosError="";
+  }catch(e){
+    state.recursosError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar los recursos.";
+  }
+  render();
+}
 async function toggleReporte(id,current){
   const next = current==="resuelto" ? "pendiente" : "resuelto";
   try{

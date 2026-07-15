@@ -75,8 +75,13 @@ document.addEventListener("click", (e)=>{
     state.panelTab="actividad"; state.actividadLoaded=false; state.actividadError="";
     loadActividad();
   }
+  else if(a==="panel-tab-recursos"){
+    state.panelTab="recursos"; state.recursosLoaded=false; state.recursosError="";
+    loadRecursos();
+  }
   else if(a==="refresh-usuarios"){ state.usersLoaded=false; state.usersError=""; loadUsuarios(); }
   else if(a==="refresh-actividad"){ state.actividadLoaded=false; state.actividadError=""; loadActividad(); }
+  else if(a==="refresh-recursos"){ state.recursosLoaded=false; state.recursosError=""; loadRecursos(); }
   else if(a==="reportes-filter"){ state.reportFilter=el.dataset.f; }
   else if(a==="toggle-reporte"){
     const r=(state.reportes||[]).find(x=>String(x.id)===el.dataset.id);

@@ -25,6 +25,12 @@ function timeAgo(ts){
   const d=Math.floor(hr/24);
   return `hace ${d} día${d===1?"":"s"}`;
 }
+function fmtBytes(n){
+  n=Number(n)||0;
+  if(n<1024) return n+" B";
+  if(n<1024*1024) return (n/1024).toFixed(1)+" KB";
+  return (n/1024/1024).toFixed(1)+" MB";
+}
 
 /* ============ estado ============ */
 let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
@@ -37,6 +43,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
               reportes:[], reportFilter:"pendiente", reportesLoaded:false, reportesError:"",
               panelTab:"reportes", users:[], usersLoaded:false, usersError:"",
               metricas:[], altas:[], actividadLoaded:false, actividadError:"",
+              recursos:null, recursosLoaded:false, recursosError:"",
               backups:[], backupsLoaded:false, backupsError:"",
               confirmRestoreId:null, restoreStatus:"idle", restoreError:"",
               newVersionTag:null, updateBannerDismissed:false };

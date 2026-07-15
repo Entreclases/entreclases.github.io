@@ -361,8 +361,9 @@ function vPanel(){
     ${tabbtn("panel-tab-reportes",tab==="reportes","Reportes")}
     ${tabbtn("panel-tab-usuarios",tab==="usuarios","Usuarios")}
     ${tabbtn("panel-tab-actividad",tab==="actividad","Actividad")}
+    ${tabbtn("panel-tab-recursos",tab==="recursos","Recursos")}
   </div>`;
-  h += tab==="usuarios" ? vUsuarios() : tab==="actividad" ? vActividad() : vReportes();
+  h += tab==="usuarios" ? vUsuarios() : tab==="actividad" ? vActividad() : tab==="recursos" ? vRecursos() : vReportes();
   return h;
 }
 
@@ -462,6 +463,40 @@ function vActividad(){
   const altasSet = buckets.map((v,i)=>({label:labels[i], v})).reverse();
   h += `<div class="stitle">Altas nuevas por semana</div>` + barRow(altasSet);
 
+  return h;
+}
+
+const SUPABASE_FREE_LIMIT_BYTES = 500*1024*1024;
+function vRecursos(){
+  let h = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="chip" data-a="refresh-recursos">Actualizar</button></div>`;
+  if(state.recursosError) return h + `<div class="saveerr">${esc(state.recursosError)}</div>`;
+  if(!state.recursosLoaded) return h + `<div class="empty">Cargando recursos…</div>`;
+  const data = state.recursos;
+  if(!data) return h + `<div class="empty">No se pudieron cargar los recursos.</div>`;
+
+  const dbBytes = data.db_bytes||0;
+  const pct = Math.min(100, dbBytes/SUPABASE_FREE_LIMIT_BYTES*100);
+  const barColor = pct>=90 ? "var(--red)" : pct>=70 ? "var(--amber)" : "var(--green)";
+  h += `<div class="stitle">Uso de base de datos</div>
+  <div style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;margin-bottom:6px">
+    <div style="height:100%;width:${pct.toFixed(1)}%;background:${barColor};border-radius:99px"></div>
+  </div>
+  <div class="hint" style="margin-bottom:20px">${fmtBytes(dbBytes)} de ${fmtBytes(SUPABASE_FREE_LIMIT_BYTES)} (${pct.toFixed(1)}%) — plan gratuito de Supabase</div>`;
+
+  const usuarios = [...(data.usuarios||[])].sort((a,b)=>
+    ((b.cuaderno_bytes||0)+(b.respaldos_bytes||0)) - ((a.cuaderno_bytes||0)+(a.respaldos_bytes||0)));
+
+  h += usuarios.length===0 ? `<div class="empty">Sin datos de usuarios.</div>`
+    : usuarios.map(u=>`<div class="log" style="align-items:flex-start">
+      <div class="body">
+        <div style="font-weight:600">${esc(u.email||"—")} <span class="hint">· ${esc(u.rol||"—")}</span></div>
+        <div class="note">${u.alumnos||0} alumno${u.alumnos===1?"":"s"} · cuaderno ${fmtBytes(u.cuaderno_bytes)}
+          · ${u.respaldos||0} respaldo${u.respaldos===1?"":"s"} (${fmtBytes(u.respaldos_bytes)})</div>
+      </div>
+    </div>`).join("");
+
+  h += `<div class="hint" style="margin-top:18px">El uso de memoria/CPU del servidor se ve solo en el dashboard de Supabase; acá se mide lo que ocupan los datos.</div>`;
   return h;
 }
 
