@@ -316,6 +316,12 @@ document.addEventListener("click", (e)=>{
     }
   }
   else if(a.startsWith("tab-")){ state.tab=a.slice(4); state.confirmDel=false; state.fichaError=""; }
+  else if(a==="wa-free-send" && s){
+    const text=(document.getElementById("wa-free-text").value||"").trim();
+    if(!text) return;
+    window.open(waLink(s,text),"_blank","noopener");
+    return;
+  }
   else if(a==="open-informe" && s){ state.view="informe"; state.informeCopyMsg=""; }
   else if(a==="close-informe"){ state.view="detalle"; state.informeCopyMsg=""; }
   else if(a==="informe-print"){ window.print(); return; }

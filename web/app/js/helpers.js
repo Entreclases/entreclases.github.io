@@ -107,7 +107,7 @@ function emptyStudent(){
   return { id:uid(), name:"", career:(state.catalog.careers[0]||"Ingeniería"), subject:"", subjectId:"",
     chair:"", status:"activo", semaforo:"sd", examDate:"", startDate:today(), notes:"",
     updatedAt:Date.now(), topics:{}, sessions:[], simulacros:[],
-    tarifa:"", modalidad:"", pagos:[], informeComment:"" };
+    tarifa:"", modalidad:"", pagos:[], informeComment:"", phone:"" };
 }
 
 /* ============ regla: una ficha = un alumno en una materia ============
@@ -167,17 +167,19 @@ function shouldShowBackupReminder(){
 }
 
 /* ============ alertas ============ */
+// cada alerta trae "wa": qué mensaje pre-armado de WhatsApp corresponde si el
+// profesor quiere escribirle al alumno directo desde acá (ver waMsgForAlert en views.js).
 function studentAlerts(s){
   const out=[]; if(s.status!=="activo") return out;
   const d=daysTo(s.examDate);
   if(d!==null && d>=0 && d<=14 && s.simulacros.length===0)
-    out.push(`Examen en ${d} día${d===1?"":"s"} y todavía no hizo ningún simulacro`);
+    out.push({text:`Examen en ${d} día${d===1?"":"s"} y todavía no hizo ningún simulacro`, wa:"examen"});
   const last2=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);
   if(last2.length===2 && last2.every(x=>x.tarea==="no"))
-    out.push("Dos clases seguidas sin tarea hecha — momento de la charla");
+    out.push({text:"Dos clases seguidas sin tarea hecha — momento de la charla", wa:"tarea"});
   const lastDate = s.sessions.length ? [...s.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0].date : s.startDate;
   const gap = lastDate ? -daysTo(lastDate) : null;
-  if(gap!==null && gap>=10) out.push(`Sin clases hace ${gap} días — ¿sigue o pasarlo a pausado?`);
+  if(gap!==null && gap>=10) out.push({text:`Sin clases hace ${gap} días — ¿sigue o pasarlo a pausado?`, wa:"clase"});
   return out;
 }
 
@@ -226,6 +228,22 @@ function periodRangeLabel(key, fromDate){
   const p = INFORME_PERIODS[key]||INFORME_PERIODS["3m"];
   return fromDate ? `${p.label} (${fmtDate(fromDate)} – ${fmtDate(today())})` : p.label;
 }
+
+/* ============ WhatsApp: solo links wa.me, sin API ============
+   wa.me para Argentina necesita 54 9 + código de área + número, sin el 0 inicial
+   del área ni el 15 del celular. No hay forma confiable de aislar el "15" de en
+   medio del número sin una lista de códigos de área, así que se le pide al
+   profesor que lo cargue ya sin 0 ni 15 (ver el hint junto al campo en la ficha). */
+function normalizeArPhone(raw){
+  let d = String(raw||"").replace(/\D/g,""); if(!d) return "";
+  if(d.startsWith("0")) d = d.slice(1);
+  if(d.startsWith("54")){ d = d.slice(2); if(d.startsWith("0")) d = d.slice(1); }
+  if(!d.startsWith("9")) d = "9"+d;
+  return "54"+d;
+}
+function hasPhone(s){ return !!(s.phone && s.phone.replace(/\D/g,"").length>=8); }
+function waLink(s, text){ return `https://wa.me/${normalizeArPhone(s.phone)}?text=${encodeURIComponent(text)}`; }
+function studentFirstName(s){ return (s.name||"").trim().split(/\s+/)[0] || s.name || ""; }
 
 /* ============ sesión: cookies (web) / localStorage (nativo) ============ */
 // Cookies de sesión (solo web): sin Expires/Max-Age quedan como "cookie de sesión" del

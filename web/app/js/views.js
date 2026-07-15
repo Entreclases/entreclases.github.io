@@ -64,7 +64,7 @@ function vBackupReminder(){
 }
 function vTablero(){
   const activos = alive().filter(s=>s.status==="activo");
-  const alerts = activos.flatMap(s=>studentAlerts(s).map(t=>({s,t})));
+  const alerts = activos.flatMap(s=>studentAlerts(s).map(a=>({s,...a})));
   const upcoming = activos.filter(s=>s.examDate && daysTo(s.examDate)>=0)
                           .sort((a,b)=>a.examDate.localeCompare(b.examDate));
   const enRiesgo = new Set(alerts.map(a=>a.s.id)).size;
@@ -86,8 +86,11 @@ function vTablero(){
   h += `<div class="stitle">Alertas</div>`;
   h += alerts.length===0
     ? `<div class="empty">Sin alertas. Todo el mundo al día — buen momento para conseguir parciales viejos.</div>`
-    : alerts.map(a=>`<button class="alert" data-a="open" data-id="${a.s.id}">
-        <span class="dot"></span><b>${esc(a.s.name)}</b><span class="t">${esc(a.t)}</span></button>`).join("");
+    : alerts.map(a=>`<div class="alert-row">
+        <button class="alert" data-a="open" data-id="${a.s.id}">
+          <span class="dot"></span><b>${esc(a.s.name)}</b><span class="t">${esc(a.text)}</span></button>
+        ${hasPhone(a.s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(a.s,waMsgForAlert(a.s,a.wa))}">💬</a>`:""}
+      </div>`).join("");
 
   h += `<div class="stitle">Próximos exámenes</div>`;
   h += upcoming.length===0
@@ -170,11 +173,15 @@ function vLista(){
     const right = (d!==null&&d>=0&&s.status==="activo")
       ? `<span style="color:${d<=7?"var(--red)":"var(--ink)"};font-weight:600">examen en ${d}d</span>`
       : `<span style="color:var(--faint)">${s.examDate?fmtDate(s.examDate):"sin fecha"}</span>`;
-    return `<button class="row" data-a="open" data-id="${s.id}">
-      <div class="main"><div class="name">${esc(s.name)} ${semDot(s.semaforo,13,false)} ${pill(s.status)} ${examplePill(s)}
-        ${na?`<span class="mini-alert">${na} alerta${na>1?"s":""}</span>`:""}</div>
-      <div class="sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")} · temas ${seen}/${rel}</div></div>
-      <div class="right">${right}</div></button>`;
+    return `<div class="row">
+      <button class="row-click" data-a="open" data-id="${s.id}">
+        <div class="main"><div class="name">${esc(s.name)} ${semDot(s.semaforo,13,false)} ${pill(s.status)} ${examplePill(s)}
+          ${na?`<span class="mini-alert">${na} alerta${na>1?"s":""}</span>`:""}</div>
+        <div class="sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")} · temas ${seen}/${rel}</div></div>
+        <div class="right">${right}</div>
+      </button>
+      ${hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">💬</a>`:""}
+    </div>`;
   }).join("");
   return h;
 }
@@ -193,7 +200,7 @@ function vDetalle(){
     </div>
     ${(s.examDate&&d!==null&&d>=0)?`<span class="count big ${d<=7?"urgent":""}">examen: ${d===0?"HOY":d+" día"+(d===1?"":"s")}</span>`:""}
   </div>`;
-  h += alerts.map(t=>`<div class="alert" style="cursor:default"><span class="dot"></span><span class="t">${esc(t)}</span></div>`).join("");
+  h += alerts.map(a=>`<div class="alert" style="cursor:default"><span class="dot"></span><span class="t">${esc(a.text)}</span></div>`).join("");
   h += `<div class="tabs" style="margin:16px 0 14px">` +
     tabbtn("tab-temas",state.tab==="temas","Temas") +
     tabbtn("tab-clases",state.tab==="clases",`Clases (${s.sessions.length})`) +
@@ -266,6 +273,7 @@ function vDetalle(){
       <div><div class="ftitle" style="margin-bottom:2px">Informe de progreso</div>
         <div class="hint">Un resumen prolijo para compartir con el alumno o la familia.</div></div>
       <button class="chip" data-a="open-informe">Generar informe</button></div>`;
+    if(hasPhone(s)) h += vWhatsApp(s);
     if(state.fichaError) h += `<div class="saveerr">${esc(state.fichaError)}</div>`;
     h += `<div class="formcard">
       <div class="frow">
@@ -277,7 +285,9 @@ function vDetalle(){
           <option value="" ${!s.subjectId?"selected":""}>${s.subjectId?"—":esc(s.subject||"—")}</option>
           ${state.catalog.subjects.map(m=>`<option value="${m.id}" ${m.id===s.subjectId?"selected":""}>${esc(m.name)}</option>`).join("")}
         </select></div>
-        <div class="field"><div class="flabel">Cátedra / universidad</div><input data-f="chair" value="${esc(s.chair)}"></div></div>
+        <div class="field"><div class="flabel">Cátedra / universidad</div><input data-f="chair" value="${esc(s.chair)}"></div>
+        <div class="field"><div class="flabel">Teléfono (WhatsApp)</div><input data-f="phone" placeholder="Ej: 11 2345-6789" value="${esc(s.phone||"")}"></div></div>
+      <div class="hint" style="margin:-4px 0 8px">Cargalo sin el 0 del área ni el 15 — ej: código de área + número.</div>
       <div class="frow">
         <div class="field"><div class="flabel">Estado</div><select data-f="status">
           ${Object.entries(STATUS_META).map(([k,m])=>opt(k,s.status,m.label)).join("")}</select></div>
@@ -304,6 +314,43 @@ function vDetalle(){
       </div></div>`;
   }
   return h;
+}
+
+/* ============ WhatsApp: mensajes pre-armados, solo links wa.me (sin API) ============ */
+function waMsgProximaClase(s){
+  return `Hola ${studentFirstName(s)}! Te escribo para coordinar/recordar nuestra próxima clase de ${s.subject||"la materia"}. ¡Cualquier cosa avisame!`;
+}
+function waMsgTareaHoy(s){
+  const last=[...(s.sessions||[])].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  if(!last) return `Hola ${studentFirstName(s)}! ¿Cómo veníamos con la tarea?`;
+  const tarea = last.note || last.topic || "lo que vimos en la última clase";
+  return `Hola ${studentFirstName(s)}! Te recuerdo la tarea de la clase del ${fmtDate(last.date)}: ${tarea}`;
+}
+function waMsgExamen(s){
+  const d=daysTo(s.examDate);
+  if(d===null) return `Hola ${studentFirstName(s)}! ¿Cómo venís con el estudio para el examen?`;
+  return `Hola ${studentFirstName(s)}! Faltan ${d} día${d===1?"":"s"} para tu examen de ${s.subject||"la materia"}${s.examDate?" ("+fmtDate(s.examDate)+")":""}. ¡Vamos con todo!`;
+}
+function waQuickMessage(s){
+  const d=daysTo(s.examDate);
+  return (d!==null && d>=0 && d<=14) ? waMsgExamen(s) : waMsgProximaClase(s);
+}
+function waMsgForAlert(s, kind){
+  if(kind==="examen") return waMsgExamen(s);
+  if(kind==="tarea") return waMsgTareaHoy(s);
+  return waMsgProximaClase(s);
+}
+function vWhatsApp(s){
+  return `<div class="formcard"><div class="ftitle">Enviar WhatsApp</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgProximaClase(s))}">Recordatorio de próxima clase</a>
+      <a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgTareaHoy(s))}">Tarea de la última clase</a>
+      ${s.examDate?`<a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgExamen(s))}">Recordatorio de examen</a>`:""}
+    </div>
+    <div class="field"><div class="flabel">Mensaje libre</div>
+      <textarea id="wa-free-text">${esc(waMsgProximaClase(s))}</textarea></div>
+    <button class="chip" style="margin-top:8px" data-a="wa-free-send">Abrir en WhatsApp</button>
+  </div>`;
 }
 
 /* ============ pagos: registro mensual dentro de la ficha (modalidad "mensual") ============ */
