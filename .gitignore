@@ -1,6 +1,4 @@
 node_modules/
-src-tauri/target/
-src-tauri/gen/
 release-v*/
 
 # Claves/certificados y config de entorno — por las dudas a nivel raíz también

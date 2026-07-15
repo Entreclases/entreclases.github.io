@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-"Cuaderno de seguimiento" — a product (in Spanish) for a math tutor to track students: exam dates, topic progress, class logs, and mock-exam ("simulacro") results, with accounts and cross-device sync backed by a single shared Supabase project (multi-tenant via RLS — see `web/app/js/config.js`'s `SUPA_URL`/`SUPA_ANON_KEY`). It ships as a PWA, a desktop app via Tauri, and (in progress) an Android app via Capacitor.
+"Cuaderno de seguimiento" — a product (in Spanish) for a math tutor to track students: exam dates, topic progress, class logs, and mock-exam ("simulacro") results, with accounts and cross-device sync backed by a single shared Supabase project (multi-tenant via RLS — see `web/app/js/config.js`'s `SUPA_URL`/`SUPA_ANON_KEY`). It ships as a PWA, a desktop app via Tauri (packaging lives in a separate repo, `cuaderno-desktop`, currently paused — see below), and (in progress) an Android app via Capacitor.
 
 `web/` is the site published to GitHub Pages, and has two independent, self-contained parts:
 - `web/index.html` — the marketing/landing page (product site root). Static HTML/CSS/JS, no shared state with the app, links to `./app/` and to GitHub Releases for downloads.
-- `web/app/` — the actual application: `index.html` (HTML skeleton only — no inline CSS/JS, see "Architecture" below), `styles.css`, `js/*.js` (vanilla JS split into six classic scripts), `sw.js` (service worker), `manifest.webmanifest` (PWA manifest), `icon-*.png`. This is what the Tauri and Capacitor builds wrap.
+- `web/app/` — the actual application: `index.html` (HTML skeleton only — no inline CSS/JS, see "Architecture" below), `styles.css`, `js/*.js` (vanilla JS split into six classic scripts), `sw.js` (service worker), `manifest.webmanifest` (PWA manifest), `icon-*.png`. This is what the Capacitor build wraps directly, and what the separate `cuaderno-desktop` repo's Tauri build wraps as a sibling-repo directory.
 
-There is no build system, no package manager, and no dependencies for either the landing page or the app — both are hand-authored, self-contained files. `web/` lives outside the repo root (rather than files sitting at the repo root) so that `src-tauri/`'s `frontendDist` can point at a directory containing only deployable web assets, without sweeping in `node_modules/`, `.git/`, or `src-tauri/target/`.
+There is no build system, no package manager, and no dependencies for either the landing page or the app — both are hand-authored, self-contained files. `web/` lives outside the repo root (rather than files sitting at the repo root) so that a directory containing only deployable web assets can be pointed at directly — originally so this repo's own `src-tauri/frontendDist` wouldn't sweep in `node_modules/`/`.git/`/`src-tauri/target/`, and now so `cuaderno-desktop`'s `tauri.conf.json` can reference `../../manugandini53-design.github.io/web/app` as a clean sibling path with nothing extra in it.
 
 ## Running / testing
 
@@ -27,27 +27,15 @@ There is no build, lint, or test tooling.
 
 Note: any PWA installed from the site root *before* the landing page existed will keep opening to the landing page under its old install, since its service worker scope was `/`. Users need to uninstall that and reinstall from `/app/` instead — the current app can only be installed from within `/app/`.
 
-## Desktop packaging (Tauri)
+## Desktop packaging (Tauri) — moved to its own repo, currently paused
 
-`src-tauri/` wraps `web/app/` (not the landing page) as a native Windows/macOS/Linux app — no bundler, no build step for the web files, which remain the single source of truth. `src-tauri/tauri.conf.json` sets `build.frontendDist` to `../web/app` directly (no `devUrl`, no `beforeDevCommand`/`beforeBuildCommand`).
+The Tauri wrapper (`src-tauri/`, `scripts/generate-latest-json.js`, and the desktop-only `package.json`/`@tauri-apps/cli` dependency) used to live in this repo but was moved out to its own repo, [`cuaderno-desktop`](https://github.com/manugandini53-design/cuaderno-desktop), so its build tooling has its own history separate from the app's. **That repo is currently paused** — its README documents how to resume (cloning both repos as siblings, where the private signing key lives, which env vars a release build needs) and flags a pending decision about whether future desktop releases keep publishing from this repo or move to `cuaderno-desktop`. Nothing about `identifier`, the updater `pubkey`, or the updater `endpoints` changed in that move.
 
-- `npm install` once to fetch `@tauri-apps/cli` locally (dev dependency only, no bundler for the app code).
-- `npm run tauri dev` to run the desktop app against the live files in `web/app/`.
-- `npm run tauri build` to produce an installable bundle (in `src-tauri/target/release/bundle/`).
+What stays in *this* repo, because it's part of the app's own JS rather than native build tooling:
+
 - `window.__TAURI__` (injected by Tauri) and `window.Capacitor` (injected by Capacitor) are detected via `IS_NATIVE` in `web/app/js/config.js` — used to skip service worker registration, since a native shell resolves local files itself and doesn't need it.
-- If you regenerate icons from `web/app/icon-512.png`, run `npx tauri icon web/app/icon-512.png` from the repo root; it writes into `src-tauri/icons/`.
-- Verified working: builds, installs, and runs on a real Windows device (`.msi` and NSIS `setup.exe`). Bump the version in `src-tauri/tauri.conf.json`, `package.json`, and `src-tauri/Cargo.toml` together before a release build.
-- If the repo lives inside a OneDrive-synced folder (it does on the maintainer's machine — `C:\Users\...\OneDrive\Escritorio\...`), `npm run tauri build` can intermittently fail with `failed to read plugin permissions: ... os error 3` because OneDrive races with Cargo writing/reading the many `target/release/build/tauri-*/out/permissions/**/*.toml` files generated for the app's capabilities (see below). Work around it by pointing Cargo's output outside the synced tree for release builds, e.g. `$env:CARGO_TARGET_DIR="$env:LOCALAPPDATA\cuaderno-seguimiento-target"` (PowerShell) before `npm run tauri build`; `scripts/generate-latest-json.js` respects the same env var.
-
-### Auto-actualización (tauri-plugin-updater, Windows)
-
-The desktop build auto-checks for updates against the GitHub Releases of this repo and can install them in place, no reinstall needed:
-
-- Rust side: `tauri-plugin-updater` + `tauri-plugin-process` (for the post-install relaunch) are registered in `src-tauri/src/main.rs`. `src-tauri/capabilities/default.json` grants the main window `core:default`, `updater:default`, and `process:allow-restart` — this file didn't exist before (the app previously ran with zero explicit capabilities); if you add other Tauri APIs later, their permissions go here too.
-- `src-tauri/tauri.conf.json`'s `plugins.updater` holds the public signing key (`pubkey`) and the update-manifest endpoint, which points at `latest.json` on the latest GitHub release of `manugandini53-design/manugandini53-design.github.io` (the same repo the landing page's download button reads from). `bundle.createUpdaterArtifacts: true` makes `tauri build` also emit `.sig` signature files next to the `.msi`/`setup.exe`.
-- The matching **private** signing key lives outside the repo, at `~/.tauri/cuaderno-seguimiento.key` on the maintainer's machine (password-protected; password is not in the repo — the maintainer has it). It never gets committed. Every future release build needs `TAURI_SIGNING_PRIVATE_KEY` (path to that file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set as env vars, or `tauri build` produces unsigned artifacts the updater will reject. Losing that key/password means existing installs can no longer receive verified updates — a new keypair would require getting every install to manually reinstall once with the new `pubkey` baked in.
-- After a signed `npm run tauri build`, run `node scripts/generate-latest-json.js` (or `npm run release:manifest`) — it reads the version from `tauri.conf.json` and the NSIS `.exe.sig`, and writes `latest.json` into the bundle folder, ready to upload to the GitHub release alongside the installer (which must be named `CuadernoSeguimiento-Setup-<version>.exe`, matching the existing release asset naming convention).
-- `web/app/js/events.js`'s `checkTauriUpdate()` (called on startup, Tauri-only) calls `window.__TAURI__.updater.check()` — exposed globally because `app.withGlobalTauri` is `true`, no bundler/import needed — and if an update is found, asks the user via `confirm()` before downloading, installing, and relaunching. The pre-existing generic "nueva versión disponible" banner (`checkForNewVersion()`) now only runs on Capacitor/Android, which still has no in-app updater.
+- `web/app/js/events.js`'s `checkTauriUpdate()` (called on startup, Tauri-only) calls `window.__TAURI__.updater.check()` — exposed globally because `cuaderno-desktop`'s `tauri.conf.json` sets `app.withGlobalTauri: true`, no bundler/import needed — and if an update is found, asks the user via `confirm()` before downloading, installing, and relaunching. The pre-existing generic "nueva versión disponible" banner (`checkForNewVersion()`) only runs on Capacitor/Android, which still has no in-app updater.
+- The already-published desktop releases (v1.1.0, v1.2.0, with their `.msi`/`setup.exe` installers) live in this repo's GitHub Releases, same as before — they weren't moved or touched, and the updater `endpoints` in `cuaderno-desktop`'s `tauri.conf.json` still point here.
 
 ## Android packaging (Capacitor)
 
