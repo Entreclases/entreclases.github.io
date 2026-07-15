@@ -354,11 +354,21 @@ function vCatalog(){
   return h;
 }
 
+function vPanel(){
+  const tab = state.panelTab||"reportes";
+  let h = `<button class="back" data-a="nav-tablero">← Volver al tablero</button>
+  <div class="tabs" style="margin-bottom:14px">
+    ${tabbtn("panel-tab-reportes",tab==="reportes","Reportes")}
+    ${tabbtn("panel-tab-usuarios",tab==="usuarios","Usuarios")}
+  </div>`;
+  h += tab==="usuarios" ? vUsuarios() : vReportes();
+  return h;
+}
+
 function vReportes(){
   const filter = state.reportFilter||"pendiente";
   const list = (state.reportes||[]).filter(r=>filter==="todos"||r.estado===filter);
-  let h = `<button class="back" data-a="nav-tablero">← Volver al tablero</button>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+  let h = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
     ${["pendiente","resuelto","todos"].map(f=>
       `<button class="chip ${filter===f?"on":""}" data-a="reportes-filter" data-f="${f}">${f==="todos"?"Todos":f==="pendiente"?"Pendientes":"Resueltos"}</button>`
     ).join("")}
@@ -374,6 +384,38 @@ function vReportes(){
       </div>
       <button class="chip ${r.estado==="resuelto"?"on":""}" data-a="toggle-reporte" data-id="${esc(r.id)}">${r.estado==="resuelto"?"Resuelto ✓":"Marcar resuelto"}</button>
     </div>`).join("");
+  return h;
+}
+
+function vUsuarios(){
+  let h = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="chip" data-a="refresh-usuarios">Actualizar</button></div>`;
+  if(state.usersError) return h + `<div class="saveerr">${esc(state.usersError)}</div>`;
+  if(!state.usersLoaded) return h + `<div class="empty">Cargando usuarios…</div>`;
+  const list = state.users||[];
+  const now = Date.now();
+  const ONLINE_MS = 10*60*1000, WEEK_MS = 7*86400000;
+  const lastSeenMs = u => u.last_seen_at ? now-new Date(u.last_seen_at).getTime() : null;
+  const isOnline = u => { const ms=lastSeenMs(u); return ms!==null && ms<ONLINE_MS; };
+  const isActiveWeek = u => { const ms=lastSeenMs(u); return ms!==null && ms<WEEK_MS; };
+  h += `<div class="stats">
+    <div class="stat"><b>${list.length}</b><span>cuentas totales</span></div>
+    <div class="stat"><b>${list.filter(isOnline).length}</b><span>en línea ahora</span></div>
+    <div class="stat"><b>${list.filter(isActiveWeek).length}</b><span>activos últimos 7 días</span></div>
+  </div>`;
+  if(list.length===0) return h + `<div class="empty">Todavía no hay cuentas.</div>`;
+  h += list.map(u=>{
+    const seen = isOnline(u)
+      ? `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--green);font-weight:600">
+          <span class="sem" style="width:8px;height:8px;background:var(--green)"></span>En línea</span>`
+      : `<span style="color:var(--faint)">${u.last_seen_at?"visto por última vez "+timeAgo(u.last_seen_at):"nunca conectado"}</span>`;
+    return `<div class="log" style="align-items:flex-start">
+      <div class="body">
+        <div style="font-weight:600">${esc(u.email||"—")} <span class="hint">· ${esc(u.rol||"—")}</span></div>
+        <div class="note">${seen} · ${esc(u.plataforma||"—")} · v${esc(u.version||"—")} · alta ${fmtDateTime(u.created_at)}</div>
+      </div>
+    </div>`;
+  }).join("");
   return h;
 }
 
@@ -450,7 +492,7 @@ function render(){
     <span style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="chip ${state.view==="catalog"?"on":""}" data-a="nav-catalog">Materias y carreras</button>
       <button class="chip ${state.view==="cuenta"?"on":""}" data-a="nav-cuenta">Cuenta</button>
-      ${isAdmin?`<button class="chip ${state.view==="reportes"?"on":""}" data-a="nav-reportes">Reportes</button>`:""}
+      ${isAdmin?`<button class="chip ${state.view==="panel"?"on":""}" data-a="nav-panel">Panel</button>`:""}
     </span>
   </div>`;
   if(state.saveErr) h += `<div class="saveerr">No se pudo guardar el último cambio. Descargá una copia de respaldo por las dudas.</div>`;
@@ -458,7 +500,7 @@ function render(){
   if(state.view==="lista") h += vLista();
   if(state.view==="detalle") h += vDetalle();
   if(state.view==="cuenta") h += vCuenta();
-  if(state.view==="reportes") h += isAdmin ? vReportes() : vTablero();
+  if(state.view==="panel") h += isAdmin ? vPanel() : vTablero();
   if(state.view==="catalog") h += vCatalog();
   if(state.showNew) h += vModal();
   h += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;

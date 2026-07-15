@@ -58,10 +58,20 @@ document.addEventListener("click", (e)=>{
     state.backupsLoaded=false; state.backupsError=""; loadBackups();
   }
   else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; }
-  else if(a==="nav-reportes"){
-    state.view="reportes"; state.selId=null; state.reportesLoaded=false; state.reportesError="";
+  else if(a==="nav-panel"){
+    state.view="panel"; state.selId=null; state.panelTab="reportes";
+    state.reportesLoaded=false; state.reportesError="";
     loadReportes();
   }
+  else if(a==="panel-tab-reportes"){
+    state.panelTab="reportes"; state.reportesLoaded=false; state.reportesError="";
+    loadReportes();
+  }
+  else if(a==="panel-tab-usuarios"){
+    state.panelTab="usuarios"; state.usersLoaded=false; state.usersError="";
+    loadUsuarios();
+  }
+  else if(a==="refresh-usuarios"){ state.usersLoaded=false; state.usersError=""; loadUsuarios(); }
   else if(a==="reportes-filter"){ state.reportFilter=el.dataset.f; }
   else if(a==="toggle-reporte"){
     const r=(state.reportes||[]).find(x=>String(x.id)===el.dataset.id);

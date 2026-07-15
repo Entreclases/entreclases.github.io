@@ -14,6 +14,17 @@ function fmtDateTime(ts){
   try{ return new Date(ts).toLocaleString("es-AR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }
   catch(e){ return "—"; }
 }
+function timeAgo(ts){
+  if(!ts) return null;
+  const ms=Date.now()-new Date(ts).getTime();
+  if(ms<60000) return "recién";
+  const min=Math.floor(ms/60000);
+  if(min<60) return `hace ${min} minuto${min===1?"":"s"}`;
+  const hr=Math.floor(min/60);
+  if(hr<24) return `hace ${hr} hora${hr===1?"":"s"}`;
+  const d=Math.floor(hr/24);
+  return `hace ${d} día${d===1?"":"s"}`;
+}
 
 /* ============ estado ============ */
 let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
@@ -24,6 +35,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
               pendingConfirmEmail:null, confirmStatus:"idle", confirmError:"",
               reportMsg:"", reportStatus:"idle", reportError:"",
               reportes:[], reportFilter:"pendiente", reportesLoaded:false, reportesError:"",
+              panelTab:"reportes", users:[], usersLoaded:false, usersError:"",
               backups:[], backupsLoaded:false, backupsError:"",
               confirmRestoreId:null, restoreStatus:"idle", restoreError:"",
               newVersionTag:null, updateBannerDismissed:false };

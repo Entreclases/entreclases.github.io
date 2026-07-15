@@ -198,7 +198,7 @@ async function restoreBackup(id){
   }
 }
 
-/* ============ reportar un problema / panel admin ============ */
+/* ============ reportar un problema / panel admin (reportes y usuarios) ============ */
 async function sendReport(msg){
   const ses=getSes(); if(!ses) throw new Error("no-session");
   const s=await ensureToken();
@@ -218,6 +218,19 @@ async function loadReportes(){
     state.reportesLoaded=true; state.reportesError="";
   }catch(e){
     state.reportesError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar los reportes.";
+  }
+  render();
+}
+async function loadUsuarios(){
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=*&order=last_seen_at.desc.nullslast",{headers:h});
+    if(!r.ok) throw new Error("error "+r.status);
+    state.users=await r.json();
+    state.usersLoaded=true; state.usersError="";
+  }catch(e){
+    state.usersError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar los usuarios.";
   }
   render();
 }
