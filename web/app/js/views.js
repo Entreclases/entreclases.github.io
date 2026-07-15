@@ -354,6 +354,102 @@ function vCatalog(){
   return h;
 }
 
+/* ============ estadísticas por materia (todos los usuarios) ============ */
+function subjectsWithStudents(){
+  return state.catalog.subjects.filter(m => alive().some(s=>s.subjectId===m.id));
+}
+function defaultStatsSubjectId(){
+  const subs = subjectsWithStudents();
+  if(subs.length===0) return null;
+  let best=subs[0], bestCount=-1;
+  subs.forEach(m=>{
+    const c = alive().filter(s=>s.subjectId===m.id && s.status==="activo").length;
+    if(c>bestCount){ bestCount=c; best=m; }
+  });
+  return best.id;
+}
+function topicProgressPct(s){
+  const units=unitsFor(s); if(units.length===0) return null;
+  const topics=s.topics||{};
+  const entran=units.filter(t=>topics[t]!=="noentra");
+  if(entran.length===0) return null;
+  const parcial=entran.filter(t=>topics[t]==="parcial").length;
+  return parcial/entran.length*100;
+}
+// Una columna por categoría: barra (alto proporcional al total del grupo), número y label.
+function semaforoBars(counts){
+  const total=Object.values(counts).reduce((a,b)=>a+b,0)||1;
+  const order=[["verde","Encaminado"],["amarillo","En riesgo"],["rojo","Complicado"],["sd","Sin evaluar"]];
+  return `<div style="display:flex;gap:16px;margin-bottom:20px">` +
+    order.map(([k,lbl])=>{
+      const v=counts[k]||0, hgt=Math.max(2,Math.round(v/total*70));
+      return `<div style="flex:1;max-width:80px;display:flex;flex-direction:column;align-items:center">
+        <div style="height:70px;width:100%;display:flex;align-items:flex-end;justify-content:center">
+          <div title="${esc(lbl)}: ${v}" style="width:28px;background:${SEM_META[k].color};border-radius:4px 4px 0 0;height:${hgt}px"></div>
+        </div>
+        <b style="font-family:var(--mono);font-size:13px;margin-top:4px">${v}</b>
+        <div class="hint" style="text-align:center">${esc(lbl)}</div>
+      </div>`;
+    }).join("") + `</div>`;
+}
+function vEstadisticas(){
+  let h = `<button class="back" data-a="nav-tablero">← Volver al tablero</button>`;
+  const subs = subjectsWithStudents();
+  if(subs.length===0) return h + `<div class="empty">Todavía no hay alumnos con una materia asignada.</div>`;
+
+  const curId = subs.some(m=>m.id===state.statsSubjectId) ? state.statsSubjectId : subs[0].id;
+  h += `<div class="field" style="max-width:320px;margin-bottom:18px">
+    <div class="flabel">Materia</div>
+    <select data-cf="stats-subject">
+      ${subs.map(m=>`<option value="${m.id}" ${m.id===curId?"selected":""}>${esc(m.name)}</option>`).join("")}
+    </select></div>`;
+
+  const grupo = alive().filter(s=>s.subjectId===curId && s.status==="activo");
+  const conExamen = grupo.filter(s=>s.examDate && daysTo(s.examDate)!==null && daysTo(s.examDate)>=0);
+  const proximo = conExamen.length ? [...conExamen].sort((a,b)=>daysTo(a.examDate)-daysTo(b.examDate))[0] : null;
+
+  h += `<div class="stats" style="margin-bottom:6px">
+    <div class="stat"><b>${grupo.length}</b><span>alumnos activos</span></div>
+    <div class="stat"><b>${conExamen.length}</b><span>con examen a la vista</span></div>
+  </div>`;
+  h += proximo
+    ? `<div class="hint" style="margin-bottom:20px">Más próximo: <b>${esc(proximo.name)}</b> — ${daysTo(proximo.examDate)===0?"hoy":"en "+daysTo(proximo.examDate)+" día"+(daysTo(proximo.examDate)===1?"":"s")} (${fmtDate(proximo.examDate)})</div>`
+    : `<div style="margin-bottom:20px"></div>`;
+
+  h += `<div class="stitle">Semáforo del grupo</div>`;
+  const semCounts={verde:0,amarillo:0,rojo:0,sd:0};
+  grupo.forEach(s=>{ const v=s.semaforo||"sd"; semCounts[v]=(semCounts[v]||0)+1; });
+  h += semaforoBars(semCounts);
+
+  h += `<div class="stitle">Avance promedio de temas</div>`;
+  const progresos = grupo.map(topicProgressPct).filter(p=>p!==null);
+  if(progresos.length===0){
+    h += `<div class="empty">Sin datos de temas todavía.</div>`;
+  }else{
+    const avg = progresos.reduce((a,b)=>a+b,0)/progresos.length;
+    h += `<div class="stats" style="margin-bottom:8px"><div class="stat"><b>${avg.toFixed(0)}%</b><span>en nivel parcial, promedio del grupo</span></div></div>
+    <div style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:20px">
+      <div style="height:100%;width:${avg.toFixed(1)}%;background:var(--green);border-radius:99px"></div>
+    </div>`;
+  }
+
+  h += `<div class="stitle">Simulacros (últimos 30 días)</div>`;
+  const notas=[];
+  grupo.forEach(s=>(s.simulacros||[]).forEach(sim=>{
+    if(!sim.date) return;
+    const diasTranscurridos=-daysTo(sim.date);
+    if(diasTranscurridos<0 || diasTranscurridos>30) return;
+    const n=parseFloat(String(sim.grade||"").replace(",","."));
+    if(!isNaN(n)) notas.push(n);
+  }));
+  h += notas.length
+    ? `<div class="stats"><div class="stat"><b>${(notas.reduce((a,b)=>a+b,0)/notas.length).toFixed(1)}</b><span>promedio (${notas.length} simulacro${notas.length===1?"":"s"})</span></div></div>`
+    : `<div class="empty">Sin simulacros recientes.</div>`;
+
+  h += `<div class="stitle" style="margin-top:26px">Aula</div>`;
+  return h;
+}
+
 function vPanel(){
   const tab = state.panelTab||"reportes";
   let h = `<button class="back" data-a="nav-tablero">← Volver al tablero</button>
@@ -572,6 +668,7 @@ function render(){
     <span class="hint" id="syncStatus">${syncStatusText()}</span>
     <span style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="chip ${state.view==="catalog"?"on":""}" data-a="nav-catalog">Materias y carreras</button>
+      <button class="chip ${state.view==="stats"?"on":""}" data-a="nav-stats">Estadísticas</button>
       <button class="chip ${state.view==="cuenta"?"on":""}" data-a="nav-cuenta">Cuenta</button>
       ${isAdmin?`<button class="chip ${state.view==="panel"?"on":""}" data-a="nav-panel">Panel</button>`:""}
     </span>
@@ -583,6 +680,7 @@ function render(){
   if(state.view==="cuenta") h += vCuenta();
   if(state.view==="panel") h += isAdmin ? vPanel() : vTablero();
   if(state.view==="catalog") h += vCatalog();
+  if(state.view==="stats") h += vEstadisticas();
   if(state.showNew) h += vModal();
   h += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
   document.getElementById("app").innerHTML = h;

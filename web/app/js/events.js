@@ -58,6 +58,10 @@ document.addEventListener("click", (e)=>{
     state.backupsLoaded=false; state.backupsError=""; loadBackups();
   }
   else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; }
+  else if(a==="nav-stats"){
+    state.view="stats"; state.selId=null;
+    if(!subjectsWithStudents().some(m=>m.id===state.statsSubjectId)) state.statsSubjectId=defaultStatsSubjectId();
+  }
   else if(a==="nav-panel"){
     state.view="panel"; state.selId=null; state.panelTab="reportes";
     state.reportesLoaded=false; state.reportesError="";
@@ -276,6 +280,7 @@ document.addEventListener("change",(e)=>{
     state.students=state.students.map(x=>x.subjectId===m.id?{...x,subject:v}:x);
     touchCatalog(); return;
   }
+  if(cf && cf.dataset.cf==="stats-subject"){ state.statsSubjectId=cf.value; render(); return; }
   const el=e.target.closest("[data-f]"); if(!el) return;
   const s=sel(); if(!s) return;
   if(el.dataset.f==="subjectId"){

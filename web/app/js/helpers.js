@@ -35,6 +35,7 @@ function fmtBytes(n){
 /* ============ estado ============ */
 let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
               view:"tablero", selId:null, filter:"activo", tab:"temas",
+              statsSubjectId:null,
               showNew:false, confirmDel:false, saveErr:false,
               syncStatus:"idle", syncMsg:"", lastSync:null,
               authMode:"login", authEmail:"", recovery:null,
