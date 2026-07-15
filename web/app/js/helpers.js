@@ -32,6 +32,14 @@ function fmtBytes(n){
   return (n/1024/1024).toFixed(1)+" MB";
 }
 function fmtMoney(n){ return "$"+Math.round(n||0).toLocaleString("es-AR"); }
+async function copyToClipboard(text){
+  if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return; }
+  const ta=document.createElement("textarea");
+  ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ if(!document.execCommand("copy")) throw new Error("copy failed"); }
+  finally{ document.body.removeChild(ta); }
+}
 
 /* ============ estado ============ */
 let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPackId:null,
@@ -56,7 +64,8 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               materialesUploading:false, materialesUploadError:"",
               materialesConfirmDelName:null, materialesDeleteStatus:"idle",
               newVersionTag:null, updateBannerDismissed:false,
-              pagosMonth:null };
+              pagosMonth:null,
+              informePeriod:"3m", informeCopyMsg:"" };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
@@ -98,7 +107,7 @@ function emptyStudent(){
   return { id:uid(), name:"", career:(state.catalog.careers[0]||"Ingeniería"), subject:"", subjectId:"",
     chair:"", status:"activo", semaforo:"sd", examDate:"", startDate:today(), notes:"",
     updatedAt:Date.now(), topics:{}, sessions:[], simulacros:[],
-    tarifa:"", modalidad:"", pagos:[] };
+    tarifa:"", modalidad:"", pagos:[], informeComment:"" };
 }
 
 /* ============ regla: una ficha = un alumno en una materia ============
@@ -202,6 +211,20 @@ function pagoResumen(s, mk){
   }
   const cobrado=Math.min(tarifa, (s.pagos||[]).filter(p=>monthKeyOf(p.date)===mk).reduce((a,p)=>a+(Number(p.amount)||0),0));
   return { clases:clasesMes.length, total:tarifa, cobrado, pendiente:Math.max(0, tarifa-cobrado) };
+}
+
+/* ============ informe de progreso: período elegido para filtrar clases/simulacros ============ */
+const INFORME_PERIODS = {
+  "1m":{label:"Último mes",days:30}, "3m":{label:"Últimos 3 meses",days:90},
+  "6m":{label:"Últimos 6 meses",days:180}, "all":{label:"Todo el historial",days:null},
+};
+function informePeriodFrom(key){
+  const p = INFORME_PERIODS[key]||INFORME_PERIODS["3m"];
+  return p.days ? daysFromToday(-p.days) : null;
+}
+function periodRangeLabel(key, fromDate){
+  const p = INFORME_PERIODS[key]||INFORME_PERIODS["3m"];
+  return fromDate ? `${p.label} (${fmtDate(fromDate)} – ${fmtDate(today())})` : p.label;
 }
 
 /* ============ sesión: cookies (web) / localStorage (nativo) ============ */

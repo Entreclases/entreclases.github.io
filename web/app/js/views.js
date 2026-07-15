@@ -262,6 +262,10 @@ function vDetalle(){
 
   if(state.tab==="ficha"){
     const opt=(v,cur,l)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(l)}</option>`;
+    h += `<div class="formcard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div><div class="ftitle" style="margin-bottom:2px">Informe de progreso</div>
+        <div class="hint">Un resumen prolijo para compartir con el alumno o la familia.</div></div>
+      <button class="chip" data-a="open-informe">Generar informe</button></div>`;
     if(state.fichaError) h += `<div class="saveerr">${esc(state.fichaError)}</div>`;
     h += `<div class="formcard">
       <div class="frow">
@@ -355,6 +359,117 @@ function vPagos(){
     </button>`;
   }).join("");
   return h;
+}
+
+/* ============ informe de progreso: vista limpia, pensada para imprimir/compartir ============ */
+function informeFilteredData(s){
+  const periodKey = state.informePeriod||"3m";
+  const fromDate = informePeriodFrom(periodKey);
+  const sessions = [...(s.sessions||[])].filter(c=>!fromDate||c.date>=fromDate).sort((a,b)=>a.date.localeCompare(b.date));
+  const simulacros = [...(s.simulacros||[])].filter(c=>!fromDate||c.date>=fromDate).sort((a,b)=>a.date.localeCompare(b.date));
+  return { periodKey, fromDate, sessions, simulacros };
+}
+function vInforme(){
+  const s = sel(); if(!s) return "";
+  const { periodKey, fromDate, sessions, simulacros } = informeFilteredData(s);
+  const units = unitsFor(s), topics = s.topics||{};
+  const d = daysTo(s.examDate);
+
+  let h = `<div class="informe-bar no-print">
+    <button class="back" style="margin:0" data-a="close-informe">← Volver a la ficha</button>
+    <div class="informe-actions">
+      <select data-cf="informe-period" style="width:auto">
+        ${Object.entries(INFORME_PERIODS).map(([k,p])=>`<option value="${k}" ${k===periodKey?"selected":""}>${esc(p.label)}</option>`).join("")}
+      </select>
+      <button class="chip" data-a="informe-copy">Copiar resumen para WhatsApp</button>
+      <button class="primary" style="margin-left:0" data-a="informe-print">Descargar PDF</button>
+    </div>
+  </div>`;
+  if(state.informeCopyMsg) h += `<div class="hint no-print" style="margin:-10px 0 14px">${esc(state.informeCopyMsg)}</div>`;
+
+  h += `<div class="informe-doc">
+    <div class="informe-eyebrow">Informe de progreso</div>
+    <h1 class="informe-name">${esc(s.name)}</h1>
+    <div class="informe-sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")}${s.chair?" · "+esc(s.chair):""}</div>
+    <div class="informe-meta">
+      <div><span class="informe-metalabel">Período</span>${esc(periodRangeLabel(periodKey,fromDate))}</div>
+      <div><span class="informe-metalabel">Examen</span>${s.examDate?esc(fmtDate(s.examDate))+(d!==null&&d>=0?` (en ${d} día${d===1?"":"s"})`:""):"sin fecha cargada"}</div>
+      <div><span class="informe-metalabel">Estado</span>${esc(STATUS_META[s.status].label)}</div>
+    </div>
+
+    <div class="informe-section">
+      <div class="informe-stitle">Progreso por unidad</div>
+      ${units.length===0 ? `<div class="informe-empty">Sin materia asignada.</div>` : `<div class="informe-units">` +
+        units.map(t=>{ const st=topics[t]||"pendiente", m=TOPIC_META[st];
+          return `<div class="informe-unit" style="border-left-color:${m.fg}"><span>${esc(t)}</span><b style="color:${m.fg}">${m.label}</b></div>`;
+        }).join("") + `</div>`}
+    </div>
+
+    <div class="informe-section">
+      <div class="informe-stitle">Clases del período (${sessions.length})</div>
+      ${sessions.length===0 ? `<div class="informe-empty">Sin clases registradas en este período.</div>` :
+        sessions.map(c=>`<div class="informe-row">
+          <div class="informe-date">${esc(fmtDate(c.date))}</div>
+          <div class="informe-rowbody"><b>${esc(c.topic||"Clase")}</b>${c.tarea&&c.tarea!=="sd"?` <span style="color:${TAREA_META[c.tarea].fg}">· tarea ${esc(TAREA_META[c.tarea].label)}</span>`:""}
+          ${c.note?`<div class="informe-note">${esc(c.note)}</div>`:""}</div></div>`).join("")}
+    </div>
+
+    <div class="informe-section">
+      <div class="informe-stitle">Simulacros (${simulacros.length})</div>
+      ${simulacros.length===0 ? `<div class="informe-empty">Sin simulacros en este período.</div>` :
+        simulacros.map(c=>`<div class="informe-row">
+          <div class="informe-date">${esc(fmtDate(c.date))}</div>
+          <div class="informe-rowbody"><b>${esc(c.grade||"s/nota")}</b>
+          ${c.note?`<div class="informe-note">${esc(c.note)}</div>`:""}</div></div>`).join("")}
+    </div>
+
+    <div class="informe-section">
+      <div class="informe-stitle">Comentario del profesor</div>
+      <textarea class="informe-comment" data-f="informeComment" placeholder="Agregá un comentario para este informe…">${esc(s.informeComment||"")}</textarea>
+    </div>
+
+    <div class="informe-footer">Generado con Cuaderno de seguimiento — ${esc(fmtDate(today()))}</div>
+  </div>`;
+  return h;
+}
+function buildInformeText(s){
+  const { periodKey, fromDate, sessions, simulacros } = informeFilteredData(s);
+  const units = unitsFor(s), topics = s.topics||{};
+  const d = daysTo(s.examDate);
+  const lines = [];
+  lines.push(`*Informe de progreso — ${s.name}*`);
+  lines.push(`${s.career} · ${s.subject||"materia s/d"}`);
+  lines.push(`Período: ${periodRangeLabel(periodKey,fromDate)}`);
+  lines.push(s.examDate ? `Examen: ${fmtDate(s.examDate)}${d!==null&&d>=0?` (en ${d} día${d===1?"":"s"})`:""}` : "Examen: sin fecha cargada");
+  lines.push("");
+  if(units.length){
+    lines.push("*Progreso por unidad:*");
+    units.forEach(t=>lines.push(`- ${t}: ${TOPIC_META[topics[t]||"pendiente"].label}`));
+    lines.push("");
+  }
+  lines.push(`*Clases del período (${sessions.length}):*`);
+  if(sessions.length===0) lines.push("Sin clases registradas.");
+  else sessions.forEach(c=>{
+    let l = `- ${fmtDate(c.date)}: ${c.topic||"Clase"}`;
+    if(c.tarea && c.tarea!=="sd") l += ` (tarea ${TAREA_META[c.tarea].label})`;
+    lines.push(l);
+    if(c.note) lines.push(`  ${c.note}`);
+  });
+  lines.push("");
+  lines.push(`*Simulacros (${simulacros.length}):*`);
+  if(simulacros.length===0) lines.push("Sin simulacros registrados.");
+  else simulacros.forEach(c=>{
+    lines.push(`- ${fmtDate(c.date)}: ${c.grade||"s/nota"}`);
+    if(c.note) lines.push(`  ${c.note}`);
+  });
+  if(s.informeComment){
+    lines.push("");
+    lines.push("*Comentario del profesor:*");
+    lines.push(s.informeComment);
+  }
+  lines.push("");
+  lines.push("_Generado con Cuaderno de seguimiento_");
+  return lines.join("\n");
 }
 
 function vAuth(){
@@ -1105,6 +1220,10 @@ function render(){
     document.getElementById("app").innerHTML = vAuth();
     const em=document.getElementById("auth-email"); if(em) em.focus();
     return;
+  }
+  if(state.view==="informe"){
+    if(!sel()){ state.view="tablero"; }
+    else{ document.getElementById("app").innerHTML = vInforme(); return; }
   }
   const activos = alive().filter(s=>s.status==="activo").length;
   const ses = getSes();

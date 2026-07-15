@@ -316,6 +316,15 @@ document.addEventListener("click", (e)=>{
     }
   }
   else if(a.startsWith("tab-")){ state.tab=a.slice(4); state.confirmDel=false; state.fichaError=""; }
+  else if(a==="open-informe" && s){ state.view="informe"; state.informeCopyMsg=""; }
+  else if(a==="close-informe"){ state.view="detalle"; state.informeCopyMsg=""; }
+  else if(a==="informe-print"){ window.print(); return; }
+  else if(a==="informe-copy" && s){
+    copyToClipboard(buildInformeText(s))
+      .then(()=>{ state.informeCopyMsg="Copiado — pegalo en WhatsApp."; render(); })
+      .catch(()=>{ state.informeCopyMsg="No se pudo copiar. Seleccioná el texto manualmente."; render(); });
+    return;
+  }
   else if(a==="filter"){ state.filter=el.dataset.f; }
   else if(a==="clear-filters"){
     state.filter="activo"; state.listSearch=""; state.listSubject="todas"; state.listCareer="todas"; state.listSem="todos";
@@ -421,6 +430,7 @@ document.addEventListener("change",(e)=>{
   if(cf && cf.dataset.cf==="new-pack-name"){ state.newPackName=cf.value; return; }
   if(cf && cf.dataset.cf==="stats-subject"){ state.statsSubjectId=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="pagos-month"){ state.pagosMonth=cf.value; render(); return; }
+  if(cf && cf.dataset.cf==="informe-period"){ state.informePeriod=cf.value; state.informeCopyMsg=""; render(); return; }
   const lf=e.target.closest("[data-lf]");
   if(lf){
     if(lf.dataset.lf==="subject") state.listSubject=lf.value;
