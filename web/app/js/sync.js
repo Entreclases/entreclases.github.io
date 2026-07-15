@@ -55,6 +55,7 @@ async function syncNow(force){
           // nada cambió ni acá ni en la nube: ni bajamos data ni escribimos nada
           state.lastSync=Date.now();
           setStatus("ok");
+          pendingSyncs++;
           maybeSnapshotBackup(uid_, s);
           return;
         }
@@ -94,6 +95,7 @@ async function syncNow(force){
     if(remoteUpdatedAt) localStorage.setItem(LAST_REMOTE_KEY, remoteUpdatedAt);
     state.lastSync=Date.now();
     setStatus("ok");
+    pendingSyncs++;
     // re-dibujar solo si la nube trajo cambios (para no interrumpir si estás escribiendo)
     if(JSON.stringify({a:state.students,b:state.catalog})!==before && state.view!=="cuenta" && state.view!=="catalog") render();
     maybeSnapshotBackup(uid_, s);
@@ -112,23 +114,37 @@ window.addEventListener("offline", ()=>setStatus("offline"));
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && getSes()) syncNow(); });
 setInterval(()=>{ if(getSes() && !document.hidden) syncNow(); }, 10*60*1000);
 
-/* ============ heartbeat de presencia (tabla perfiles) ============ */
+/* ============ heartbeat de presencia (tabla perfiles) + métricas de actividad ============ */
 // Se cuelga del ciclo de sync existente (no arranca timers propios): se llama desde
 // syncNow() en cada intento real de sync, que ya solo ocurre con la pestaña visible
 // (arranque, volver a la pestaña, o el intervalo de 10min que también chequea
 // document.hidden) o al recuperar conexión. Acá adentro nos aseguramos una vez más de
-// la visibilidad (por si algún caller llega a cambiar) y de no mandar más de un PATCH
+// la visibilidad (por si algún caller llega a cambiar) y de no mandar más de un PATCH/RPC
 // cada 5 minutos.
-let lastHeartbeat=0;
+let lastHeartbeat=0, aperturaRegistrada=false, pendingSyncs=0;
 async function maybeHeartbeat(uid_, s){
   if(document.hidden) return;
   if(Date.now()-lastHeartbeat < 5*60*1000) return;
   lastHeartbeat=Date.now();
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
   try{
-    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
     await fetch(SUPA_URL+"/rest/v1/perfiles?user_id=eq."+encodeURIComponent(uid_), {method:"PATCH", headers:h,
       body:JSON.stringify({last_seen_at:new Date().toISOString(), plataforma:detectPlatform(), version:APP_VERSION})});
   }catch(e){ /* silencioso: offline o falla puntual, nunca interrumpe al usuario */ }
+
+  // registrar_actividad(n_aperturas, n_syncs) suma sobre el día del usuario autenticado.
+  // "1 apertura" se manda una sola vez por sesión de uso (primer heartbeat elegible, que en
+  // la práctica coincide con el arranque de la app); los syncs se cuentan localmente
+  // (pendingSyncs, incrementado en syncNow) y se despachan acumulados junto al heartbeat.
+  const nAperturas = aperturaRegistrada ? 0 : 1;
+  const nSyncs = pendingSyncs;
+  if(nAperturas || nSyncs){
+    aperturaRegistrada=true; pendingSyncs=0;
+    try{
+      await fetch(SUPA_URL+"/rest/v1/rpc/registrar_actividad", {method:"POST", headers:h,
+        body:JSON.stringify({n_aperturas:nAperturas, n_syncs:nSyncs})});
+    }catch(e){ /* silencioso */ }
+  }
 }
 
 /* ============ respaldos automáticos con historial ============ */
@@ -231,6 +247,25 @@ async function loadUsuarios(){
     state.usersLoaded=true; state.usersError="";
   }catch(e){
     state.usersError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar los usuarios.";
+  }
+  render();
+}
+async function loadActividad(){
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const desde=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+    const [rm,rp]=await Promise.all([
+      fetch(SUPA_URL+"/rest/v1/metricas_diarias?select=user_id,dia,aperturas,syncs&dia=gte."+desde+"&order=dia.asc", {headers:h}),
+      fetch(SUPA_URL+"/rest/v1/perfiles?select=created_at", {headers:h})
+    ]);
+    if(!rm.ok) throw new Error("error "+rm.status);
+    if(!rp.ok) throw new Error("error "+rp.status);
+    state.metricas=await rm.json();
+    state.altas=(await rp.json()).map(x=>x.created_at);
+    state.actividadLoaded=true; state.actividadError="";
+  }catch(e){
+    state.actividadError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar las métricas.";
   }
   render();
 }

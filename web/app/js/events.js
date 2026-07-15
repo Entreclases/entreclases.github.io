@@ -71,7 +71,12 @@ document.addEventListener("click", (e)=>{
     state.panelTab="usuarios"; state.usersLoaded=false; state.usersError="";
     loadUsuarios();
   }
+  else if(a==="panel-tab-actividad"){
+    state.panelTab="actividad"; state.actividadLoaded=false; state.actividadError="";
+    loadActividad();
+  }
   else if(a==="refresh-usuarios"){ state.usersLoaded=false; state.usersError=""; loadUsuarios(); }
+  else if(a==="refresh-actividad"){ state.actividadLoaded=false; state.actividadError=""; loadActividad(); }
   else if(a==="reportes-filter"){ state.reportFilter=el.dataset.f; }
   else if(a==="toggle-reporte"){
     const r=(state.reportes||[]).find(x=>String(x.id)===el.dataset.id);

@@ -360,8 +360,9 @@ function vPanel(){
   <div class="tabs" style="margin-bottom:14px">
     ${tabbtn("panel-tab-reportes",tab==="reportes","Reportes")}
     ${tabbtn("panel-tab-usuarios",tab==="usuarios","Usuarios")}
+    ${tabbtn("panel-tab-actividad",tab==="actividad","Actividad")}
   </div>`;
-  h += tab==="usuarios" ? vUsuarios() : vReportes();
+  h += tab==="usuarios" ? vUsuarios() : tab==="actividad" ? vActividad() : vReportes();
   return h;
 }
 
@@ -416,6 +417,51 @@ function vUsuarios(){
       </div>
     </div>`;
   }).join("");
+  return h;
+}
+
+// Barras simples en CSS (sin librerías): una <div> por dato, alto proporcional al máximo
+// del propio conjunto. El título (tooltip) lleva la etiqueta y el valor exacto.
+function barRow(dataset){
+  const max=Math.max(1, ...dataset.map(d=>d.v));
+  return `<div style="display:flex;align-items:flex-end;gap:3px;height:60px;margin-bottom:4px">` +
+    dataset.map(d=>`<div title="${esc(d.label)}: ${d.v}" style="flex:1;min-width:2px;background:var(--ink);
+      border-radius:2px 2px 0 0;height:${Math.max(2,Math.round(d.v/max*60))}px"></div>`).join("") +
+    `</div><div class="hint" style="margin-bottom:16px">${esc(dataset[0].label)} → ${esc(dataset[dataset.length-1].label)}</div>`;
+}
+
+function vActividad(){
+  let h = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="chip" data-a="refresh-actividad">Actualizar</button></div>`;
+  if(state.actividadError) return h + `<div class="saveerr">${esc(state.actividadError)}</div>`;
+  if(!state.actividadLoaded) return h + `<div class="empty">Cargando métricas…</div>`;
+
+  const days=[]; for(let i=29;i>=0;i--) days.push(new Date(Date.now()-i*86400000).toISOString().slice(0,10));
+  const byDay={}; days.forEach(d=>byDay[d]={users:new Set(),aperturas:0,syncs:0});
+  (state.metricas||[]).forEach(m=>{
+    const d=byDay[m.dia]; if(!d) return;
+    d.users.add(m.user_id); d.aperturas+=(m.aperturas||0); d.syncs+=(m.syncs||0);
+  });
+  const activeSet = days.map(d=>({label:fmtDate(d), v:byDay[d].users.size}));
+  const aperturasSet = days.map(d=>({label:fmtDate(d), v:byDay[d].aperturas}));
+  const syncsSet = days.map(d=>({label:fmtDate(d), v:byDay[d].syncs}));
+
+  h += `<div class="stitle">Usuarios activos por día (últimos 30 días)</div>` + barRow(activeSet);
+  h += `<div class="stitle">Aperturas por día</div>` + barRow(aperturasSet);
+  h += `<div class="stitle">Syncs por día</div>` + barRow(syncsSet);
+
+  // Altas nuevas por semana: buckets de 7 días sobre perfiles.created_at (~35 días de ventana).
+  const buckets=[0,0,0,0,0];
+  (state.altas||[]).forEach(ts=>{
+    if(!ts) return;
+    const daysAgo=Math.floor((Date.now()-new Date(ts).getTime())/86400000);
+    const idx=Math.floor(daysAgo/7);
+    if(idx>=0 && idx<5) buckets[idx]++;
+  });
+  const labels=["Últimos 7 días","8–14 días","15–21 días","22–28 días","29–35 días"];
+  const altasSet = buckets.map((v,i)=>({label:labels[i], v})).reverse();
+  h += `<div class="stitle">Altas nuevas por semana</div>` + barRow(altasSet);
+
   return h;
 }
 

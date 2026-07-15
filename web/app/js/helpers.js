@@ -36,6 +36,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
               reportMsg:"", reportStatus:"idle", reportError:"",
               reportes:[], reportFilter:"pendiente", reportesLoaded:false, reportesError:"",
               panelTab:"reportes", users:[], usersLoaded:false, usersError:"",
+              metricas:[], altas:[], actividadLoaded:false, actividadError:"",
               backups:[], backupsLoaded:false, backupsError:"",
               confirmRestoreId:null, restoreStatus:"idle", restoreError:"",
               newVersionTag:null, updateBannerDismissed:false };
