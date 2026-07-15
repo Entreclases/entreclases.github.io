@@ -1,0 +1,143 @@
+"use strict";
+/* ============ helpers genéricos: texto, fechas, ids ============ */
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const today = () => new Date().toISOString().slice(0,10);
+const esc = (s) => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function daysTo(ds){ if(!ds) return null;
+  const d=new Date(ds+"T12:00:00"), n=new Date(); n.setHours(12,0,0,0);
+  return Math.round((d-n)/86400000); }
+function fmtDate(ds){ if(!ds) return "—";
+  return new Date(ds+"T12:00:00").toLocaleDateString("es-AR",{day:"numeric",month:"short"}); }
+function fmtDateTime(ts){
+  if(!ts) return "—";
+  try{ return new Date(ts).toLocaleString("es-AR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}); }
+  catch(e){ return "—"; }
+}
+
+/* ============ estado ============ */
+let state = { students:[], catalog:defaultCatalog(), editSubjectId:null,
+              view:"tablero", selId:null, filter:"activo", tab:"temas",
+              showNew:false, confirmDel:false, saveErr:false,
+              syncStatus:"idle", syncMsg:"", lastSync:null,
+              authMode:"login", authEmail:"", recovery:null,
+              pendingConfirmEmail:null, confirmStatus:"idle", confirmError:"",
+              reportMsg:"", reportStatus:"idle", reportError:"",
+              reportes:[], reportFilter:"pendiente", reportesLoaded:false, reportesError:"",
+              backups:[], backupsLoaded:false, backupsError:"",
+              confirmRestoreId:null, restoreStatus:"idle", restoreError:"",
+              newVersionTag:null, updateBannerDismissed:false };
+
+const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
+function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
+function careerOptions(cur){ const l=[...state.catalog.careers]; if(cur && !l.includes(cur)) l.push(cur); return l; }
+function touchCatalog(){ state.catalog.updatedAt=Date.now(); save(); render(); }
+
+const alive = () => state.students.filter(s => !s.deleted);
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){ const p = JSON.parse(raw);
+      if(Array.isArray(p.students)) state.students = p.students;
+      if(p.catalog && Array.isArray(p.catalog.careers) && Array.isArray(p.catalog.subjects))
+        state.catalog = p.catalog; }
+  }catch(e){}
+  // limpiar marcas de borrado con más de 90 días (ya viajaron a todos los dispositivos)
+  state.students = state.students.filter(s => !(s.deleted && (Date.now()-(s.updatedAt||0)) > 90*86400000));
+}
+function setDirty(v){ try{ v ? localStorage.setItem(DIRTY_KEY,"1") : localStorage.removeItem(DIRTY_KEY); }catch(e){} }
+function isDirty(){ return localStorage.getItem(DIRTY_KEY)==="1"; }
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify({students:state.students, catalog:state.catalog})); state.saveErr=false; }
+  catch(e){ state.saveErr=true; }
+  setDirty(true);
+  scheduleSync();
+}
+const sel = () => state.students.find(s=>s.id===state.selId) || null;
+function update(id, patch){
+  patch = {...patch, updatedAt: Date.now()};
+  state.students = state.students.map(s => s.id===id ? {...s,...patch} : s);
+  save(); render();
+}
+function emptyStudent(){
+  return { id:uid(), name:"", career:(state.catalog.careers[0]||"Ingeniería"), subject:"", subjectId:"",
+    chair:"", status:"activo", semaforo:"sd", examDate:"", startDate:today(), notes:"",
+    updatedAt:Date.now(), topics:{}, sessions:[], simulacros:[] };
+}
+
+/* ============ alertas ============ */
+function studentAlerts(s){
+  const out=[]; if(s.status!=="activo") return out;
+  const d=daysTo(s.examDate);
+  if(d!==null && d>=0 && d<=14 && s.simulacros.length===0)
+    out.push(`Examen en ${d} día${d===1?"":"s"} y todavía no hizo ningún simulacro`);
+  const last2=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);
+  if(last2.length===2 && last2.every(x=>x.tarea==="no"))
+    out.push("Dos clases seguidas sin tarea hecha — momento de la charla");
+  const lastDate = s.sessions.length ? [...s.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0].date : s.startDate;
+  const gap = lastDate ? -daysTo(lastDate) : null;
+  if(gap!==null && gap>=10) out.push(`Sin clases hace ${gap} días — ¿sigue o pasarlo a pausado?`);
+  return out;
+}
+
+/* ============ sesión: cookies (web) / localStorage (nativo) ============ */
+// Cookies de sesión (solo web): sin Expires/Max-Age quedan como "cookie de sesión" del
+// navegador — sobreviven a cerrar la pestaña pero se borran al cerrar el navegador entero.
+function setCookie(name,value){
+  const secure = location.protocol==="https:" ? "; Secure" : "";
+  document.cookie = name+"="+encodeURIComponent(value)+"; path=/; SameSite=Lax"+secure;
+}
+function getCookie(name){
+  const m = document.cookie.match(new RegExp("(?:^|; )"+name+"=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function delCookie(name){
+  document.cookie = name+"=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+}
+// Techo a la sesión web: algunos navegadores (Chrome/Edge con "continuar donde lo dejé")
+// preservan las cookies de sesión al reabrir aunque se haya cerrado el navegador entero.
+// Como eso escapa a lo que la página puede controlar, la propia app invalida la sesión
+// si pasó más de este tiempo desde el login, sin cambiar el resto del comportamiento.
+const SES_MAX_AGE_MS = 24*60*60*1000; // 24hs
+function getSes(){
+  try{
+    if(IS_NATIVE) return JSON.parse(localStorage.getItem(SES_KEY))||null;
+    let raw = getCookie(SES_KEY);
+    if(!raw){
+      // migración: versiones previas de la web guardaban la sesión en localStorage
+      const legacy = localStorage.getItem(SES_KEY);
+      if(legacy){ setCookie(SES_KEY, legacy); localStorage.removeItem(SES_KEY); raw = legacy; }
+    }
+    if(!raw) return null;
+    const ses = JSON.parse(raw);
+    if(ses.loginAt && (Date.now()-ses.loginAt) > SES_MAX_AGE_MS){ delCookie(SES_KEY); return null; }
+    return ses;
+  }catch(e){ return null; }
+}
+function setSes(v){
+  if(IS_NATIVE){
+    v ? localStorage.setItem(SES_KEY,JSON.stringify(v)) : localStorage.removeItem(SES_KEY);
+  }else{
+    v ? setCookie(SES_KEY,JSON.stringify(v)) : delCookie(SES_KEY);
+  }
+}
+// rol cacheado en la propia sesión (ver storeSession/loadRole) para que ande offline;
+// sin rol conocido todavía se degrada a "profesor" — nunca admin por defecto.
+function sesIsAdmin(ses){ return !!(ses && ses.role==="admin"); }
+function getRememberedEmails(){
+  try{ const a=JSON.parse(localStorage.getItem(EMAILS_KEY)); return Array.isArray(a)?a:[]; }
+  catch(e){ return []; }
+}
+function rememberEmail(email){
+  if(!email) return;
+  try{
+    const list=[email, ...getRememberedEmails().filter(e=>e!==email)].slice(0,8);
+    localStorage.setItem(EMAILS_KEY, JSON.stringify(list));
+  }catch(e){}
+}
+
+function jwtSub(tok){
+  try{ return JSON.parse(atob(tok.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).sub; }
+  catch(e){ return null; }
+}
