@@ -66,12 +66,14 @@
   .card p{font-size:13.5px;color:var(--muted);margin:0}
 
   .dlgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;align-items:stretch}
+  .dlgrid.single{max-width:440px;margin:0 auto}
   .dlcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;
           display:flex;flex-direction:column;gap:10px}
   .dlcard .platform{font-weight:700;font-size:16px}
   .dlcard .desc{font-size:13px;color:var(--muted);margin-bottom:6px;min-height:34px}
   .dlcard .meta{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-top:2px}
   .dlcard .subnote{font-size:11px;color:var(--faint);line-height:1.4;margin-top:2px}
+  .section-note{margin-top:22px;font-size:12px;color:var(--faint);text-align:center}
 
   footer.site{border-top:1px solid var(--line);padding:30px 0;text-align:center;
     color:var(--faint);font-size:12.5px}
@@ -95,7 +97,7 @@
     </div>
     <nav class="mainnav">
       <a href="#caracteristicas">Características</a>
-      <a href="#descargas">Descargas</a>
+      <a href="#usala">Usala donde quieras</a>
     </nav>
   </div>
 </header>
@@ -106,7 +108,7 @@
     <p class="sub">Una app que te simplifica la vida</p>
     <div class="actions">
       <a class="btn primary hero-cta" href="./app/index.html">Abrir la aplicación web</a>
-      <a class="btn-link" href="#descargas">Descargas</a>
+      <a class="btn-link" href="#usala">Usala donde quieras</a>
     </div>
   </div>
 </section>
@@ -140,35 +142,19 @@
   </div>
 </section>
 
-<section id="descargas">
+<section id="usala">
   <div class="wrap">
-    <div class="stitle">Descargas</div>
-    <h2 class="sectitle">Usala en la compu, el celular, o directo desde el navegador</h2>
-    <div class="dlgrid">
-
-      <div class="dlcard">
-        <div class="platform">Windows</div>
-        <div class="desc">Aplicación de escritorio instalable, con ícono propio y sin depender del navegador.</div>
-        <a class="btn primary block" id="dl-windows" href="https://github.com/manugandini53-design/manugandini53-design.github.io/releases/latest">Descargar para Windows</a>
-        <div class="meta" id="dl-windows-meta">Buscando la última versión…</div>
-      </div>
-
-      <div class="dlcard">
-        <div class="platform">Android</div>
-        <div class="desc">Aplicación nativa para celular, instalable directo (fuera de Google Play).</div>
-        <a class="btn primary block" id="dl-android" href="https://github.com/manugandini53-design/manugandini53-design.github.io/releases/latest">Descargar para Android</a>
-        <div class="meta" id="dl-android-meta">Buscando la última versión…</div>
-        <div class="subnote">Al instalar, Android puede pedir permiso para instalar aplicaciones de este origen — es normal en apps distribuidas fuera de Google Play.</div>
-      </div>
-
+    <div class="stitle">Usala donde quieras</div>
+    <h2 class="sectitle">En la compu, en el celular, con o sin internet</h2>
+    <div class="dlgrid single">
       <div class="dlcard">
         <div class="platform">Versión web</div>
-        <div class="desc">Se abre directo en el navegador. No requiere instalación, y podés "instalarla" a la pantalla de inicio si querés.</div>
-        <a class="btn secondary block" href="./app/index.html">Abrir en el navegador</a>
-        <div class="meta">&nbsp;</div>
+        <div class="desc">Se abre directo en el navegador, en la compu o el celular. No requiere instalación, funciona con o sin conexión, y sincroniza sola entre tus dispositivos.</div>
+        <a class="btn primary block" href="./app/index.html">Abrir la aplicación</a>
+        <div class="subnote">Desde el navegador del celular podés tocar "Agregar a la pantalla de inicio" para tenerla como una app más, con su propio ícono.</div>
       </div>
-
     </div>
+    <p class="section-note">Las aplicaciones instalables para Windows y Android vuelven más adelante.</p>
   </div>
 </section>
 
@@ -177,42 +163,6 @@
     Cuaderno de seguimiento — Contacto: <a href="mailto:manugandini53@gmail.com">manugandini53@gmail.com</a>
   </div>
 </footer>
-
-<script>
-"use strict";
-async function loadLatestRelease(){
-  const winBtn = document.getElementById("dl-windows");
-  const winMeta = document.getElementById("dl-windows-meta");
-  const andMeta = document.getElementById("dl-android-meta");
-  try{
-    const r = await fetch("https://api.github.com/repos/manugandini53-design/manugandini53-design.github.io/releases/latest");
-    if(!r.ok) throw new Error("sin release");
-    const j = await r.json();
-    const assets = Array.isArray(j.assets) ? j.assets : [];
-
-    const exe = assets.find(a => /\.exe$/i.test(a.name));
-    if(exe){
-      winBtn.href = exe.browser_download_url;
-      winMeta.textContent = (j.tag_name||"") + " · " + (exe.size/1024/1024).toFixed(1) + " MB";
-    }else{
-      winMeta.textContent = "Ver todas las versiones en GitHub";
-    }
-
-    const andBtn = document.getElementById("dl-android");
-    const apk = assets.find(a => /\.apk$/i.test(a.name));
-    if(apk){
-      andBtn.href = apk.browser_download_url;
-      andMeta.textContent = (j.tag_name||"") + " · " + (apk.size/1024/1024).toFixed(1) + " MB";
-    }else{
-      andMeta.textContent = "Ver todas las versiones en GitHub";
-    }
-  }catch(e){
-    winMeta.textContent = "Ver todas las versiones en GitHub";
-    andMeta.textContent = "Ver todas las versiones en GitHub";
-  }
-}
-loadLatestRelease();
-</script>
 
 </body>
 </html>
