@@ -420,6 +420,7 @@ function vCatalog(){
   const em = state.editSubjectId ? subjById(state.editSubjectId) : null;
   if(em){
     h += `<div class="formcard"><div class="ftitle">Editar materia</div>
+    ${em.id==="materia-ejemplo"?`<div class="hint" style="margin-bottom:12px">Esta materia viene de ejemplo para mostrar el formato de unidades — renombrala o borrala cuando quieras.</div>`:""}
     <div class="field"><div class="flabel">Nombre de la materia</div>
       <input data-cf="subj-name" value="${esc(em.name)}"></div>
     <div class="flabel" style="margin-top:12px">Unidades / temas (se muestran en este orden)</div>
@@ -441,9 +442,8 @@ function vCatalog(){
     <button class="chip" data-a="cat-add-career" style="margin-bottom:2px">+ Agregar carrera</button></div>
   <div class="hint" style="margin-top:6px">Quitar una carrera no afecta a los alumnos que ya la tienen: la conservan en su ficha.</div></div>`;
   h += `<div class="formcard"><div class="ftitle">Materias y sus unidades</div>
-  ${c.subjects.map(m=>`<div class="log" style="padding:7px 12px;align-items:center">
-    <div class="body"><b>${esc(m.name)}</b><div class="note">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
-    <button class="chip" data-a="cat-edit-subject" data-id="${m.id}">Editar</button>
+  ${c.subjects.map(m=>`<div class="row" style="cursor:pointer" data-a="cat-edit-subject" data-id="${m.id}">
+    <div class="main"><b>${esc(m.name)}</b><div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
     <button class="del" data-a="cat-del-subject" data-id="${m.id}" title="Eliminar materia">×</button></div>`).join("") || `<div class="empty">Sin materias cargadas.</div>`}
   <div class="frow" style="margin-top:8px;align-items:flex-end">
     <div class="field"><input id="new-subject" placeholder="Ej: Álgebra y Geometría Analítica"></div>

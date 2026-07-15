@@ -42,7 +42,6 @@ function detectPlatform(){
   if(window.Capacitor) return "Android";
   return "Web";
 }
-const TOPICS = ["Trigonometría","Funciones","Matrices","Determinantes","Vectores","Límites","Derivadas","Integrales"];
 const TOPIC_CYCLE = ["pendiente","visto","practica","parcial","noentra"];
 const TOPIC_META = {
   pendiente:{label:"Pendiente",bg:"var(--topic-pendiente-bg)",fg:"var(--topic-pendiente-fg)",bd:"var(--topic-pendiente-bd)"},
@@ -68,7 +67,8 @@ const SEM_META = {
 const CAREERS = ["Ingeniería","Licenciatura","Arquitectura","Ingresante"];
 function defaultCatalog(){
   return { careers:[...CAREERS],
-    subjects:[{ id:"matbasica", name:"Matemática básica", units:[...TOPICS] }],
+    subjects:[{ id:"materia-ejemplo", name:"Materia de ejemplo (tocala para verla)",
+      units:["Unidad 1: introducción","Unidad 2: desarrollo","Unidad 3: aplicaciones","Unidad 4: repaso final"] }],
     updatedAt:0 };
 }
 const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};

@@ -95,7 +95,7 @@ function emptyStudent(){
 // la app sabe hacer, para que una cuenta nueva sin datos vea de entrada qué se puede hacer.
 function daysFromToday(n){ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
 function sampleStudent(){
-  const m = subjById("matbasica") || state.catalog.subjects[0] || null;
+  const m = subjById("materia-ejemplo") || state.catalog.subjects[0] || null;
   const units = m ? m.units : [];
   const topics = {};
   const cycle = ["parcial","visto","practica","pendiente","noentra"];
