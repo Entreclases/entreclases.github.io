@@ -184,6 +184,7 @@ document.addEventListener("click", (e)=>{
       .catch(err=>authMsgShow(friendlyAuthError(err)));
     return;
   }
+  else if(a==="set-theme"){ setTheme(el.dataset.f); }
   else if(a==="sync-now"){ syncNow(true); return; }
   else if(a==="dismiss-update-banner"){ state.updateBannerDismissed=true; }
   else if(a==="restore-ask"){ state.confirmRestoreId=el.dataset.id; }

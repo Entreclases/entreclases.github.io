@@ -38,7 +38,7 @@ function vTablero(){
           <span class="count ${d<=7?"urgent":""}">${d===0?"HOY":d+" día"+(d===1?"":"s")}</span>
           <div style="font-weight:700;font-size:15px;margin:8px 0 2px;display:flex;align-items:center;gap:7px">${esc(s.name)} ${semDot(s.semaforo,11,false)}</div>
           <div style="font-size:12.5px;color:var(--muted)">${esc(s.subject||"Materia s/d")} · ${fmtDate(s.examDate)}</div>
-          <div style="font-size:11.5px;font-family:var(--mono);margin-top:6px;color:${s.simulacros.length?"#1F6B44":"#A23A2A"}">${sim}</div>
+          <div style="font-size:11.5px;font-family:var(--mono);margin-top:6px;color:${s.simulacros.length?"var(--green)":"var(--red)"}">${sim}</div>
         </button>`;}).join("") + `</div>`;
 
   if(alive().length===0)
@@ -118,7 +118,7 @@ function vDetalle(){
         const m=TOPIC_META[st];
         return `<button class="topic" data-a="cycle-topic" data-t="${esc(t)}"
           style="background:${m.bg};border-color:${m.bd}">
-          <b style="color:${st==="noentra"?"#B4B6BE":"var(--ink)"}">${esc(t)}</b>
+          <b style="color:${st==="noentra"?"var(--gray2)":"var(--ink)"}">${esc(t)}</b>
           <small style="color:${m.fg}">${m.label}</small></button>`;
       }).join("") + `</div>`;
     }
@@ -275,6 +275,11 @@ function vCuenta(){
       <button class="danger" data-a="auth-logout">Cerrar sesión</button>
     </div>
   </div>
+  <div class="formcard"><div class="ftitle">Apariencia</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${themeBtn("system","Según el sistema")}${themeBtn("light","Claro")}${themeBtn("dark","Oscuro")}
+    </div>
+  </div>
   <div class="formcard"><div class="ftitle">Respaldos automáticos</div>
     <div class="hint" style="margin-bottom:10px">Se guarda una copia completa una vez por día, en la primera sincronización. Se conservan las últimas ${MAX_BACKUPS}. Esto no reemplaza la copia manual (.json) del tablero — conviven.</div>
     ${vBackupsList()}
@@ -284,6 +289,9 @@ function vCuenta(){
     <button class="primary" style="margin:10px 0 0;margin-left:0" data-a="send-report" ${state.reportStatus==="sending"?"disabled":""}>Enviar reporte</button>
     <div class="hint" id="reportMsg" style="margin-top:10px;min-height:16px;color:${state.reportStatus==="error"?"var(--red)":state.reportStatus==="ok"?"var(--green)":"var(--faint)"}">${esc(reportStatusText())}</div>
   </div>`;
+}
+function themeBtn(v,label){
+  return `<button class="chip ${getTheme()===v?"on":""}" data-a="set-theme" data-f="${v}">${label}</button>`;
 }
 function reportStatusText(){
   if(state.reportStatus==="sending") return "Enviando…";
@@ -515,7 +523,7 @@ function hbarList(dataset){
     <div style="width:130px;flex-shrink:0;font-size:12.5px;color:var(--muted);white-space:nowrap;
       overflow:hidden;text-overflow:ellipsis" title="${esc(d.label)}">${esc(d.label)}</div>
     <div style="flex:1;background:var(--soft);border-radius:4px;overflow:hidden;height:14px">
-      <div style="height:100%;width:${Math.max(2,Math.round(d.v/max*100))}%;background:var(--ink);border-radius:4px"></div>
+      <div style="height:100%;width:${Math.max(2,Math.round(d.v/max*100))}%;background:var(--accent);border-radius:4px"></div>
     </div>
     <div style="width:22px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted)">${d.v}</div>
   </div>`).join("");
@@ -647,7 +655,7 @@ function vUsuarios(){
 function barRow(dataset){
   const max=Math.max(1, ...dataset.map(d=>d.v));
   return `<div style="display:flex;align-items:flex-end;gap:3px;height:60px;margin-bottom:4px">` +
-    dataset.map(d=>`<div title="${esc(d.label)}: ${d.v}" style="flex:1;min-width:2px;background:var(--ink);
+    dataset.map(d=>`<div title="${esc(d.label)}: ${d.v}" style="flex:1;min-width:2px;background:var(--accent);
       border-radius:2px 2px 0 0;height:${Math.max(2,Math.round(d.v/max*60))}px"></div>`).join("") +
     `</div><div class="hint" style="margin-bottom:16px">${esc(dataset[0].label)} → ${esc(dataset[dataset.length-1].label)}</div>`;
 }
@@ -777,7 +785,7 @@ function render(){
   let h = "";
   if(IS_NATIVE && state.newVersionTag && !state.updateBannerDismissed){
     h += `<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;
-      background:var(--bluebg);border:1px solid #B9C6E8;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px;color:var(--blue)">
+      background:var(--bluebg);border:1px solid var(--blueline);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px;color:var(--blue)">
       <span>Hay una versión nueva disponible (${esc(state.newVersionTag)}). <a href="${DOWNLOADS_URL}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">Ir a descargas</a></span>
       <button data-a="dismiss-update-banner" title="Cerrar aviso" style="background:none;border:none;color:var(--blue);font-size:16px;line-height:1;padding:0 4px">×</button>
     </div>`;

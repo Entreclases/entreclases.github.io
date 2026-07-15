@@ -9,6 +9,16 @@ const DIRTY_KEY = "tutoria-sync-dirty"; // "1" mientras hay cambios locales sin 
 const LAST_REMOTE_KEY = "tutoria-last-remote-updated"; // último updated_at de la fila remota que ya vimos, para el chequeo liviano
 const VERSION_CHECK_KEY = "tutoria-last-version-check"; // timestamp del último chequeo de versión (apps nativas)
 const VERSION_CHECK_INTERVAL_MS = 24*60*60*1000;
+const THEME_KEY = "tutoria-theme"; // "light" | "dark" | "system" (default)
+function getTheme(){ return localStorage.getItem(THEME_KEY) || "system"; }
+function applyTheme(theme){
+  const root = document.documentElement;
+  root.classList.remove("theme-light","theme-dark");
+  if(theme==="light") root.classList.add("theme-light");
+  else if(theme==="dark") root.classList.add("theme-dark");
+}
+function setTheme(theme){ localStorage.setItem(THEME_KEY, theme); applyTheme(theme); }
+applyTheme(getTheme()); // se aplica de entrada, antes del primer render, para evitar parpadeo
 const RELEASES_API = "https://api.github.com/repos/manugandini53-design/manugandini53-design.github.io/releases/latest";
 const DOWNLOADS_URL = "https://manugandini53-design.github.io/#usala";
 // Backend de sincronización: un único proyecto Supabase para todos los usuarios de la app.
@@ -27,25 +37,25 @@ function detectPlatform(){
 const TOPICS = ["Trigonometría","Funciones","Matrices","Determinantes","Vectores","Límites","Derivadas","Integrales"];
 const TOPIC_CYCLE = ["pendiente","visto","practica","parcial","noentra"];
 const TOPIC_META = {
-  pendiente:{label:"Pendiente",bg:"#FFFFFF",fg:"#8B90A0",bd:"#D8DAE3"},
-  visto:{label:"Visto",bg:"#EEF1F8",fg:"#3D4A6B",bd:"#B9C2D8"},
-  practica:{label:"Práctica",bg:"#FBF3DC",fg:"#8A6410",bd:"#E3C878"},
-  parcial:{label:"Nivel parcial",bg:"#E4F1E9",fg:"#1F6B44",bd:"#8FC4A6"},
-  noentra:{label:"No entra",bg:"#F4F4F2",fg:"#B4B6BE",bd:"#E4E4E0"},
+  pendiente:{label:"Pendiente",bg:"var(--topic-pendiente-bg)",fg:"var(--topic-pendiente-fg)",bd:"var(--topic-pendiente-bd)"},
+  visto:{label:"Visto",bg:"var(--topic-visto-bg)",fg:"var(--topic-visto-fg)",bd:"var(--topic-visto-bd)"},
+  practica:{label:"Práctica",bg:"var(--topic-practica-bg)",fg:"var(--topic-practica-fg)",bd:"var(--topic-practica-bd)"},
+  parcial:{label:"Nivel parcial",bg:"var(--topic-parcial-bg)",fg:"var(--topic-parcial-fg)",bd:"var(--topic-parcial-bd)"},
+  noentra:{label:"No entra",bg:"var(--topic-noentra-bg)",fg:"var(--topic-noentra-fg)",bd:"var(--topic-noentra-bd)"},
 };
 const STATUS_META = {
-  activo:{label:"Activo",fg:"#1F6B44",bg:"#E4F1E9"},
-  pausado:{label:"Pausado",fg:"#8A6410",bg:"#FBF3DC"},
-  aprobo:{label:"Aprobó",fg:"#2C4A9A",bg:"#E8EDFB"},
-  desaprobo:{label:"A recuperar",fg:"#A23A2A",bg:"#FAE9E4"},
-  dejo:{label:"Dejó",fg:"#8B90A0",bg:"#F0F0EE"},
+  activo:{label:"Activo",fg:"var(--status-activo-fg)",bg:"var(--status-activo-bg)"},
+  pausado:{label:"Pausado",fg:"var(--status-pausado-fg)",bg:"var(--status-pausado-bg)"},
+  aprobo:{label:"Aprobó",fg:"var(--status-aprobo-fg)",bg:"var(--status-aprobo-bg)"},
+  desaprobo:{label:"A recuperar",fg:"var(--status-desaprobo-fg)",bg:"var(--status-desaprobo-bg)"},
+  dejo:{label:"Dejó",fg:"var(--status-dejo-fg)",bg:"var(--status-dejo-bg)"},
 };
 const SEM_CYCLE = ["sd","verde","amarillo","rojo"];
 const SEM_META = {
-  sd:{color:"#C9CCD6",label:"Sin evaluar"},
-  verde:{color:"#2E9958",label:"Encaminado: llega bien a su objetivo"},
-  amarillo:{color:"#E0A422",label:"En riesgo: llega ajustado, priorizar temas"},
-  rojo:{color:"#C43C2B",label:"Complicado: difícilmente llegue así"},
+  sd:{color:"var(--sem-sd)",label:"Sin evaluar"},
+  verde:{color:"var(--sem-verde)",label:"Encaminado: llega bien a su objetivo"},
+  amarillo:{color:"var(--sem-amarillo)",label:"En riesgo: llega ajustado, priorizar temas"},
+  rojo:{color:"var(--sem-rojo)",label:"Complicado: difícilmente llegue así"},
 };
 const CAREERS = ["Ingeniería","Licenciatura","Arquitectura","Ingresante"];
 function defaultCatalog(){
@@ -53,4 +63,4 @@ function defaultCatalog(){
     subjects:[{ id:"matbasica", name:"Matemática básica", units:[...TOPICS] }],
     updatedAt:0 };
 }
-const TAREA_META = {hecha:{label:"hecha",fg:"#1F6B44"},intentada:{label:"intentada",fg:"#8A6410"},no:{label:"no hecha",fg:"#A23A2A"}};
+const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};

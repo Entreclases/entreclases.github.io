@@ -6,15 +6,28 @@
 <title>Cuaderno de seguimiento</title>
 <meta name="description" content="Cuaderno de seguimiento: la app para llevar el progreso de tus alumnos de clases particulares — temas, clases, simulacros y alertas de examen, con o sin internet.">
 <link rel="icon" href="app/icon-192.png">
-<meta name="theme-color" content="#1E2B4D">
+<meta name="theme-color" content="#1E2B4D" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12141A" media="(prefers-color-scheme: dark)">
 <style>
   :root{
     --bg:#E7E8EB; --card:#FFFFFF; --ink:#1E2B4D; --muted:#5B6072; --faint:#8B90A0;
     --line:#D8DAE3; --soft:#E4E4E0; --red:#C43C2B; --redbg:#FAE9E4;
     --green:#2E9958; --greenbg:#E4F1E9; --amber:#E0A422; --amberbg:#FBF3DC;
     --blue:#2C4A9A; --bluebg:#E8EDFB; --gray:#C9CCD6;
+    --accent:#1E2B4D; --accent-hover:#16213b; --header-bg:rgba(231,232,235,.92);
+    --cta-shadow:rgba(30,43,77,.22); --cta-shadow-hover:rgba(30,43,77,.28);
     --sans:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
     --mono:ui-monospace,"Cascadia Mono",Consolas,"Roboto Mono",monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#12141A; --card:#1B1E27; --ink:#E8E9EE; --muted:#A8ADBD; --faint:#7A8096;
+      --line:#2E3240; --soft:#242836; --red:#FF6B57; --redbg:#3A211D;
+      --green:#4ADE80; --greenbg:#173324; --amber:#FBBF24; --amberbg:#3A2E10;
+      --blue:#8CA6F5; --bluebg:#1B2340; --gray:#3A3F52;
+      --accent:#4C5FAB; --accent-hover:#5E70C2; --header-bg:rgba(18,20,26,.85);
+      --cta-shadow:rgba(0,0,0,.45); --cta-shadow-hover:rgba(0,0,0,.55);
+    }
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
@@ -24,7 +37,7 @@
   .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
 
   /* header */
-  header.site{position:sticky;top:0;background:rgba(231,232,235,.92);backdrop-filter:blur(6px);
+  header.site{position:sticky;top:0;background:var(--header-bg);backdrop-filter:blur(6px);
     border-bottom:1px solid var(--line);z-index:10}
   header.site .bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0}
   .brand{display:flex;flex-direction:column;line-height:1.2}
@@ -36,8 +49,8 @@
   /* botones */
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;
        border-radius:9px;padding:12px 22px;font-weight:600;font-size:14.5px;cursor:pointer;border:1px solid transparent}
-  .btn.primary{background:var(--ink);color:#fff}
-  .btn.primary:hover{background:#16213b}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.primary:hover{background:var(--accent-hover)}
   .btn.secondary{background:var(--card);color:var(--ink);border-color:var(--line)}
   .btn.secondary:hover{border-color:var(--ink)}
   .btn.block{width:100%}
@@ -48,8 +61,8 @@
   .hero h1{font-size:38px;line-height:1.18;letter-spacing:-.015em;margin:14px 0 16px}
   .hero p.sub{font-size:16.5px;color:var(--muted);max-width:600px;margin:0 auto 30px}
   .hero .actions{display:flex;flex-direction:column;align-items:center;gap:14px}
-  .hero-cta{padding:20px 44px;font-size:18px;border-radius:12px;box-shadow:0 6px 20px rgba(30,43,77,.22)}
-  .hero-cta:hover{box-shadow:0 8px 24px rgba(30,43,77,.28)}
+  .hero-cta{padding:20px 44px;font-size:18px;border-radius:12px;box-shadow:0 6px 20px var(--cta-shadow)}
+  .hero-cta:hover{box-shadow:0 8px 24px var(--cta-shadow-hover)}
   .btn-link{font-size:13.5px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
   .btn-link:hover{color:var(--ink)}
 
