@@ -446,7 +446,63 @@ function vEstadisticas(){
     ? `<div class="stats"><div class="stat"><b>${(notas.reduce((a,b)=>a+b,0)/notas.length).toFixed(1)}</b><span>promedio (${notas.length} simulacro${notas.length===1?"":"s"})</span></div></div>`
     : `<div class="empty">Sin simulacros recientes.</div>`;
 
-  h += `<div class="stitle" style="margin-top:26px">Aula</div>`;
+  h += vAula(grupo);
+  return h;
+}
+
+// Orden de "el aula": examen más próximo primero; sin fecha, al final.
+function aulaOrder(list){
+  return [...list].sort((a,b)=>{
+    const da = a.examDate ? daysTo(a.examDate) : Infinity;
+    const db = b.examDate ? daysTo(b.examDate) : Infinity;
+    return da-db;
+  });
+}
+function deskHtml(s){
+  const sem = s.semaforo||"sd";
+  const color = SEM_META[sem].color;
+  const pct = topicProgressPct(s);
+  const pctVal = pct===null ? 0 : Math.round(pct);
+  const d = s.examDate ? daysTo(s.examDate) : null;
+  const showBadge = d!==null && d>=0 && d<=14;
+  const firstName = (s.name||"").trim().split(/\s+/)[0] || "—";
+  const title = `${s.name||"—"} — ${SEM_META[sem].label} — avance: ${pctVal}%`;
+  return `<button class="desk" data-a="open" data-id="${esc(s.id)}" title="${esc(title)}">
+    <div class="desk-top"><div class="desk-progress" style="width:${pctVal}%"></div></div>
+    <div class="desk-body" style="background:${color}">
+      ${showBadge?`<span class="desk-badge">${d===0?"hoy":d+"d"}</span>`:""}
+    </div>
+    <div class="desk-name">${esc(firstName)}</div>
+  </button>`;
+}
+function vAula(grupo){
+  let h = `<div class="stitle" style="margin-top:26px">El aula</div>`;
+  if(grupo.length===0) return h + `<div class="empty">Sin alumnos activos para mostrar acá.</div>`;
+
+  h += `<div class="aula-legend">
+    <span><span class="sw" style="background:${SEM_META.verde.color}"></span>${SEM_META.verde.label}</span>
+    <span><span class="sw" style="background:${SEM_META.amarillo.color}"></span>${SEM_META.amarillo.label}</span>
+    <span><span class="sw" style="background:${SEM_META.rojo.color}"></span>${SEM_META.rojo.label}</span>
+    <span><span class="sw" style="background:${SEM_META.sd.color}"></span>${SEM_META.sd.label}</span>
+    <span>Barra arriba del banco: % de temas en nivel parcial</span>
+    <span>Puntito: días para el examen (14 o menos)</span>
+  </div>`;
+
+  const ordered = aulaOrder(grupo);
+  const shown = ordered.slice(0,30);
+  const resto = ordered.length - shown.length;
+
+  const rows=[]; for(let i=0;i<shown.length;i+=6) rows.push(shown.slice(i,i+6));
+  h += `<div class="aula-wrap"><div class="classroom">` + rows.map(row=>{
+    const left=row.slice(0,3), right=row.slice(3,6);
+    return `<div class="aula-row">
+      <div class="aula-side">${left.map(deskHtml).join("")}</div>
+      ${right.length?`<div class="aula-side">${right.map(deskHtml).join("")}</div>`:""}
+    </div>`;
+  }).join("") + `</div></div>`;
+
+  if(resto>0) h += `<button class="chip" data-a="nav-lista" style="margin-top:12px">y ${resto} más — ver en la Lista</button>`;
+
   return h;
 }
 

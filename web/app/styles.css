@@ -89,4 +89,26 @@
   .saveerr{background:var(--redbg);color:var(--red);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .hint{font-size:11.5px;color:var(--faint)}
   .tareatag{font-size:11px;font-family:var(--mono);margin-left:8px}
+  .aula-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--faint);margin-bottom:14px;align-items:center}
+  .aula-legend .sw{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle}
+  .aula-wrap{overflow-x:auto;padding-bottom:8px}
+  .classroom{display:flex;flex-direction:column;gap:16px;width:max-content;margin:0 auto}
+  .aula-row{display:flex;gap:26px;justify-content:center}
+  .aula-side{display:flex;gap:9px}
+  .desk{width:56px;flex-shrink:0;background:none;border:none;padding:0;cursor:pointer;
+        display:flex;flex-direction:column;align-items:center;font-family:inherit}
+  .desk-top{width:100%;height:4px;background:var(--soft);border-radius:2px;overflow:hidden;margin-bottom:3px}
+  .desk-progress{height:100%;background:var(--ink)}
+  .desk-body{position:relative;width:100%;height:38px;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)}
+  .desk-badge{position:absolute;top:-6px;right:-6px;background:var(--ink);color:#fff;font-size:9px;
+              font-family:var(--mono);border-radius:99px;padding:1px 4px;min-width:14px;text-align:center;line-height:1.3}
+  .desk-name{font-size:10px;color:var(--muted);margin-top:4px;max-width:56px;white-space:nowrap;
+             overflow:hidden;text-overflow:ellipsis}
+  @media (max-width:480px){
+    .desk{width:40px}
+    .desk-body{height:30px}
+    .desk-name{max-width:40px;font-size:9px}
+    .aula-row{gap:18px}
+    .aula-side{gap:6px}
+  }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
