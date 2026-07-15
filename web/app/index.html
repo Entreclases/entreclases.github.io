@@ -2,6 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<!-- CSP vía meta (no hay servidor propio para mandarla por header — GitHub Pages es estático):
+     frame-ancestors/sandbox/report-uri no valen acá (el spec los ignora en <meta>), por eso no
+     están. ipc: / http://ipc.localhost es lo que pide Tauri v2 para su IPC interno cuando la
+     CSP se escribe a mano en vez de vía tauri.conf.json (que auto-inyecta nonces propios). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src https://*.supabase.co https://api.github.com ipc: http://ipc.localhost; base-uri 'none'; form-action 'self'; object-src 'none';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuaderno de seguimiento</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -405,7 +410,7 @@ function vDetalle(){
   }
 
   if(state.tab==="ficha"){
-    const opt=(v,cur,l)=>`<option value="${v}" ${v===cur?"selected":""}>${l}</option>`;
+    const opt=(v,cur,l)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(l)}</option>`;
     h += `<div class="formcard">
       <div class="frow">
         <div class="field"><div class="flabel">Nombre</div><input data-f="name" value="${esc(s.name)}"></div>
@@ -509,7 +514,7 @@ function vCuenta(){
   <div class="formcard"><div class="ftitle">Cuenta</div>
     <div style="font-size:13.5px;margin-bottom:6px">Conectado como <b>${esc(ses?ses.email:"")}</b></div>
     <div class="hint" style="margin-bottom:6px">${sesIsAdmin(ses)?"Cuenta de administrador":"Cuenta de profesor"}</div>
-    <div class="hint" style="margin-bottom:14px">${esc(syncStatusText())}</div>
+    <div class="hint" style="margin-bottom:14px">${syncStatusText()}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="chip" data-a="sync-now">Sincronizar ahora</button>
       <button class="danger" data-a="auth-logout">Cerrar sesión</button>
@@ -893,7 +898,10 @@ function syncStatusText(){
   const st=state.syncStatus;
   if(st==="sync") return "Sincronizando…";
   if(st==="offline") return "Sin conexión — trabajando offline; se sincroniza al volver internet";
-  if(st==="error") return (state.syncMsg||"No se pudo sincronizar")+" — se reintenta solo";
+  // esc() acá porque syncStatusText() se inyecta con innerHTML/interpolación cruda en
+  // varios lugares (setStatus, el header) — mejor que el punto único de esta función
+  // quede seguro por sí mismo en vez de depender de que cada call site se acuerde de escapar.
+  if(st==="error") return esc(state.syncMsg||"No se pudo sincronizar")+" — se reintenta solo";
   if(st==="ok" && state.lastSync)
     return "Sincronizado ✓ "+new Date(state.lastSync).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
   return "Sincronización lista";

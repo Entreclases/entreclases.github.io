@@ -2,3 +2,16 @@ node_modules/
 src-tauri/target/
 src-tauri/gen/
 release-v*/
+
+# Claves/certificados y config de entorno — por las dudas a nivel raíz también
+# (android/.gitignore ya cubre lo mismo dentro de android/, que es donde vive
+# hoy el keystore de firma; esto es para que ningún .key/.pem quede afuera
+# aunque se cree en otro lado del repo).
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+keystore.properties
+.env
+.env.*
