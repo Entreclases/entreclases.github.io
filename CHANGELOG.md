@@ -24,6 +24,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
+
+## [2.0.3] - 2026-07-16
 - Base del portal de invitados: tabla `portales` y RPC pública `portal_publico()` (migración 013), sección "Portal para tus alumnos" en Cuenta (activar/desactivar, copiar link, regenerar llave, publicar el nombre a mostrar) y página standalone `portal.html`/`js/portal.js` sin sesión y fuera del service worker.
 - Biblioteca del portal: toggle "Compartir" por archivo en Materiales, "Publicar cambios" ahora firma URLs de Storage (30 días) y arma la biblioteca por materia, renovación automática silenciosa cuando quedan a 20+ días de vencer, republicado inmediato al dejar de compartir o borrar un archivo, y sección Biblioteca (agrupada, con buscador) como lo primero que ve el alumno en `portal.html`.
 - Llave por alumno: card "Portal para este alumno" en la ficha (generar/copiar/regenerar/revocar su link individual) con checkboxes explícitos de qué ve (próxima clase, tarea de la última clase, avance por unidades) — nunca notas, pagos, señas ni comentarios privados; se actualiza solo al tildar o con "Publicar cambios"; en `portal.html` el alumno con llave propia ve primero su saludo y bloque personal, arriba de la biblioteca y links generales.
