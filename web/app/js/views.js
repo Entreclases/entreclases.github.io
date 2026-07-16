@@ -1200,8 +1200,10 @@ function vPanel(){
     ${tabbtn("panel-tab-usuarios",tab==="usuarios","Usuarios")}
     ${tabbtn("panel-tab-actividad",tab==="actividad","Actividad")}
     ${tabbtn("panel-tab-recursos",tab==="recursos","Recursos")}
+    ${tabbtn("panel-tab-inactividad",tab==="inactividad","Inactividad")}
   </div>`;
-  h += tab==="usuarios" ? vUsuarios() : tab==="actividad" ? vActividad() : tab==="recursos" ? vRecursos() : vReportes();
+  h += tab==="usuarios" ? vUsuarios() : tab==="actividad" ? vActividad() : tab==="recursos" ? vRecursos()
+    : tab==="inactividad" ? vInactividad() : vReportes();
   return h;
 }
 
@@ -1237,10 +1239,17 @@ function vUsuarios(){
   if(!state.usersLoaded) return h + `<div class="empty">Cargando usuarios…</div>`;
   const list = state.users||[];
   const now = Date.now();
-  const ONLINE_MS = 10*60*1000, WEEK_MS = 7*86400000;
+  const ONLINE_MS = 10*60*1000, WEEK_MS = 7*86400000, INACTIVE_MS = 30*86400000, FINAL_MS = 5*30*86400000;
   const lastSeenMs = u => u.last_seen_at ? now-new Date(u.last_seen_at).getTime() : null;
   const isOnline = u => { const ms=lastSeenMs(u); return ms!==null && ms<ONLINE_MS; };
   const isActiveWeek = u => { const ms=lastSeenMs(u); return ms!==null && ms<WEEK_MS; };
+  // mismos umbrales que revisar_inactivos() (012_inactividad.sql): recordatorio a los 30
+  // días, aviso final a los 5 meses — el chip sólo es informativo, el cron es la fuente de verdad.
+  const inactiveChip = u => {
+    const ms=lastSeenMs(u); if(u.rol==="admin" || ms===null || ms<INACTIVE_MS) return "";
+    const color = ms>=FINAL_MS ? "var(--red)" : "var(--amber)";
+    return `<span class="chip" style="color:${color};border-color:${color};margin-left:6px">Inactivo ${timeAgo(u.last_seen_at)}</span>`;
+  };
   h += `<div class="stats">
     <div class="stat"><b>${list.length}</b><span>cuentas totales</span></div>
     <div class="stat"><b>${list.filter(isOnline).length}</b><span>en línea ahora</span></div>
@@ -1281,12 +1290,41 @@ function vUsuarios(){
     }
     return `<div class="log" style="align-items:flex-start;flex-wrap:wrap">
       <div class="body">
-        <div style="font-weight:600">${esc(u.email||"—")} <span class="hint">· ${esc(u.rol||"—")}</span></div>
+        <div style="font-weight:600">${esc(u.email||"—")} <span class="hint">· ${esc(u.rol||"—")}</span>${inactiveChip(u)}</div>
         <div class="note">${seen} · ${esc(u.plataforma||"—")} · v${esc(u.version||"—")} · alta ${fmtDateTime(u.created_at)}</div>
       </div>
       ${delUi}
     </div>`;
   }).join("");
+  return h;
+}
+
+// Log de 012_inactividad.sql: qué mail mandó (o habría mandado, en simulacro) el cron
+// revisar_inactivos() y qué cuentas terminó cerrando.
+const TIPO_NOTIF_META = {
+  recordatorio:"Recordatorio", aviso_final:"Aviso final",
+  simulacro_recordatorio:"Recordatorio (simulacro)", simulacro_aviso_final:"Aviso final (simulacro)",
+  simulacro_cierre:"Cierre (simulacro)"
+};
+function vInactividad(){
+  let h = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="chip" data-a="refresh-inactividad">Actualizar</button></div>`;
+  if(state.inactividadError) return h + `<div class="saveerr">${esc(state.inactividadError)}</div>`;
+  if(!state.inactividadLoaded) return h + `<div class="empty">Cargando…</div>`;
+  const notifs = state.notificacionesInactividad||[];
+  const cerradas = state.cuentasCerradas||[];
+  h += `<div class="stitle">Notificaciones (últimas ${notifs.length})</div>`;
+  h += notifs.length===0 ? `<div class="empty">Sin notificaciones registradas todavía.</div>` :
+    notifs.map(n=>`<div class="log">
+      <div class="body">${esc(n.email)} <span class="hint">· ${esc(TIPO_NOTIF_META[n.tipo]||n.tipo)}</span>
+        <div class="note">${fmtDateTime(n.enviada_at)}</div></div>
+    </div>`).join("");
+  h += `<div class="stitle">Cuentas cerradas (últimas ${cerradas.length})</div>`;
+  h += cerradas.length===0 ? `<div class="empty">Sin cierres todavía.</div>` :
+    cerradas.map(c=>`<div class="log">
+      <div class="body">${esc(c.email)} <span class="hint">· ${esc(c.motivo)}</span>
+        <div class="note">${fmtDateTime(c.cerrada_at)}</div></div>
+    </div>`).join("");
   return h;
 }
 

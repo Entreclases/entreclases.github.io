@@ -281,6 +281,23 @@ async function deleteUsuario(id){
     render();
   }
 }
+async function loadInactividad(){
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const [rn,rc]=await Promise.all([
+      fetch(SUPA_URL+"/rest/v1/notificaciones_inactividad?select=*&order=enviada_at.desc&limit=200",{headers:h}),
+      fetch(SUPA_URL+"/rest/v1/cuentas_cerradas?select=*&order=cerrada_at.desc&limit=200",{headers:h})
+    ]);
+    if(!rn.ok || !rc.ok) throw new Error("error "+(rn.ok?rc.status:rn.status));
+    state.notificacionesInactividad=await rn.json();
+    state.cuentasCerradas=await rc.json();
+    state.inactividadLoaded=true; state.inactividadError="";
+  }catch(e){
+    state.inactividadError = !navigator.onLine ? "Sin conexión a internet." : "No se pudo cargar el registro de inactividad.";
+  }
+  render();
+}
 async function loadActividad(){
   try{
     const s=await ensureToken();
