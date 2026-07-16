@@ -79,6 +79,8 @@ function defaultCatalog(){
     updatedAt:0 };
 }
 const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};
+// 0=Lunes .. 6=Domingo — usado por los horarios habituales y la vista Agenda.
+const DIAS_SEMANA = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 // Plantillas de materias: temarios típicos de primer año universitario para no arrancar
 // una materia nueva desde cero. Elegir una precarga estas unidades tal cual — 100% editables
 // después desde el editor de la materia, igual que si las hubiera cargado a mano.

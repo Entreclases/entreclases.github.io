@@ -109,6 +109,14 @@
             font-size:15px;line-height:1;text-decoration:none}
   .examresult{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
               border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13.5px}
+  .agenda-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .agenda-day{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;min-height:64px}
+  .agenda-day.today{border-color:var(--accent);border-width:2px}
+  .agenda-daylabel{font-weight:700;font-size:12.5px;margin-bottom:8px;display:flex;justify-content:space-between;gap:6px}
+  .agenda-event{background:var(--soft);border-radius:8px;padding:7px 9px;margin-bottom:6px;font-size:12.5px}
+  .agenda-event.overlap{background:var(--redbg);border:1px solid var(--redline2)}
+  .agenda-time{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .agenda-who{margin-top:2px}
   .examgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:10px}
   .examcard{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:left;color:var(--ink)}
   .count{display:inline-block;color:#fff;font-family:var(--mono);font-size:11.5px;

@@ -25,6 +25,18 @@ function timeAgo(ts){
   const d=Math.floor(hr/24);
   return `hace ${d} día${d===1?"":"s"}`;
 }
+function addDays(ds, n){ const d=new Date(ds+"T12:00:00"); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+// lunes de la semana que contiene ds (0=Lunes..6=Domingo, igual que DIAS_SEMANA)
+function mondayOfWeek(ds){
+  const d=new Date(ds+"T12:00:00"), dow=d.getDay(); // getDay(): 0=domingo..6=sábado
+  return addDays(ds, dow===0 ? -6 : 1-dow);
+}
+function weekdayIdx(ds){ return (new Date(ds+"T12:00:00").getDay()+6)%7; } // 0=Lunes..6=Domingo
+function addMinutesToTime(time, minutes){
+  const [h,m]=time.split(":").map(Number);
+  const total=((h*60+m+minutes)%1440+1440)%1440;
+  return String(Math.floor(total/60)).padStart(2,"0")+":"+String(total%60).padStart(2,"0");
+}
 function fmtBytes(n){
   n=Number(n)||0;
   if(n<1024) return n+" B";
@@ -65,7 +77,8 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               materialesConfirmDelName:null, materialesDeleteStatus:"idle",
               newVersionTag:null, updateBannerDismissed:false,
               pagosMonth:null,
-              informePeriod:"3m", informeCopyMsg:"" };
+              informePeriod:"3m", informeCopyMsg:"",
+              agendaWeekOffset:0, sessionPrefillDate:"" };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
@@ -107,7 +120,8 @@ function emptyStudent(){
   return { id:uid(), name:"", career:(state.catalog.careers[0]||"Ingeniería"), subject:"", subjectId:"",
     chair:"", status:"activo", semaforo:"sd", examDate:"", startDate:today(), notes:"",
     updatedAt:Date.now(), topics:{}, sessions:[], simulacros:[],
-    tarifa:"", modalidad:"", pagos:[], informeComment:"", phone:"", examResults:[] };
+    tarifa:"", modalidad:"", pagos:[], informeComment:"", phone:"", examResults:[],
+    horarios:[], clasesPuntuales:[] };
 }
 
 /* ============ regla: una ficha = un alumno en una materia ============
@@ -174,6 +188,8 @@ function studentAlerts(s){
   const d=daysTo(s.examDate);
   if(d!==null && d>=0 && d<=14 && s.simulacros.length===0)
     out.push({text:`Examen en ${d} día${d===1?"":"s"} y todavía no hizo ningún simulacro`, wa:"examen"});
+  if(d!==null && d>=0 && d<10 && !hasScheduledBeforeExam(s))
+    out.push({text:`Rinde en ${d} día${d===1?"":"s"} y no tiene ninguna clase agendada hasta el examen — ¿reforzamos?`, wa:"clase"});
   const last2=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);
   if(last2.length===2 && last2.every(x=>x.tarea==="no"))
     out.push({text:"Dos clases seguidas sin tarea hecha — momento de la charla", wa:"tarea"});
@@ -263,6 +279,56 @@ function normalizeArPhone(raw){
 function hasPhone(s){ return !!(s.phone && s.phone.replace(/\D/g,"").length>=8); }
 function waLink(s, text){ return `https://wa.me/${normalizeArPhone(s.phone)}?text=${encodeURIComponent(text)}`; }
 function studentFirstName(s){ return (s.name||"").trim().split(/\s+/)[0] || s.name || ""; }
+
+/* ============ agenda: horarios habituales + clases puntuales ============
+   Los horarios habituales (s.horarios) son recurrentes por día de semana; las
+   clases puntuales (s.clasesPuntuales) son sueltas, con fecha propia. Ambos son
+   "clases previstas", distintas de s.sessions (clases ya dadas y registradas). */
+function studentHasSessionOnDate(studentId, date){
+  const s = state.students.find(x=>x.id===studentId);
+  return !!(s && (s.sessions||[]).some(x=>x.date===date));
+}
+// ¿tiene alguna clase (habitual o puntual) prevista entre hoy y la fecha de examen, inclusive?
+function hasScheduledBeforeExam(s){
+  if(!s.examDate) return true;
+  const from = today(), to = s.examDate;
+  if(from>to) return true;
+  if((s.clasesPuntuales||[]).some(p=>p.date>=from && p.date<=to)) return true;
+  if((s.horarios||[]).length===0) return false;
+  const days = new Set((s.horarios||[]).map(h=>h.day));
+  for(let d=from; d<=to; d=addDays(d,1)) if(days.has(weekdayIdx(d))) return true;
+  return false;
+}
+// eventos de una semana (weekStart = lunes) para todos los alumnos activos: horarios
+// habituales expandidos a esa semana + clases puntuales que caen en ella.
+function agendaWeekEvents(weekStart){
+  const weekEnd = addDays(weekStart,6);
+  const events = [];
+  alive().filter(s=>s.status==="activo").forEach(s=>{
+    (s.horarios||[]).forEach(h=>events.push({
+      studentId:s.id, studentName:s.name, subject:s.subject,
+      date:addDays(weekStart,h.day), time:h.time, duration:Number(h.duration)||60,
+      kind:"horario", sourceId:h.id }));
+    (s.clasesPuntuales||[]).forEach(p=>{
+      if(p.date>=weekStart && p.date<=weekEnd) events.push({
+        studentId:s.id, studentName:s.name, subject:s.subject,
+        date:p.date, time:p.time, duration:Number(p.duration)||60,
+        kind:"puntual", sourceId:p.id });
+    });
+  });
+  return events;
+}
+// marca overlap:true en cada evento que se superpone en horario con otro el mismo día
+// (distinto alumno u horario doble cargado sin querer).
+function markOverlaps(events){
+  const toMin = t => { const [h,m]=t.split(":").map(Number); return h*60+(m||0); };
+  events.forEach(e=>{ e.startMin=toMin(e.time); e.endMin=e.startMin+e.duration; e.overlap=false; });
+  for(let i=0;i<events.length;i++) for(let j=i+1;j<events.length;j++){
+    const a=events[i], b=events[j];
+    if(a.date===b.date && a.startMin<b.endMin && b.startMin<a.endMin){ a.overlap=true; b.overlap=true; }
+  }
+  return events;
+}
 
 /* ============ sesión: cookies (web) / localStorage (nativo) ============ */
 // Cookies de sesión (solo web): sin Expires/Max-Age quedan como "cookie de sesión" del

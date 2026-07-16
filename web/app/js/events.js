@@ -59,6 +59,21 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; state.editPackId=null; }
   else if(a==="nav-pagos"){ state.view="pagos"; state.selId=null; if(!state.pagosMonth) state.pagosMonth=currentMonthKey(); }
+  else if(a==="nav-agenda"){ state.view="agenda"; state.selId=null; }
+  else if(a==="agenda-prev"){ state.agendaWeekOffset=(state.agendaWeekOffset||0)-1; }
+  else if(a==="agenda-next"){ state.agendaWeekOffset=(state.agendaWeekOffset||0)+1; }
+  else if(a==="agenda-today"){ state.agendaWeekOffset=0; }
+  else if(a==="agenda-log"){
+    state.selId=el.dataset.id; state.view="detalle"; state.tab="clases";
+    state.sessionPrefillDate=el.dataset.date; state.confirmDel=false; state.fichaError="";
+  }
+  else if(a==="export-agenda-ics"){
+    const blob=new Blob([buildAgendaIcs()],{type:"text/calendar;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url; link.download=`agenda-${today()}.ics`;
+    link.click(); URL.revokeObjectURL(url);
+  }
   else if(a==="nav-stats"){
     state.view="stats"; state.selId=null;
     if(!subjectsWithStudents().some(m=>m.id===state.statsSubjectId)) state.statsSubjectId=defaultStatsSubjectId();
@@ -271,7 +286,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="auth-logout"){ setSes(null); state.view="tablero"; render(); return; }
   else if(a==="open"){
     state.view="detalle"; state.selId=el.dataset.id; state.tab="temas"; state.confirmDel=false;
-    state.simTimer=null; state.simPrefillNote=""; state.fichaError="";
+    state.simTimer=null; state.simPrefillNote=""; state.fichaError=""; state.sessionPrefillDate="";
   }
   else if(a==="back"){ state.view="lista"; state.selId=null; state.simTimer=null; state.simPrefillNote=""; }
   else if(a==="new"){ state.showNew=true; state.newStudentError=""; }
@@ -322,7 +337,7 @@ document.addEventListener("click", (e)=>{
       state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=st.id; state.tab="temas";
     }
   }
-  else if(a.startsWith("tab-")){ state.tab=a.slice(4); state.confirmDel=false; state.fichaError=""; }
+  else if(a.startsWith("tab-")){ state.tab=a.slice(4); state.confirmDel=false; state.fichaError=""; state.sessionPrefillDate=""; }
   else if(a==="exam-result"){
     const id=el.dataset.id, result=el.dataset.r;
     const st=state.students.find(x=>x.id===id); if(!st) return;
@@ -363,6 +378,7 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="save-session" && s){
     const date=document.getElementById("c-date").value; if(!date) return;
+    state.sessionPrefillDate="";
     update(s.id,{sessions:[...s.sessions,{id:uid(),date,
       topic:document.getElementById("c-topic").value,
       tarea:document.getElementById("c-tarea").value,
@@ -371,6 +387,24 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="del-session" && s){
     update(s.id,{sessions:s.sessions.filter(x=>x.id!==el.dataset.id)}); return;
+  }
+  else if(a==="add-horario" && s){
+    const day=parseInt(document.getElementById("h-day").value,10);
+    const time=document.getElementById("h-time").value; if(!time) return;
+    const duration=parseInt(document.getElementById("h-duration").value,10)||60;
+    update(s.id,{horarios:[...(s.horarios||[]), {id:uid(), day, time, duration}]}); return;
+  }
+  else if(a==="del-horario" && s){
+    update(s.id,{horarios:(s.horarios||[]).filter(x=>x.id!==el.dataset.id)}); return;
+  }
+  else if(a==="add-puntual" && s){
+    const date=document.getElementById("p-date").value; if(!date) return;
+    const time=document.getElementById("p-time").value; if(!time) return;
+    const duration=parseInt(document.getElementById("p-duration").value,10)||60;
+    update(s.id,{clasesPuntuales:[...(s.clasesPuntuales||[]), {id:uid(), date, time, duration}]}); return;
+  }
+  else if(a==="del-puntual" && s){
+    update(s.id,{clasesPuntuales:(s.clasesPuntuales||[]).filter(x=>x.id!==el.dataset.id)}); return;
   }
   else if(a==="toggle-cobrada" && s){
     update(s.id,{sessions:s.sessions.map(x=>x.id===el.dataset.id?{...x,cobrada:!x.cobrada}:x)}); return;

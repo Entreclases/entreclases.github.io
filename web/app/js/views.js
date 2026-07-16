@@ -233,7 +233,7 @@ function vDetalle(){
   if(state.tab==="clases"){
     h += `<div class="formcard"><div class="ftitle">Registrar clase (30 segundos, apenas termina)</div>
       <div class="frow">
-        <div class="field"><div class="flabel">Fecha</div><input type="date" id="c-date" value="${today()}"></div>
+        <div class="field"><div class="flabel">Fecha</div><input type="date" id="c-date" value="${esc(state.sessionPrefillDate||today())}"></div>
         <div class="field"><div class="flabel">Tema principal</div><select id="c-topic"><option value="">—</option>
           ${unitsFor(s).map(t=>`<option>${esc(t)}</option>`).join("")}
           <option>Nivelación</option><option>Repaso / parciales viejos</option></select></div>
@@ -279,6 +279,8 @@ function vDetalle(){
       <div><div class="ftitle" style="margin-bottom:2px">Informe de progreso</div>
         <div class="hint">Un resumen prolijo para compartir con el alumno o la familia.</div></div>
       <button class="chip" data-a="open-informe">Generar informe</button></div>`;
+    h += vHorariosCard(s);
+    h += vPuntualesCard(s);
     if(hasPhone(s)) h += vWhatsApp(s);
     if(state.fichaError) h += `<div class="saveerr">${esc(state.fichaError)}</div>`;
     h += `<div class="formcard">
@@ -337,6 +339,125 @@ function vExamResultPrompt(s){
       </div>
     </div>
   </div>`;
+}
+
+/* ============ agenda: horarios habituales + clases puntuales, dentro de la ficha ============ */
+function vHorariosCard(s){
+  const list=[...(s.horarios||[])].sort((a,b)=>a.day-b.day||a.time.localeCompare(b.time));
+  let h = `<div class="formcard"><div class="ftitle">Horarios habituales</div>`;
+  h += list.length===0 ? `<div class="empty">Sin horarios cargados.</div>`
+    : list.map(hr=>`<div class="log" style="align-items:center">
+      <div class="body">${esc(DIAS_SEMANA[hr.day])} ${esc(hr.time)} · ${hr.duration||60} min</div>
+      <button class="del" data-a="del-horario" data-id="${hr.id}" title="Borrar">×</button></div>`).join("");
+  h += `<div class="frow" style="margin-top:8px;align-items:flex-end">
+    <div class="field"><div class="flabel">Día</div><select id="h-day">
+      ${DIAS_SEMANA.map((d,i)=>`<option value="${i}">${esc(d)}</option>`).join("")}</select></div>
+    <div class="field"><div class="flabel">Hora</div><input type="time" id="h-time" value="18:00"></div>
+    <div class="field" style="max-width:120px"><div class="flabel">Duración (min)</div><input type="number" id="h-duration" value="60" min="15" step="15"></div>
+    <button class="chip" data-a="add-horario" style="margin-bottom:2px">+ Agregar horario</button></div>
+  </div>`;
+  return h;
+}
+function vPuntualesCard(s){
+  const list=[...(s.clasesPuntuales||[])].sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  let h = `<div class="formcard"><div class="ftitle">Clases puntuales</div>
+    <div class="hint" style="margin-bottom:8px">Clases sueltas que no siguen el horario habitual — una recuperación, una clase extra.</div>`;
+  h += list.length===0 ? `<div class="empty">Sin clases puntuales cargadas.</div>`
+    : list.map(p=>`<div class="log" style="align-items:center">
+      <div class="body">${esc(fmtDate(p.date))} ${esc(p.time)} · ${p.duration||60} min</div>
+      <button class="del" data-a="del-puntual" data-id="${p.id}" title="Borrar">×</button></div>`).join("");
+  h += `<div class="frow" style="margin-top:8px;align-items:flex-end">
+    <div class="field"><div class="flabel">Fecha</div><input type="date" id="p-date" value="${today()}"></div>
+    <div class="field"><div class="flabel">Hora</div><input type="time" id="p-time" value="18:00"></div>
+    <div class="field" style="max-width:120px"><div class="flabel">Duración (min)</div><input type="number" id="p-duration" value="60" min="15" step="15"></div>
+    <button class="chip" data-a="add-puntual" style="margin-bottom:2px">+ Agregar clase puntual</button></div>
+  </div>`;
+  return h;
+}
+
+/* ============ vista "Agenda": semana actual, todos los alumnos ============ */
+function vAgenda(){
+  const offset = state.agendaWeekOffset||0;
+  const weekStart = addDays(mondayOfWeek(today()), offset*7);
+  const weekEnd = addDays(weekStart,6);
+  let h = `<button class="back" data-a="nav-tablero">← Volver al tablero</button>`;
+  h += `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="chip" data-a="agenda-prev">← Semana anterior</button>
+      <b style="font-size:14px">${esc(fmtDate(weekStart))} – ${esc(fmtDate(weekEnd))}</b>
+      <button class="chip" data-a="agenda-next">Semana siguiente →</button>
+      ${offset!==0?`<button class="chip" data-a="agenda-today">Esta semana</button>`:""}
+    </div>
+    <button class="chip" data-a="export-agenda-ics">Exportar agenda (.ics)</button>
+  </div>`;
+
+  const events = markOverlaps(agendaWeekEvents(weekStart));
+  if(events.length===0){
+    h += `<div class="empty">Sin clases agendadas esta semana. Cargá horarios habituales o clases puntuales desde la ficha de cada alumno (pestaña «Ficha»).</div>`;
+    return h;
+  }
+
+  const byDay = Array.from({length:7},()=>[]);
+  events.forEach(e=>{
+    const idx = Math.round((new Date(e.date+"T12:00:00")-new Date(weekStart+"T12:00:00"))/86400000);
+    if(idx>=0 && idx<7) byDay[idx].push(e);
+  });
+  byDay.forEach(list=>list.sort((a,b)=>a.time.localeCompare(b.time)));
+
+  h += `<div class="agenda-grid">` + DIAS_SEMANA.map((label,i)=>{
+    const date = addDays(weekStart,i);
+    const list = byDay[i];
+    return `<div class="agenda-day ${date===today()?"today":""}">
+      <div class="agenda-daylabel">${esc(label)} <span class="hint">${esc(fmtDate(date))}</span></div>
+      ${list.length===0 ? `<div class="hint">Sin clases</div>` : list.map(e=>vAgendaEvent(e,date)).join("")}
+    </div>`;
+  }).join("") + `</div>`;
+  return h;
+}
+function vAgendaEvent(e, date){
+  const past = date<today();
+  const already = past && studentHasSessionOnDate(e.studentId, e.date);
+  return `<div class="agenda-event ${e.overlap?"overlap":""}">
+    <div class="agenda-time">${esc(e.time)} <span class="hint">${e.duration}min</span></div>
+    <div class="agenda-who"><b>${esc(e.studentName)}</b>${e.subject?` <span class="hint">· ${esc(e.subject)}</span>`:""}</div>
+    ${e.overlap?`<div class="hint" style="color:var(--red)">⚠ se superpone con otra clase</div>`:""}
+    ${past && already ? `<div class="hint" style="color:var(--green)">Ya registrada</div>` : ""}
+    ${past && !already ? `<button class="chip" style="margin-top:6px" data-a="agenda-log" data-id="${e.studentId}" data-date="${e.date}">Registrar esta clase</button>` : ""}
+  </div>`;
+}
+
+/* ============ exportar agenda (.ics), próximas 4 semanas ============ */
+function icsEscape(s){ return String(s??"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n"); }
+function icsDateTime(date, time){ return date.replace(/-/g,"")+"T"+time.replace(":","")+"00"; }
+function buildAgendaIcs(){
+  const start = today(), end = addDays(start,27);
+  const events = [];
+  alive().filter(s=>s.status==="activo").forEach(s=>{
+    (s.clasesPuntuales||[]).forEach(p=>{
+      if(p.date>=start && p.date<=end) events.push({studentName:s.name, subject:s.subject, date:p.date, time:p.time, duration:Number(p.duration)||60});
+    });
+    if((s.horarios||[]).length){
+      for(let d=start; d<=end; d=addDays(d,1)){
+        const dow=weekdayIdx(d);
+        (s.horarios||[]).filter(h=>h.day===dow).forEach(h=>{
+          events.push({studentName:s.name, subject:s.subject, date:d, time:h.time, duration:Number(h.duration)||60});
+        });
+      }
+    }
+  });
+  const stamp = start.replace(/-/g,"")+"T000000Z";
+  const lines = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Cuaderno de seguimiento//ES","CALSCALE:GREGORIAN"];
+  events.forEach((e,i)=>{
+    lines.push("BEGIN:VEVENT");
+    lines.push("UID:"+stamp+"-"+i+"@cuaderno-seguimiento");
+    lines.push("DTSTAMP:"+stamp);
+    lines.push("DTSTART:"+icsDateTime(e.date,e.time));
+    lines.push("DTEND:"+icsDateTime(e.date,addMinutesToTime(e.time,e.duration)));
+    lines.push("SUMMARY:"+icsEscape(`Clase con ${e.studentName}${e.subject?" — "+e.subject:""}`));
+    lines.push("END:VEVENT");
+  });
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
 }
 
 /* ============ WhatsApp: mensajes pre-armados, solo links wa.me (sin API) ============ */
@@ -1368,6 +1489,7 @@ function render(){
     <span style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="chip ${state.view==="catalog"?"on":""}" data-a="nav-catalog">Materias y carreras</button>
       <button class="chip ${state.view==="stats"?"on":""}" data-a="nav-stats">Estadísticas</button>
+      <button class="chip ${state.view==="agenda"?"on":""}" data-a="nav-agenda">Agenda</button>
       <button class="chip ${state.view==="pagos"?"on":""}" data-a="nav-pagos">Pagos</button>
       <button class="chip ${state.view==="cuenta"?"on":""}" data-a="nav-cuenta">Cuenta</button>
       ${isAdmin?`<button class="chip ${state.view==="panel"?"on":""}" data-a="nav-panel">Panel</button>`:""}
@@ -1382,6 +1504,7 @@ function render(){
   if(state.view==="catalog") h += vCatalog();
   if(state.view==="stats") h += vEstadisticas();
   if(state.view==="pagos") h += vPagos();
+  if(state.view==="agenda") h += vAgenda();
   if(state.showNew) h += vModal();
   h += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
   document.getElementById("app").innerHTML = h;
