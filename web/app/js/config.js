@@ -80,6 +80,7 @@ function defaultCatalog(){
     packs:[],
     cancelPolicy: defaultCancelPolicy(),
     recordatorios: defaultRecordatorios(),
+    costos: defaultCostos(),
     updatedAt:0 };
 }
 const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};
@@ -108,6 +109,13 @@ function defaultCancelPolicy(){ return {horasMinimas:24, siATiempo:"devuelve", t
 // recordatoriosFor() en helpers.js). notificacionesOS es la intención guardada; el permiso real
 // del navegador (Notification.permission) es local a cada dispositivo y no viaja en el JSON.
 function defaultRecordatorios(){ return {activo:true, diasAtraso:1, notificacionesOS:false}; }
+// Costos del negocio (state.catalog.costos) — mismo patrón que cancelPolicy/recordatorios: sincroniza
+// vía catalog, con este default para catálogos viejos que todavía no lo tienen (ver costosFor() en
+// helpers.js). Cada costo tiene subjectId/studentId opcionales (nunca ambos) para asignarlo a una
+// materia o alumno puntual; sin ninguno de los dos, es un costo general del negocio (ver
+// rentabilidadPorMateria/rentabilidadPorAlumno en helpers.js — los generales no se reparten ahí,
+// sólo entran en el total del mes).
+function defaultCostos(){ return {fijos:[], variables:[]}; }
 // 0=Lunes .. 6=Domingo — usado por los horarios habituales y la vista Agenda.
 const DIAS_SEMANA = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 // Plantillas de materias: temarios típicos de primer año universitario para no arrancar

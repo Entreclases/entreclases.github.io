@@ -45,6 +45,9 @@ function fmtBytes(n){
   return (n/1024/1024).toFixed(1)+" MB";
 }
 function fmtMoney(n){ return "$"+Math.round(n||0).toLocaleString("es-AR"); }
+// como fmtMoney pero con el signo antes del "$" (fmtMoney(-500) da "$-500"; esto da "-$500") —
+// para ganancias que pueden dar negativas (rentabilidad).
+function fmtMoneySigned(n){ return (n||0)<0 ? "-"+fmtMoney(-n) : fmtMoney(n); }
 async function copyToClipboard(text){
   if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return; }
   const ta=document.createElement("textarea");
@@ -266,6 +269,11 @@ function monthLabel(mk){
   const l=d.toLocaleDateString("es-AR",{month:"long",year:"numeric"});
   return l.charAt(0).toUpperCase()+l.slice(1);
 }
+function monthLabelShort(mk){
+  const d=new Date(mk+"-01T12:00:00");
+  const l=d.toLocaleDateString("es-AR",{month:"short"}).replace(/\.$/,"");
+  return l.charAt(0).toUpperCase()+l.slice(1);
+}
 function recentMonthKeys(n){
   const out=[]; const d=new Date(); d.setDate(1);
   for(let i=0;i<n;i++){ out.push(d.toISOString().slice(0,7)); d.setMonth(d.getMonth()-1); }
@@ -287,6 +295,14 @@ function pagoResumen(s, mk){
 /* ============ recordatorios de cobro: clases sin cobrar + mensualidades vencidas + señas
    pendientes, todo junto, para el aviso diario del tablero (ver events.js: maybeNotifyCobros) ============ */
 function recordatoriosFor(){ return state.catalog.recordatorios || defaultRecordatorios(); }
+function costosFor(){ return state.catalog.costos || defaultCostos(); }
+// "m:<id>" / "s:<id>" (valor del <select> de alcance en Rentabilidad) → {subjectId,studentId}
+// (nunca ambos con valor); "" o cualquier otra cosa → costo general, sin alcance.
+function parseScopeValue(v){
+  if(v && v.startsWith("m:")) return {subjectId:v.slice(2), studentId:""};
+  if(v && v.startsWith("s:")) return {subjectId:"", studentId:v.slice(2)};
+  return {subjectId:"", studentId:""};
+}
 // todo lo pendiente de un alumno (mes actual + señas), sin filtrar por días de atraso — lo usa
 // el mensaje de WhatsApp de recordatorio de pago, que tiene sentido mandar apenas hay algo
 // pendiente y no recién cuando ya se hizo tarde.
@@ -498,6 +514,117 @@ function pagosSeniaResumen(mk){
   rows.sort((a,b)=>a.p.date.localeCompare(b.p.date));
   return {cobrado, retenida, rows};
 }
+
+/* ============ rentabilidad real: ingresos cobrados menos costos, por hora realmente dictada ============
+   "Clases dictadas" = s.sessions de todos los alumnos vivos (no sólo los que tienen tarifa cargada:
+   un costo variable como viáticos se paga igual aunque esa clase no se cobre). Cada sesión puede
+   traer duration en minutos (cargado al registrar la clase); si falta, se asume 60' y se cuenta en
+   sinDuracion para que la UI lo aclare. Costos fijos: se descuentan completos cada mes que existan,
+   sin prorratear por cantidad de clases. Costos variables: monto × cantidad de clases dictadas dentro
+   de su alcance ese mes. Sin alcance (subjectId y studentId vacíos) = costo general: entra en el total
+   del mes pero no se reparte en los desgloses por materia/alumno (ver rentabilidadPorMateria/Alumno). */
+function classesInMonth(mk){
+  const out=[];
+  alive().forEach(s=>(s.sessions||[]).forEach(c=>{ if(monthKeyOf(c.date)===mk) out.push({s,c}); }));
+  return out;
+}
+function classDurationHours(c){ return (Number(c.duration)||60)/60; }
+function costoAppliesTo(costo, s){
+  if(costo.subjectId) return s.subjectId===costo.subjectId;
+  if(costo.studentId) return s.id===costo.studentId;
+  return true;
+}
+function rentabilidadMes(mk){
+  const costos = costosFor();
+  const clases = classesInMonth(mk);
+
+  let ingresos = 0;
+  alive().forEach(s=>{ if(hasPagos(s)){ const r=pagoResumen(s,mk); if(r) ingresos+=r.cobrado; } });
+  ingresos += pagosSeniaResumen(mk).retenida;
+
+  const costoFijoTotal = costos.fijos.reduce((a,c)=>a+(Number(c.monto)||0),0);
+  let costoVarTotal = 0;
+  costos.variables.forEach(cv=>{
+    const n = clases.filter(({s})=>costoAppliesTo(cv,s)).length;
+    costoVarTotal += (Number(cv.monto)||0)*n;
+  });
+  const costosTotal = costoFijoTotal+costoVarTotal;
+  const ganancia = ingresos-costosTotal;
+
+  let horas=0, sinDuracion=0;
+  clases.forEach(({c})=>{ if(c.duration==null || c.duration==="") sinDuracion++; horas+=classDurationHours(c); });
+  const netoPorHora = horas>0 ? ganancia/horas : null;
+
+  return { mk, ingresos, costoFijoTotal, costoVarTotal, costosTotal, ganancia, horas, clasesCount:clases.length, sinDuracion, netoPorHora };
+}
+// desglose por materia: ingresos/costos/horas atribuibles a cada una — los costos generales
+// (sin materia ni alumno asignado) no entran acá, sólo los que se asignaron a esa materia puntual.
+function rentabilidadPorMateria(mk){
+  const groups={};
+  const ensure=(key,label)=>{ if(!groups[key]) groups[key]={label,ingresos:0,costos:0,horas:0,clases:0}; return groups[key]; };
+  const labelFor = key => key ? (subjById(key)?subjById(key).name:"Materia") : "Sin materia";
+  alive().forEach(s=>{
+    const key=s.subjectId||"";
+    const g=ensure(key,labelFor(key));
+    if(hasPagos(s)){ const r=pagoResumen(s,mk); if(r) g.ingresos+=r.cobrado; }
+    (s.clasesPuntuales||[]).forEach(p=>{ if(monthKeyOf(p.date)===mk && p.seniaEstado==="retenida") g.ingresos+=Number(p.seniaMonto)||0; });
+  });
+  const clases = classesInMonth(mk);
+  clases.forEach(({s,c})=>{ const key=s.subjectId||""; const g=ensure(key,labelFor(key)); g.horas+=classDurationHours(c); g.clases++; });
+  const costos=costosFor();
+  costos.fijos.forEach(cf=>{ if(cf.subjectId && groups[cf.subjectId]) groups[cf.subjectId].costos+=Number(cf.monto)||0; });
+  costos.variables.forEach(cv=>{
+    if(!cv.subjectId) return;
+    const n=clases.filter(({s})=>s.subjectId===cv.subjectId).length;
+    if(groups[cv.subjectId]) groups[cv.subjectId].costos+=(Number(cv.monto)||0)*n;
+  });
+  return Object.values(groups).filter(g=>g.ingresos>0||g.clases>0||g.costos>0)
+    .map(g=>({...g, neto:g.ingresos-g.costos, netoPorHora:g.horas>0?(g.ingresos-g.costos)/g.horas:null}))
+    .sort((a,b)=>b.neto-a.neto);
+}
+// desglose por alumno — mismo criterio que por materia, pero atribuyendo también el nombre de
+// materia (para distinguir alumnos con el mismo nombre en materias distintas, como en el resto de la app).
+function rentabilidadPorAlumno(mk){
+  const groups={};
+  alive().forEach(s=>{
+    groups[s.id]={label:s.name, subject:s.subject, ingresos:0, costos:0, horas:0, clases:0};
+    if(hasPagos(s)){ const r=pagoResumen(s,mk); if(r) groups[s.id].ingresos+=r.cobrado; }
+    (s.clasesPuntuales||[]).forEach(p=>{ if(monthKeyOf(p.date)===mk && p.seniaEstado==="retenida") groups[s.id].ingresos+=Number(p.seniaMonto)||0; });
+  });
+  const clases = classesInMonth(mk);
+  clases.forEach(({s,c})=>{ const g=groups[s.id]; if(g){ g.horas+=classDurationHours(c); g.clases++; } });
+  const costos=costosFor();
+  costos.fijos.forEach(cf=>{ if(cf.studentId && groups[cf.studentId]) groups[cf.studentId].costos+=Number(cf.monto)||0; });
+  costos.variables.forEach(cv=>{
+    if(!cv.studentId) return;
+    const n=clases.filter(({s})=>s.id===cv.studentId).length;
+    if(groups[cv.studentId]) groups[cv.studentId].costos+=(Number(cv.monto)||0)*n;
+  });
+  return Object.values(groups).filter(g=>g.ingresos>0||g.clases>0||g.costos>0)
+    .map(g=>({...g, neto:g.ingresos-g.costos, netoPorHora:g.horas>0?(g.ingresos-g.costos)/g.horas:null}))
+    .sort((a,b)=>b.neto-a.neto);
+}
+// proyección del mes en curso al ritmo actual (regla de tres simple sobre los días ya
+// transcurridos) — no aplica a meses cerrados, que ya tienen su resultado real y completo.
+function rentabilidadProyeccion(mk){
+  if(mk!==currentMonthKey()) return null;
+  const r = rentabilidadMes(mk);
+  const now = new Date();
+  const diasTranscurridos = now.getDate();
+  const diasEnMes = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  if(diasTranscurridos<=0) return null;
+  const factor = diasEnMes/diasTranscurridos;
+  return { ganancia:r.ganancia*factor, ingresos:r.ingresos*factor, costos:r.costosTotal*factor,
+    horas:r.horas*factor, diasTranscurridos, diasEnMes };
+}
+// últimos 12 meses, del más viejo al más nuevo (para que el histórico se lea de izquierda a derecha).
+function rentabilidadHistorico(){
+  return recentMonthKeys(12).reverse().map(mk=>{
+    const r=rentabilidadMes(mk);
+    return { mk, label:monthLabelShort(mk), neto:r.ganancia, netoPorHora:r.netoPorHora };
+  });
+}
+
 // marca overlap:true en cada evento que se superpone en horario con otro el mismo día
 // (distinto alumno u horario doble cargado sin querer).
 function markOverlaps(events){

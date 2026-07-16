@@ -438,10 +438,13 @@ document.addEventListener("click", (e)=>{
     const date=document.getElementById("c-date").value; if(!date) return;
     state.sessionPrefillDate="";
     const goal=document.getElementById("c-goal").value.trim();
+    const durationRaw=document.getElementById("c-duration").value;
+    const duration=durationRaw==="" ? null : (parseInt(durationRaw,10)||60);
     update(s.id,{sessions:[...s.sessions,{id:uid(),date,
       topic:document.getElementById("c-topic").value,
       tarea:document.getElementById("c-tarea").value,
       note:document.getElementById("c-note").value,
+      duration,
       objetivo:goal, objetivoResult:null,
       cobrada:false}]}); return;
   }
@@ -538,6 +541,33 @@ document.addEventListener("click", (e)=>{
   else if(a==="del-pago" && s){
     update(s.id,{pagos:(s.pagos||[]).filter(x=>x.id!==el.dataset.id)}); return;
   }
+  else if(a==="pagos-tab"){ state.pagosTab=el.dataset.t; }
+  else if(a==="add-costo-fijo"){
+    const name=document.getElementById("costo-fijo-name").value.trim(); if(!name) return;
+    const monto=Number(document.getElementById("costo-fijo-monto").value)||0;
+    const {subjectId,studentId}=parseScopeValue(document.getElementById("costo-fijo-scope").value);
+    const costos=costosFor();
+    state.catalog.costos={...costos, fijos:[...costos.fijos,{id:uid(),name,monto,subjectId,studentId}]};
+    touchCatalog(); return;
+  }
+  else if(a==="del-costo-fijo"){
+    const costos=costosFor();
+    state.catalog.costos={...costos, fijos:costos.fijos.filter(c=>c.id!==el.dataset.id)};
+    touchCatalog(); return;
+  }
+  else if(a==="add-costo-variable"){
+    const name=document.getElementById("costo-var-name").value.trim(); if(!name) return;
+    const monto=Number(document.getElementById("costo-var-monto").value)||0;
+    const {subjectId,studentId}=parseScopeValue(document.getElementById("costo-var-scope").value);
+    const costos=costosFor();
+    state.catalog.costos={...costos, variables:[...costos.variables,{id:uid(),name,monto,subjectId,studentId}]};
+    touchCatalog(); return;
+  }
+  else if(a==="del-costo-variable"){
+    const costos=costosFor();
+    state.catalog.costos={...costos, variables:costos.variables.filter(c=>c.id!==el.dataset.id)};
+    touchCatalog(); return;
+  }
   else if(a==="save-sim" && s){
     const date=document.getElementById("s-date").value; if(!date) return;
     update(s.id,{simulacros:[...s.simulacros,{id:uid(),date,
@@ -624,6 +654,7 @@ document.addEventListener("change",(e)=>{
   }
   if(cf && cf.dataset.cf==="stats-subject"){ state.statsSubjectId=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="pagos-month"){ state.pagosMonth=cf.value; render(); return; }
+  if(cf && cf.dataset.cf==="renta-month"){ state.rentaMonth=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="informe-period"){ state.informePeriod=cf.value; state.informeCopyMsg=""; render(); return; }
   const lf=e.target.closest("[data-lf]");
   if(lf){

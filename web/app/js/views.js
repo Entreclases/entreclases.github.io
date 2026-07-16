@@ -281,6 +281,8 @@ function vDetalle(){
         <div class="field"><div class="flabel">¿Trajo la tarea?</div><select id="c-tarea">
           <option value="sd">—</option><option value="hecha">Hecha</option>
           <option value="intentada">Intentada</option><option value="no">No hecha</option></select></div>
+        <div class="field" style="max-width:130px"><div class="flabel">Duración (min)</div>
+          <input type="number" min="1" id="c-duration" value="60"></div>
       </div>
       <div class="field"><div class="flabel">Nota rápida (qué costó, tarea que dejaste)</div>
         <input id="c-note" placeholder="Ej: se traba en cadena+cociente. Tarea: guía 5, ej. 8-12"></div>
@@ -292,6 +294,7 @@ function vDetalle(){
     h += sorted.length===0 ? `<div class="empty">Todavía no hay clases registradas.</div>`
       : sorted.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
         <div class="body"><span style="font-weight:600">${esc(c.topic||"Clase")}</span>
+        <span class="tareatag">${c.duration!=null&&c.duration!==""?Math.round(c.duration)+" min":"60 min (asumido)"}</span>
         ${c.tarea&&c.tarea!=="sd"?`<span class="tareatag" style="color:${TAREA_META[c.tarea].fg}">tarea: ${TAREA_META[c.tarea].label}</span>`:""}
         ${c.note?`<div class="note">${esc(c.note)}</div>`:""}
         ${c.objetivo?`<div class="note goaltag">🎯 ${esc(c.objetivo)}${c.objetivoResult
@@ -732,8 +735,17 @@ function vPagosMensuales(s){
   return h;
 }
 
-/* ============ vista "Pagos": resumen del mes, todos los alumnos con tarifa cargada ============ */
+/* ============ vista "Pagos": sub-pestañas "Resumen" (mes a mes, quién debe qué) y
+   "Rentabilidad" (cuánto se gana de verdad por hora, ver vRentabilidad más abajo) ============ */
 function vPagos(){
+  const tab = state.pagosTab||"resumen";
+  let h = `<div class="tabs" style="margin-bottom:14px">
+    <button class="tabbtn ${tab==="resumen"?"on":""}" data-a="pagos-tab" data-t="resumen">Resumen</button>
+    <button class="tabbtn ${tab==="rentabilidad"?"on":""}" data-a="pagos-tab" data-t="rentabilidad">Rentabilidad</button>
+  </div>`;
+  return h + (tab==="rentabilidad" ? vRentabilidad() : vPagosResumen());
+}
+function vPagosResumen(){
   const mk = state.pagosMonth || currentMonthKey();
   let h = `<div class="field" style="max-width:280px;margin-bottom:14px">
     <div class="flabel">Mes</div>
@@ -783,6 +795,116 @@ function vPagos(){
       <span class="chip" style="color:${SENIA_ESTADO_META[p.seniaEstado].fg};border-color:${SENIA_ESTADO_META[p.seniaEstado].fg};flex-shrink:0">${fmtMoney(p.seniaMonto)} · ${SENIA_ESTADO_META[p.seniaEstado].label}</span>
     </div>`).join("");
   }
+  return h;
+}
+
+/* ============ rentabilidad real: ingresos cobrados menos costos, por hora dictada ============ */
+function vRentabilidad(){
+  const mk = state.rentaMonth || currentMonthKey();
+  let h = `<div class="field" style="max-width:280px;margin-bottom:14px">
+    <div class="flabel">Mes</div>
+    <select data-cf="renta-month">
+      ${recentMonthKeys(12).map(k=>`<option value="${k}" ${k===mk?"selected":""}>${esc(monthLabel(k))}</option>`).join("")}
+    </select></div>`;
+
+  const r = rentabilidadMes(mk);
+  h += `<div class="stats" style="margin-bottom:10px">
+    <div class="stat"><b style="font-size:34px;color:${r.horas>0?(r.ganancia>=0?"var(--green)":"var(--red)"):"var(--ink)"}">${r.horas>0?fmtMoneySigned(r.netoPorHora):"—"}</b><span>neto por hora real</span></div>
+  </div>`;
+  h += `<div class="stats" style="margin-bottom:8px">
+    <div class="stat"><b>${fmtMoney(r.ingresos)}</b><span>ingresos cobrados</span></div>
+    <div class="stat"><b>${fmtMoney(r.costosTotal)}</b><span>costos del mes</span></div>
+    <div class="stat ${r.ganancia<0?"warn":""}"><b>${fmtMoneySigned(r.ganancia)}</b><span>ganancia neta</span></div>
+    <div class="stat"><b>${r.horas.toFixed(1)}</b><span>horas dictadas</span></div>
+  </div>`;
+  if(r.sinDuracion>0) h += `<div class="hint" style="margin-bottom:14px">${r.sinDuracion} clase${r.sinDuracion===1?"":"s"} sin duración cargada — se contaron como 1 hora.</div>`;
+  if(r.clasesCount===0) h += `<div class="empty" style="margin-bottom:14px">Sin clases registradas este mes todavía.</div>`;
+
+  const proy = rentabilidadProyeccion(mk);
+  if(proy) h += `<div class="hint" style="margin-bottom:20px">Proyección del mes al ritmo actual (día ${proy.diasTranscurridos} de ${proy.diasEnMes}): ganancia neta ≈ <b>${fmtMoneySigned(proy.ganancia)}</b>.</div>`;
+
+  h += `<div class="stitle">Por materia</div>`;
+  const porMateria = rentabilidadPorMateria(mk);
+  h += porMateria.length===0 ? `<div class="empty">Sin datos todavía este mes.</div>` : rentaRows(porMateria);
+
+  h += `<div class="stitle">Por alumno</div>`;
+  const porAlumno = rentabilidadPorAlumno(mk);
+  h += porAlumno.length===0 ? `<div class="empty">Sin datos todavía este mes.</div>` : rentaRows(porAlumno);
+
+  h += `<div class="stitle" style="margin-top:26px">Histórico (últimos 12 meses)</div>`;
+  const hist = rentabilidadHistorico();
+  const axisLabels = hist.map(x=>x.label);
+  h += `<div class="hint" style="margin-bottom:6px">Ganancia neta por mes — línea punteada: tendencia</div>`;
+  h += signedBarChart(hist.map(x=>({label:x.mk,v:x.neto})), axisLabels, fmtMoney);
+  h += `<div class="hint" style="margin:18px 0 6px">Neto por hora real por mes — línea punteada: tendencia</div>`;
+  h += signedBarChart(hist.map(x=>({label:x.mk,v:x.netoPorHora||0})), axisLabels, v=>v?fmtMoney(v):"—");
+
+  h += vCostosConfig();
+  return h;
+}
+// filas de desglose (por materia o por alumno) — mismo formato de tarjeta en ambos casos.
+function rentaRows(groups){
+  return groups.map(g=>`<div class="row" style="cursor:default">
+    <div class="main"><div class="name">${esc(g.label)}${g.subject?` <span class="hint">· ${esc(g.subject)}</span>`:""}</div>
+      <div class="sub">${g.clases} clase${g.clases===1?"":"s"} · ${fmtMoney(g.ingresos)} ingresos${g.costos?` · ${fmtMoney(g.costos)} costos`:""}</div></div>
+    <div class="right"><span style="color:${g.neto>=0?"var(--green)":"var(--red)"};font-weight:600">${fmtMoneySigned(g.neto)}</span>
+      ${g.horas>0?`<div class="hint">${fmtMoneySigned(g.netoPorHora)}/h</div>`:""}</div>
+  </div>`).join("");
+}
+// <select> de alcance para un costo: general (todo el negocio), una materia puntual o un alumno
+// puntual — el valor codifica cuál con el prefijo "m:"/"s:" (ver parseScopeValue en helpers.js).
+function scopeOptionsHtml(selected){
+  let h = `<option value="" ${!selected?"selected":""}>General (todo el negocio)</option>`;
+  if(state.catalog.subjects.length){
+    h += `<optgroup label="Por materia">` + state.catalog.subjects.map(m=>
+      `<option value="m:${m.id}" ${selected==="m:"+m.id?"selected":""}>${esc(m.name)}</option>`).join("") + `</optgroup>`;
+  }
+  const studs = alive();
+  if(studs.length){
+    h += `<optgroup label="Por alumno">` + studs.map(s=>
+      `<option value="s:${s.id}" ${selected==="s:"+s.id?"selected":""}>${esc(s.name)}</option>`).join("") + `</optgroup>`;
+  }
+  return h;
+}
+function scopeLabelOf(c){
+  if(c.subjectId){ const m=subjById(c.subjectId); return m?m.name:"materia eliminada"; }
+  if(c.studentId){ const s=state.students.find(x=>x.id===c.studentId); return s?s.name:"alumno eliminado"; }
+  return "General";
+}
+function vCostosConfig(){
+  const costos = costosFor();
+  let h = `<div class="stitle" style="margin-top:30px">Costos</div>`;
+  h += `<div class="formcard">
+    <div class="ftitle">Costos fijos mensuales</div>
+    <div class="hint" style="margin-bottom:10px">Se descuentan completos cada mes, dicten o no clases ese mes. Asignalos a una materia o alumno si querés que aparezcan en su desglose — sin asignar, quedan como costo general del negocio.</div>
+    ${costos.fijos.map(c=>`<div class="log">
+      <div class="body">${esc(c.name)} <span class="hint">· ${esc(scopeLabelOf(c))}</span></div>
+      <div style="font-family:var(--mono);font-weight:600">${fmtMoney(c.monto)}</div>
+      <button class="del" data-a="del-costo-fijo" data-id="${c.id}" title="Borrar">×</button>
+    </div>`).join("")}
+    <div class="frow" style="align-items:flex-end;margin-top:8px">
+      <div class="field"><div class="flabel">Nombre</div><input id="costo-fijo-name" placeholder="Ej: alquiler de aula"></div>
+      <div class="field" style="max-width:130px"><div class="flabel">Monto mensual</div><input type="number" min="0" id="costo-fijo-monto"></div>
+      <div class="field"><div class="flabel">Alcance</div><select id="costo-fijo-scope">${scopeOptionsHtml("")}</select></div>
+      <button class="chip" data-a="add-costo-fijo" style="margin-bottom:2px">+ Agregar</button>
+    </div>
+  </div>`;
+
+  h += `<div class="formcard">
+    <div class="ftitle">Costos variables por clase</div>
+    <div class="hint" style="margin-bottom:10px">Se descuentan por cada clase dictada dentro de su alcance (viáticos, material impreso, etc.).</div>
+    ${costos.variables.map(c=>`<div class="log">
+      <div class="body">${esc(c.name)} <span class="hint">· ${esc(scopeLabelOf(c))}</span></div>
+      <div style="font-family:var(--mono);font-weight:600">${fmtMoney(c.monto)}/clase</div>
+      <button class="del" data-a="del-costo-variable" data-id="${c.id}" title="Borrar">×</button>
+    </div>`).join("")}
+    <div class="frow" style="align-items:flex-end;margin-top:8px">
+      <div class="field"><div class="flabel">Nombre</div><input id="costo-var-name" placeholder="Ej: viáticos"></div>
+      <div class="field" style="max-width:130px"><div class="flabel">Monto por clase</div><input type="number" min="0" id="costo-var-monto"></div>
+      <div class="field"><div class="flabel">Alcance</div><select id="costo-var-scope">${scopeOptionsHtml("")}</select></div>
+      <button class="chip" data-a="add-costo-variable" style="margin-bottom:2px">+ Agregar</button>
+    </div>
+  </div>`;
   return h;
 }
 
@@ -1698,6 +1820,56 @@ function barRow(dataset, axisLabels){
   // dense (30/48 puntos): las barras quedan a ancho fijo y el bloque scrollea horizontal
   // en pantallas angostas en vez de aplastarse hasta hacer ilegibles número y etiqueta.
   return (dense?`<div style="overflow-x:auto;padding-bottom:2px">${chart}${axisRow}</div>`:chart+axisRow) + rangeHint;
+}
+// Regresión lineal simple (mínimos cuadrados) sobre una serie — devuelve una función que da el
+// valor predicho en el índice x. La usa signedBarChart para la línea de tendencia del histórico.
+function linearTrend(values){
+  const n=values.length, meanX=(n-1)/2, meanY=values.reduce((a,b)=>a+b,0)/n;
+  let num=0, den=0;
+  values.forEach((y,x)=>{ num+=(x-meanX)*(y-meanY); den+=(x-meanX)*(x-meanX); });
+  const slope = den===0?0:num/den, intercept = meanY-slope*meanX;
+  return x=>slope*x+intercept;
+}
+// Barras que pueden dar negativas (rentabilidad: un mes puede cerrar en pérdida), creciendo desde
+// una línea de cero al medio en vez de desde abajo como barRow — verde hacia arriba, rojo hacia
+// abajo, valor siempre visible en la punta de la barra. Incluye una línea de tendencia (regresión
+// lineal simple) superpuesta en SVG puro, sin librerías. fmt formatea cada valor para el label.
+function signedBarChart(dataset, axisLabels, fmt){
+  const H=120, half=48, n=dataset.length;
+  const max = Math.max(1, ...dataset.map(d=>Math.abs(d.v)));
+  const trendFn = linearTrend(dataset.map(d=>d.v));
+  const cols = dataset.map(d=>{
+    const hgt = d.v===0 ? 0 : Math.max(2, Math.round(Math.abs(d.v)/max*half));
+    const label = `<span style="font-size:9px;font-family:var(--mono);color:var(--muted);white-space:nowrap">${esc(fmt(d.v))}</span>`;
+    const posBar = d.v>0
+      ? `${label}<div style="width:70%;max-width:16px;background:var(--green);border-radius:2px 2px 0 0;height:${hgt}px;margin-top:2px"></div>`
+      : (d.v===0 ? `<span style="font-size:9px;font-family:var(--mono);color:var(--faint)">–</span>` : "");
+    const negBar = d.v<0
+      ? `<div style="width:70%;max-width:16px;background:var(--red);border-radius:0 0 2px 2px;height:${hgt}px;margin-bottom:2px"></div>${label}`
+      : "";
+    return `<div title="${esc(d.label)}: ${esc(fmt(d.v))}" style="flex:1;min-width:2px;display:flex;flex-direction:column;height:100%">
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center">${posBar}</div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;align-items:center">${negBar}</div>
+    </div>`;
+  }).join("");
+  const baseline = H/2;
+  const trendPoints = dataset.map((d,i)=>{
+    const y = Math.max(4, Math.min(H-4, baseline-(trendFn(i)/max*half)));
+    const x = ((i+0.5)/n*100).toFixed(2);
+    return `${x},${y.toFixed(1)}`;
+  }).join(" ");
+  const chart = `<div style="position:relative;height:${H}px;margin-bottom:4px">
+    <div style="position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--line)"></div>
+    <svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
+      <polyline points="${trendPoints}" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-dasharray="4 3"/>
+    </svg>
+    <div style="display:flex;gap:3px;height:100%;position:relative">${cols}</div>
+  </div>`;
+  const axisRow = axisLabels ? `<div style="display:flex;gap:3px;margin-bottom:14px">` +
+    dataset.map((d,i)=>`<div style="flex:1;min-width:2px;text-align:center">
+      ${axisLabels[i]?`<span style="display:inline-block;font-size:8.5px;font-family:var(--mono);color:var(--faint);white-space:nowrap">${esc(axisLabels[i])}</span>`:""}
+    </div>`).join("") + `</div>` : "";
+  return chart+axisRow;
 }
 // Título de sub-gráfico + total del período, en la misma línea (formato de .stitle).
 function chartTitle(text, dataset){
