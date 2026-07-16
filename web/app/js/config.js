@@ -42,7 +42,7 @@ const MATERIALES_BUCKET = "materiales";
 const MATERIAL_MAX_BYTES = 10*1024*1024;
 const MATERIAL_MAX_COUNT = 20;
 const MATERIAL_MAX_TOTAL_BYTES = 20*1024*1024; // por usuario, sumando materiales de todas sus materias
-const APP_VERSION = "2.0.1";
+const APP_VERSION = "2.0.2";
 // Empaquetado nativo: Tauri inyecta window.__TAURI__, Capacitor inyecta window.Capacitor
 const IS_NATIVE = !!(window.__TAURI__ || window.Capacitor);
 function detectPlatform(){

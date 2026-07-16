@@ -24,6 +24,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
+
+## [2.0.2] - 2026-07-16
 - Generador de contratos de servicio: botón "Generar contrato" en la ficha del alumno, con un modelo precargado (docente, alumno, materia, tarifa y modalidad, horarios habituales, política de cancelación y señas) y campos editables (responsable, DNI opcional, fecha de inicio, cláusulas adicionales); datos del docente reutilizables cargados una sola vez en Cuenta; vista tipo documento con el mismo patrón que el informe (Descargar PDF / Copiar texto).
 - Rentabilidad real: sub-pestaña dentro de Pagos con costos fijos mensuales y variables por clase (asignables a una materia o alumno puntual), $ neto por hora realmente dictada del mes (ingresos cobrados menos costos, sobre la duración cargada en cada clase), desglose por materia y por alumno, proyección del mes en curso y un histórico de 12 meses (ganancia neta y $/hora) con barras que admiten negativo y línea de tendencia, todo en CSS/SVG puro.
 - Objetivos de clase: campo opcional al registrar una clase, mini-tarjeta de cierre con micro-animación al registrar la clase siguiente (o desde la ficha) para marcar si se cumplió, racha de objetivos cumplidos en la ficha, y tasa de cumplimiento en Estadísticas e informe compartible.
