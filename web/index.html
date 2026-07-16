@@ -6,8 +6,58 @@
 <title>Cuaderno de seguimiento</title>
 <meta name="description" content="Cuaderno de seguimiento: la app para llevar el progreso de tus alumnos de clases particulares — temas, clases, simulacros y alertas de examen, con o sin internet.">
 <link rel="icon" href="app/icon-192.png">
-<meta name="theme-color" content="#1E2B4D" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#12141A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="theme-color-meta" content="#1E2B4D">
+<script>
+  // Tema elegible (automático/claro/oscuro), aplicado antes del primer render para evitar el
+  // flash. Usa LA MISMA clave que la app (ver THEME_KEY en web/app/js/config.js) para que
+  // landing y app queden siempre consistentes entre sí, aunque no comparten JS ni localStorage
+  // (cada origen tiene el suyo — coinciden solo si se abren desde el mismo dominio).
+  var THEME_KEY = "tutoria-theme";
+  var THEME_ORDER = ["system","light","dark"];
+  var THEME_LABELS = {system:"Automático",light:"Claro",dark:"Oscuro"};
+  var THEME_ICONS = {
+    system:'<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>',
+    light:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
+    dark:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>'
+  };
+  function getTheme(){ try{ return localStorage.getItem(THEME_KEY) || "system"; }catch(e){ return "system"; } }
+  function isDarkEffective(t){
+    if(t==="dark") return true;
+    if(t==="light") return false;
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+  function updateThemeColorMeta(t){
+    var meta=document.getElementById("theme-color-meta");
+    if(meta) meta.setAttribute("content", isDarkEffective(t) ? "#12141A" : "#1E2B4D");
+  }
+  function applyTheme(t){
+    var root=document.documentElement;
+    root.classList.remove("theme-light","theme-dark");
+    if(t==="light") root.classList.add("theme-light");
+    else if(t==="dark") root.classList.add("theme-dark");
+    updateThemeColorMeta(t);
+  }
+  applyTheme(getTheme()); // antes del primer render, para evitar el parpadeo
+  if(window.matchMedia){
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(){
+      if(getTheme()==="system") updateThemeColorMeta("system");
+    });
+  }
+  function updateThemeButton(t){
+    var btn=document.getElementById("theme-toggle");
+    if(!btn) return;
+    btn.innerHTML = THEME_ICONS[t];
+    var label = "Tema: "+THEME_LABELS[t]+" — tocar para cambiar";
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  }
+  function cycleTheme(){
+    var next = THEME_ORDER[(THEME_ORDER.indexOf(getTheme())+1) % THEME_ORDER.length];
+    try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+    applyTheme(next);
+    updateThemeButton(next);
+  }
+</script>
 <style>
   :root{
     --bg:#E7E8EB; --card:#FFFFFF; --ink:#1E2B4D; --muted:#5B6072; --faint:#8B90A0;
@@ -19,8 +69,10 @@
     --sans:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
     --mono:ui-monospace,"Cascadia Mono",Consolas,"Roboto Mono",monospace;
   }
+  /* modo automático: sigue prefers-color-scheme, salvo que haya una elección explícita
+     (clase theme-light/theme-dark en <html>, puesta por cycleTheme() de arriba) */
   @media (prefers-color-scheme:dark){
-    :root{
+    :root:not(.theme-light):not(.theme-dark){
       --bg:#12141A; --card:#1B1E27; --ink:#E8E9EE; --muted:#A8ADBD; --faint:#7A8096;
       --line:#2E3240; --soft:#242836; --red:#FF6B57; --redbg:#3A211D;
       --green:#4ADE80; --greenbg:#173324; --amber:#FBBF24; --amberbg:#3A2E10;
@@ -29,6 +81,17 @@
       --cta-shadow:rgba(0,0,0,.45); --cta-shadow-hover:rgba(0,0,0,.55);
     }
   }
+  /* modo oscuro forzado (mismos valores que arriba), sin importar el sistema */
+  :root.theme-dark{
+    --bg:#12141A; --card:#1B1E27; --ink:#E8E9EE; --muted:#A8ADBD; --faint:#7A8096;
+    --line:#2E3240; --soft:#242836; --red:#FF6B57; --redbg:#3A211D;
+    --green:#4ADE80; --greenbg:#173324; --amber:#FBBF24; --amberbg:#3A2E10;
+    --blue:#8CA6F5; --bluebg:#1B2340; --gray:#3A3F52;
+    --accent:#4C5FAB; --accent-hover:#5E70C2; --header-bg:rgba(18,20,26,.85);
+    --cta-shadow:rgba(0,0,0,.45); --cta-shadow-hover:rgba(0,0,0,.55);
+  }
+  /* modo claro forzado: :root ya nace con los valores claros arriba, no hace falta repetirlos —
+     alcanza con que la regla dark de @media excluya :not(.theme-light) como hace arriba */
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
        font-size:15px;line-height:1.5}
@@ -42,9 +105,15 @@
   header.site .bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0}
   .brand{display:flex;flex-direction:column;line-height:1.2}
   .brand b{font-size:15.5px;letter-spacing:-.01em}
+  .bar-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:flex-end}
   nav.mainnav{display:flex;gap:22px;font-size:13.5px;font-weight:500}
   nav.mainnav a{text-decoration:none;color:var(--muted)}
   nav.mainnav a:hover{color:var(--ink)}
+  .theme-toggle{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:34px;height:34px;border-radius:99px;border:1px solid var(--line);background:var(--card);
+    color:var(--ink);cursor:pointer;padding:0}
+  .theme-toggle:hover{border-color:var(--ink)}
+  .theme-toggle svg{display:block}
 
   /* botones */
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;
@@ -97,6 +166,8 @@
     .hero{padding:52px 0 44px}
     .hero h1{font-size:29px}
     section{padding:40px 0}
+    nav.mainnav{gap:14px}
+    .bar-right{gap:10px}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -108,12 +179,16 @@
     <div class="brand">
       <b>Cuaderno de seguimiento</b>
     </div>
-    <nav class="mainnav">
-      <a href="#caracteristicas">Características</a>
-      <a href="#usala">Usala donde quieras</a>
-    </nav>
+    <div class="bar-right">
+      <nav class="mainnav">
+        <a href="#caracteristicas">Características</a>
+        <a href="#usala">Usala donde quieras</a>
+      </nav>
+      <button type="button" id="theme-toggle" class="theme-toggle" onclick="cycleTheme()"></button>
+    </div>
   </div>
 </header>
+<script>updateThemeButton(getTheme());</script>
 
 <section class="hero">
   <div class="wrap">

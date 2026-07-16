@@ -26,6 +26,7 @@ a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc
 ## [Sin publicar]
 - Eliminado GoatCounter de la landing (métricas propias en `metricas_diarias`/`metricas_horarias` no se tocan).
 - Límite total de materiales (20 MB por usuario entre todas sus materias), con índice liviano en el catálogo, reconciliación contra Storage y barra de uso en la sección Materiales.
+- Tema elegible (automático/claro/oscuro) en la landing, con botón sol/luna en el header y la misma clave de localStorage que usa la app.
 
 ## [2.0.0] - 2026-07-16
 - Registro de pagos por alumno.
