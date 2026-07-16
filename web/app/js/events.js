@@ -248,6 +248,14 @@ document.addEventListener("click", (e)=>{
     if(!file) return;
     uploadMaterial(el.dataset.id, file); return;
   }
+  else if(a==="mat-toggle-share"){
+    const entry=materialIndexEntry(el.dataset.id, el.dataset.name); if(!entry) return;
+    const next=!entry.compartido;
+    entry.compartido=next;
+    touchCatalog();
+    if(!next) removeFromPortalBiblioteca(el.dataset.id, el.dataset.name);
+    return;
+  }
   else if(a==="mat-download"){ downloadMaterial(el.dataset.id, el.dataset.name); return; }
   else if(a==="mat-del-ask"){ state.materialesConfirmDelName=el.dataset.name; }
   else if(a==="mat-del-cancel"){ state.materialesConfirmDelName=null; }

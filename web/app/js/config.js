@@ -18,6 +18,12 @@ const LOGIN_ATTEMPTS_KEY = "tutoria-login-attempts"; // {count, lockUntil} — f
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCK_MS = 5*60*1000;
 const LAST_COBROS_NOTIFY_KEY = "tutoria-last-cobros-notify-date"; // fecha (YYYY-MM-DD) del último aviso del sistema por cobros atrasados — uno por día, por dispositivo
+// Biblioteca del portal (state.catalog.subjects[].materiales[].compartido + portales.publicado.biblioteca):
+// URLs firmadas de Storage con este vencimiento; se renuevan solas (ver maybeRenewPortalLibrary
+// en sync.js) cuando les queda menos de PORTAL_LINK_TTL_DAYS-PORTAL_LINK_RENEW_AFTER_DAYS de vida.
+const PORTAL_LINK_TTL_DAYS = 30;
+const PORTAL_LINK_RENEW_AFTER_DAYS = 20;
+const PORTAL_RENEW_CHECK_KEY = "tutoria-portal-renew-check-date"; // fecha (YYYY-MM-DD) del último chequeo de renovación — uno por día, por dispositivo
 const THEME_KEY = "tutoria-theme"; // "light" | "dark" | "system" (default)
 function getTheme(){ return localStorage.getItem(THEME_KEY) || "system"; }
 function applyTheme(theme){

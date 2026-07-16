@@ -57,6 +57,7 @@ async function syncNow(force){
           setStatus("ok");
           pendingSyncs++;
           maybeSnapshotBackup(uid_, s);
+          maybeRenewPortalLibrary(uid_, s);
           return;
         }
       }
@@ -100,6 +101,7 @@ async function syncNow(force){
     // re-dibujar solo si la nube trajo cambios (para no interrumpir si estás escribiendo)
     if(JSON.stringify({a:state.students,b:state.catalog})!==before && state.view!=="cuenta" && state.view!=="catalog") render();
     maybeSnapshotBackup(uid_, s);
+    maybeRenewPortalLibrary(uid_, s);
   }catch(e){
     // offline se chequea primero: una falla de red (incluido el refresh del token) mientras
     // no hay internet nunca debe cerrar la sesión ni bloquear la app — solo degrada el estado.
@@ -429,13 +431,37 @@ async function regenerarPortalToken(){
     render();
   }
 }
+// Devuelve una URL firmada de Storage (válida expiresInSec) para un material propio. Requiere
+// solamente la policy de SELECT ya existente para la carpeta del usuario (007_materiales_storage_
+// policies.sql) — firmar un objeto pasa por la misma RLS que descargarlo directo.
+async function signMaterialUrl(s, path, expiresInSec){
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+  const r=await fetch(SUPA_URL+"/storage/v1/object/sign/"+MATERIALES_BUCKET+"/"+path.split("/").map(encodeURIComponent).join("/"),
+    {method:"POST", headers:h, body:JSON.stringify({expiresIn:expiresInSec})});
+  if(!r.ok) throw new Error("no se pudo firmar "+path);
+  const j=await r.json();
+  return SUPA_URL+"/storage/v1"+j.signedURL;
+}
+// Publicar cambios: nombre a mostrar + biblioteca (un ítem firmado por cada material con
+// compartido:true en cualquier materia). Si falla la firma de algún archivo, no se publica nada
+// (todo o nada, para no dejar el portal a medio actualizar) — se puede reintentar tocando de nuevo.
 async function publicarPortal(){
   if(!state.portal) return;
   state.portalSaving=true; state.portalSaveMsg=""; render();
-  const publicado={...state.portal.publicado, nombre:(state.portal.draftNombre||"").trim()};
   try{
     const s=await ensureToken();
     const uid_=jwtSub(s.access);
+    const compartidos=[];
+    (state.catalog.subjects||[]).forEach(m=>{
+      materialesIndexFor(m.id).forEach(f=>{ if(f.compartido) compartidos.push({subjectId:m.id, subject:m.name, ...f}); });
+    });
+    const biblioteca=await Promise.all(compartidos.map(async f=>{
+      const path=materialPath(uid_, f.subjectId, f.name);
+      const url=await signMaterialUrl(s, path, PORTAL_LINK_TTL_DAYS*86400);
+      return {subjectId:f.subjectId, materia:f.subject, nombre:materialDisplayName(f.name),
+        path, url, bytes:f.bytes||0, at:f.at||null, firmadoAt:Date.now()};
+    }));
+    const publicado={...state.portal.publicado, nombre:(state.portal.draftNombre||"").trim(), biblioteca};
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
     const r=await fetch(SUPA_URL+"/rest/v1/portales?user_id=eq."+encodeURIComponent(uid_), {method:"PATCH", headers:h,
       body:JSON.stringify({publicado, updated_at:new Date().toISOString()})});
@@ -446,6 +472,60 @@ async function publicarPortal(){
     state.portalSaveMsg = !navigator.onLine ? "Sin conexión a internet." : "No se pudo publicar. Probá de nuevo.";
   }
   state.portalSaving=false; render();
+}
+// Renovación silenciosa de los links firmados de la biblioteca (una vez por día por dispositivo,
+// ver PORTAL_RENEW_CHECK_KEY), colgada del ciclo de sync existente igual que maybeSnapshotBackup.
+// No depende de que Cuenta esté abierta ni de state.portal: lee/escribe la fila directo, así
+// también funciona si el docente nunca entra a esa pantalla en el día. Sólo re-firma los ítems que
+// están a PORTAL_LINK_RENEW_AFTER_DAYS o más de su firma — el resto de la biblioteca no se toca.
+async function maybeRenewPortalLibrary(uid_, s){
+  if(localStorage.getItem(PORTAL_RENEW_CHECK_KEY) === today()) return;
+  localStorage.setItem(PORTAL_RENEW_CHECK_KEY, today());
+  try{
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+    const r=await fetch(SUPA_URL+"/rest/v1/portales?select=habilitado,publicado", {headers:h});
+    if(!r.ok) return;
+    const row=(await r.json())[0];
+    if(!row || !row.habilitado) return;
+    const biblioteca=(row.publicado&&row.publicado.biblioteca)||[];
+    const staleCutoff=Date.now()-PORTAL_LINK_RENEW_AFTER_DAYS*86400000;
+    const stale=biblioteca.filter(it=>!it.firmadoAt || it.firmadoAt<staleCutoff);
+    if(!stale.length) return;
+    const renewed=await Promise.all(stale.map(async it=>{
+      try{
+        const url=await signMaterialUrl(s, it.path, PORTAL_LINK_TTL_DAYS*86400);
+        return {...it, url, firmadoAt:Date.now()};
+      }catch(e){ return it; } // best-effort: un archivo puntual borrado/renombrado no frena a los demás
+    }));
+    const byPath=new Map(renewed.map(it=>[it.path,it]));
+    const merged=biblioteca.map(it=>byPath.get(it.path)||it);
+    const publicado={...row.publicado, biblioteca:merged};
+    await fetch(SUPA_URL+"/rest/v1/portales?user_id=eq."+encodeURIComponent(uid_), {method:"PATCH",
+      headers:{...h, Prefer:"return=minimal"}, body:JSON.stringify({publicado, updated_at:new Date().toISOString()})});
+    if(state.portal){ state.portal.publicado=publicado; render(); }
+  }catch(e){ /* silencioso: se reintenta al otro día */ }
+}
+// Al dejar de compartir un archivo o borrarlo, sacarlo del portal enseguida en vez de esperar a
+// que el docente toque "Publicar cambios" — no vuelve a firmar nada, sólo saca el ítem de
+// publicado.biblioteca. Lee/escribe la fila directo (no depende de que state.portal esté cargado,
+// ya que esto se dispara desde el editor de Materiales, no desde Cuenta).
+async function removeFromPortalBiblioteca(subjectId, fileName){
+  try{
+    const s=await ensureToken();
+    const uid_=jwtSub(s.access);
+    const path=materialPath(uid_, subjectId, fileName);
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+    const r=await fetch(SUPA_URL+"/rest/v1/portales?select=publicado", {headers:h});
+    if(!r.ok) return;
+    const row=(await r.json())[0];
+    if(!row || !row.publicado) return;
+    const biblioteca=row.publicado.biblioteca||[];
+    if(!biblioteca.some(it=>it.path===path)) return;
+    const publicado={...row.publicado, biblioteca:biblioteca.filter(it=>it.path!==path)};
+    await fetch(SUPA_URL+"/rest/v1/portales?user_id=eq."+encodeURIComponent(uid_), {method:"PATCH",
+      headers:{...h, Prefer:"return=minimal"}, body:JSON.stringify({publicado, updated_at:new Date().toISOString()})});
+    if(state.portal){ state.portal.publicado=publicado; render(); }
+  }catch(e){ /* silencioso: se corrige solo en la próxima publicación manual */ }
 }
 
 /* ============ materiales por materia (Supabase Storage, bucket privado "materiales") ============
@@ -478,6 +558,9 @@ function materialesIndexFor(subjectId){
   const s=subjById(subjectId);
   return (s && Array.isArray(s.materiales)) ? s.materiales : [];
 }
+function materialIndexEntry(subjectId, name){
+  return materialesIndexFor(subjectId).find(m=>m.name===name) || null;
+}
 function materialesTotalBytes(){
   return (state.catalog.subjects||[]).reduce((sum,s)=>
     sum+((s.materiales||[]).reduce((a,m)=>a+(Number(m.bytes)||0),0)), 0);
@@ -489,11 +572,18 @@ function materialesIndexMatches(subjectId, storageList){
   const idxKeys=new Set(idx.map(m=>key(m.name,m.bytes)));
   return storageList.every(f=>idxKeys.has(key(f.name,(f.metadata&&f.metadata.size)||0)));
 }
+// Preserva "compartido" (matcheando por nombre+bytes, misma clave que materialesIndexMatches)
+// para que reconciliar contra Storage no borre sin querer lo que ya está compartido en el portal.
 function reconcileMaterialesIndex(subjectId, storageList){
   if(materialesIndexMatches(subjectId, storageList)) return;
   const s=subjById(subjectId);
   if(!s) return;
-  s.materiales=storageList.map(f=>({name:f.name, bytes:(f.metadata&&f.metadata.size)||0, at:f.updated_at||f.created_at||null}));
+  const prev=new Map((s.materiales||[]).map(m=>[m.name+"|"+m.bytes, m]));
+  s.materiales=storageList.map(f=>{
+    const bytes=(f.metadata&&f.metadata.size)||0;
+    const old=prev.get(f.name+"|"+bytes);
+    return {name:f.name, bytes, at:f.updated_at||f.created_at||null, compartido:!!(old&&old.compartido)};
+  });
   touchCatalog();
 }
 
@@ -562,6 +652,7 @@ async function deleteMaterial(subjectId, fileName){
     const r=await fetch(materialObjectUrl(materialPath(uid_, subjectId, fileName)), {method:"DELETE", headers:h});
     if(!r.ok) throw new Error("error "+r.status);
     state.materialesDeleteStatus="idle";
+    removeFromPortalBiblioteca(subjectId, fileName);
     await loadMateriales(subjectId);
   }catch(e){
     state.materialesDeleteStatus="idle";
@@ -613,10 +704,15 @@ async function listMaterialsForSubject(subjectId){
 // también (dos confirm() nativos, igual que el resto de la app). Offline no intenta comprobar
 // nada — borra la materia como siempre, sin tocar materiales (no hay forma de saber si tiene).
 async function deleteSubjectAndMaybeMaterials(subjectId){
+  // Materiales compartidos de esta materia: se sacan de la biblioteca del portal al borrar la
+  // materia entera, se elija o no borrarlos también de Storage (ya dejaron de existir para el
+  // catálogo, así que no tiene sentido que sigan visibles ahí).
+  const compartidos=materialesIndexFor(subjectId).filter(f=>f.compartido);
   const removeFromCatalog=()=>{
     state.catalog.subjects=state.catalog.subjects.filter(m=>m.id!==subjectId);
     state.catalog.packs=(state.catalog.packs||[]).map(p=>({...p, subjectIds:p.subjectIds.filter(id=>id!==subjectId)}));
     touchCatalog();
+    compartidos.forEach(f=>removeFromPortalBiblioteca(subjectId, f.name));
   };
   if(!navigator.onLine){ removeFromCatalog(); return; }
   const {uid_, s, files} = await listMaterialsForSubject(subjectId);

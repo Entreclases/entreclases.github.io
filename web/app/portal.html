@@ -37,6 +37,19 @@
   .msg .big{font-size:17px;font-weight:600;margin-bottom:8px}
   .msg .small{color:var(--muted);font-size:13.5px}
   .err{color:var(--red);background:var(--redbg);border-radius:10px;padding:10px 14px;font-size:13.5px}
+  #biblio-search{width:100%;font:inherit;font-size:14px;padding:9px 12px;margin:4px 0 10px;
+    border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink)}
+  #biblio-search:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .subject + .subject{margin-top:14px;padding-top:14px;border-top:1px solid var(--soft)}
+  .subjectname{font-weight:600;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .file{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:9px 0;border-top:1px solid var(--soft)}
+  .subjectname + .file{border-top:none}
+  .filemain{font-size:13.5px}
+  .filemeta{font-size:12px;color:var(--faint);margin-top:2px}
+  .dl{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none;
+    border:1px solid var(--line);border-radius:8px;padding:6px 12px;white-space:nowrap}
+  .dl:hover{background:var(--soft)}
 </style>
 </head>
 <body>

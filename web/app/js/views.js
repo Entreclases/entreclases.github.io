@@ -1370,7 +1370,8 @@ function vPortalCard(){
       <button class="chip" data-a="portal-regen">Regenerar llave</button>
     </div>
     ${state.portalCopyMsg?`<div class="hint" style="margin-top:6px;color:var(--green)">${esc(state.portalCopyMsg)}</div>`:""}
-    <div class="hint" style="margin-top:10px">Regenerar la llave hace que el link de arriba deje de funcionar — cualquier alumno que ya lo tenga guardado pierde el acceso.</div>`;
+    <div class="hint" style="margin-top:10px">Regenerar la llave hace que el link de arriba deje de funcionar — cualquier alumno que ya lo tenga guardado pierde el acceso.</div>
+    <div class="hint" style="margin-top:6px">Los archivos de la Biblioteca usan un link propio (vencimiento a los ${PORTAL_LINK_TTL_DAYS} días, se renueva solo): quien lo tenga puede reenviarlo hasta esa fecha, y regenerar la llave de arriba no lo corta.</div>`;
   }
   h += `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--soft)">
     <div class="field"><div class="flabel">Nombre a mostrar en el portal</div>
@@ -1511,13 +1512,17 @@ function vMateriales(subjectId){
   </div>
   <div class="hint" style="margin-bottom:10px">${fmtBytes(totalBytes)} de ${fmtBytes(MATERIAL_MAX_TOTAL_BYTES)} usados (entre todas tus materias)</div>
   <div class="hint" style="margin-bottom:10px">${list.length}/${MATERIAL_MAX_COUNT} archivos · máx. ${fmtBytes(MATERIAL_MAX_BYTES)} cada uno</div>`;
+  h += `<div class="hint" style="margin-bottom:8px">Tocá «Compartir» para incluir un archivo en la Biblioteca del portal para alumnos — después hace falta tocar «Publicar cambios» en Cuenta para que se vea (dejar de compartir o borrar el archivo lo saca del portal al toque).</div>`;
   h += list.length===0 ? `<div class="empty">Sin materiales todavía.</div>` : list.map(f=>{
     const dn=materialDisplayName(f.name);
     const size=(f.metadata&&f.metadata.size)||0;
     const confirming = state.materialesConfirmDelName===f.name;
+    const idxEntry=materialIndexEntry(subjectId, f.name);
+    const compartido=!!(idxEntry && idxEntry.compartido);
     return `<div class="log" style="align-items:center;flex-wrap:wrap">
       <div class="body">${esc(dn)}<div class="note">${fmtBytes(size)} · ${fmtDateTime(f.updated_at||f.created_at)}</div></div>
-      ${!confirming ? `<button class="chip" data-a="mat-download" data-id="${subjectId}" data-name="${esc(f.name)}">Descargar</button>
+      ${!confirming ? `<button class="chip ${compartido?"on":""}" data-a="mat-toggle-share" data-id="${subjectId}" data-name="${esc(f.name)}" title="Compartir en el portal de alumnos">${compartido?"Compartido":"Compartir"}</button>
+        <button class="chip" data-a="mat-download" data-id="${subjectId}" data-name="${esc(f.name)}">Descargar</button>
         <button class="del" data-a="mat-del-ask" data-name="${esc(f.name)}" title="Borrar">×</button>`
       : `<span style="font-size:12px;color:var(--red)">¿Borrar «${esc(dn)}»?</span>
         <button class="danger" data-a="mat-del-confirm" data-id="${subjectId}" data-name="${esc(f.name)}" ${state.materialesDeleteStatus==="deleting"?"disabled":""}>Sí, borrar</button>

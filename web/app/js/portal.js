@@ -15,13 +15,60 @@ function showMsg(big, small){
     `<div class="msg"><div class="big">${esc(big)}</div>${small?`<div class="small">${esc(small)}</div>`:""}</div>`;
 }
 
+function fmtBytes(n){
+  n = Number(n) || 0;
+  if(n < 1024) return n + " B";
+  if(n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+  return (n/1024/1024).toFixed(1) + " MB";
+}
+function fmtDate(ts){
+  if(!ts) return "";
+  try{ return new Date(ts).toLocaleDateString("es-AR", {day:"numeric", month:"short"}); }
+  catch(e){ return ""; }
+}
+// Agrupa por materia y arma la sección de Biblioteca (primera y bien visible: es la sección
+// principal del portal). filtro filtra por materia+nombre de archivo, case-insensitive.
+function bibliotecaHtml(items, filtro){
+  const f = (filtro||"").trim().toLowerCase();
+  const filtered = f ? items.filter(it =>
+    (it.materia||"").toLowerCase().includes(f) || (it.nombre||"").toLowerCase().includes(f)) : items;
+  if(filtered.length===0){
+    return f ? `<div class="empty">Ningún archivo coincide con «${esc(filtro)}».</div>`
+             : `<div class="empty">Todavía no hay materiales compartidos.</div>`;
+  }
+  const bySubject = new Map();
+  filtered.forEach(it=>{
+    const key = it.materia || "Sin materia";
+    if(!bySubject.has(key)) bySubject.set(key, []);
+    bySubject.get(key).push(it);
+  });
+  return [...bySubject.entries()].map(([materia, files])=>`
+    <div class="subject">
+      <div class="subjectname">${esc(materia)}</div>
+      ${files.map(it=>`<div class="file">
+        <div class="filemain">${esc(it.nombre)}<div class="filemeta">${fmtBytes(it.bytes)}${it.at?" · "+fmtDate(it.at):""}</div></div>
+        <a class="dl" href="${esc(it.url)}" target="_blank" rel="noopener">Descargar</a>
+      </div>`).join("")}
+    </div>`).join("");
+}
 function showPortal(res){
   const nombre = (res.data && res.data.nombre) ? res.data.nombre.trim() : "";
   const titulo = nombre ? `Portal de ${nombre}` : "Portal de tu profesor";
+  const biblioteca = (res.data && Array.isArray(res.data.biblioteca)) ? res.data.biblioteca : [];
   let h = `<div class="eyebrow">Cuaderno de seguimiento</div><h1>${esc(titulo)}</h1>`;
-  h += `<div class="card"><div class="ctitle">Biblioteca</div><div class="empty">Todavía no hay materiales compartidos.</div></div>`;
+  h += `<div class="card">
+    <div class="ctitle">Biblioteca</div>
+    ${biblioteca.length>1 ? `<input id="biblio-search" placeholder="Buscar por materia o archivo…" autocomplete="off">` : ""}
+    <div id="biblio-list">${bibliotecaHtml(biblioteca, "")}</div>
+  </div>`;
   h += `<div class="card"><div class="ctitle">Links útiles</div><div class="empty">Todavía no hay links compartidos.</div></div>`;
   document.getElementById("app").innerHTML = h;
+  const search = document.getElementById("biblio-search");
+  if(search){
+    search.addEventListener("input", ()=>{
+      document.getElementById("biblio-list").innerHTML = bibliotecaHtml(biblioteca, search.value);
+    });
+  }
 }
 
 async function init(){
