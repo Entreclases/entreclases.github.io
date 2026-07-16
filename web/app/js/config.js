@@ -83,6 +83,13 @@ function defaultCatalog(){
     updatedAt:0 };
 }
 const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};
+// Resultado del cierre de objetivo de clase (ver s.sessions[].objetivoResult en helpers.js).
+// pctDefault es el valor que toma el slider si el profesor no lo tocó antes de tocar el botón.
+const OBJETIVO_META = {
+  si:{label:"Sí",emoji:"✅",fg:"var(--tarea-hecha-fg)",bg:"var(--greenbg)",pctDefault:100},
+  medias:{label:"A medias",emoji:"🤏",fg:"var(--tarea-intentada-fg)",bg:"var(--amberbg)",pctDefault:50},
+  no:{label:"No",emoji:"❌",fg:"var(--tarea-no-fg)",bg:"var(--redbg)",pctDefault:0},
+};
 // Estado de la seña de una clase puntual (ver s.clasesPuntuales[].seniaEstado en helpers.js).
 // "retenida"/"devuelta" son terminales (las pone applyCancelacion, no se tocan a mano); sólo
 // "pendiente"↔"cobrada" se alternan con un toque (ver toggle-senia-estado en events.js).

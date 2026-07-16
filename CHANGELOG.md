@@ -24,6 +24,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
+- Objetivos de clase: campo opcional al registrar una clase, mini-tarjeta de cierre con micro-animación al registrar la clase siguiente (o desde la ficha) para marcar si se cumplió, racha de objetivos cumplidos en la ficha, y tasa de cumplimiento en Estadísticas e informe compartible.
 - Agenda con vista mensual (switch Semana/Mes, grilla del mes con mini-marcas por día, detalle de día con "Programar clase acá"); seña opcional por alumno (monto fijo o % de la tarifa) con estado por clase puntual (pendiente/cobrada/retenida/devuelta); política de cancelación configurable en Cuenta (horas mínimas de aviso, devolución o crédito a la próxima clase); avisos de seña sin cobrar al programar y al cancelar; señas como rubro propio en el resumen mensual de Pagos.
 - Recordatorios de cobro: aviso desplegable en el tablero (clases sin cobrar + mensualidades vencidas + señas pendientes, con marcar-cobrada y WhatsApp por alumno), notificación del navegador opcional (permiso pedido recién al activarla) y configuración en Cuenta (sí/no, días de atraso mínimos).
 

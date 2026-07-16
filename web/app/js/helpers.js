@@ -222,6 +222,36 @@ function examResultCounts(students){
   return { aprobo, desaprobo, total:aprobo+desaprobo };
 }
 
+/* ============ objetivo de clase: cierre, racha y estadísticas ============
+   s.sessions[].objetivo (string, opcional) se carga al registrar la clase; s.sessions[].objetivoResult
+   ({estado:"si"|"medias"|"no", pct}) se completa después, desde la mini-tarjeta de cierre que aparece
+   al registrar la clase siguiente o al entrar a la ficha (ver vGoalClosure en views.js). Se identifica
+   el objetivo pendiente más antiguo sin resolver para no acumular varias tarjetas a la vez. */
+function pendingGoalClosure(s){
+  const withGoal=(s.sessions||[]).filter(c=>c.objetivo && !c.objetivoResult);
+  if(withGoal.length===0) return null;
+  return [...withGoal].sort((a,b)=>a.date.localeCompare(b.date))[0];
+}
+// racha de objetivos cumplidos ("si") seguidos, contando desde el más reciente evaluado hacia atrás;
+// "medias" y "no" cortan la racha.
+function goalStreak(s){
+  const resolved=(s.sessions||[]).filter(c=>c.objetivo && c.objetivoResult)
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  let n=0;
+  for(const c of resolved){ if(c.objetivoResult.estado==="si") n++; else break; }
+  return n;
+}
+function goalCounts(students){
+  let si=0, medias=0, no=0;
+  students.forEach(s=>(s.sessions||[]).forEach(c=>{
+    if(!c.objetivo || !c.objetivoResult) return;
+    if(c.objetivoResult.estado==="si") si++;
+    else if(c.objetivoResult.estado==="medias") medias++;
+    else if(c.objetivoResult.estado==="no") no++;
+  }));
+  return { si, medias, no, total: si+medias+no };
+}
+
 /* ============ pagos: opcional por alumno (tarifa + modalidad) ============
    Sin tarifa cargada, la función de pagos no existe para ese alumno — ni en su
    ficha, ni en clases, ni en la vista "Pagos". Todo se calcula por mes (YYYY-MM):

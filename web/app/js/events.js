@@ -437,11 +437,26 @@ document.addEventListener("click", (e)=>{
   else if(a==="save-session" && s){
     const date=document.getElementById("c-date").value; if(!date) return;
     state.sessionPrefillDate="";
+    const goal=document.getElementById("c-goal").value.trim();
     update(s.id,{sessions:[...s.sessions,{id:uid(),date,
       topic:document.getElementById("c-topic").value,
       tarea:document.getElementById("c-tarea").value,
       note:document.getElementById("c-note").value,
+      objetivo:goal, objetivoResult:null,
       cobrada:false}]}); return;
+  }
+  else if(a==="goal-resultado"){
+    const sid=el.dataset.sid, st=state.students.find(x=>x.id===sid); if(!st) return;
+    const cid=el.dataset.id, r=el.dataset.r;
+    const sliderEl=document.getElementById("goal-pct-"+cid);
+    const pct = sliderEl ? parseInt(sliderEl.value,10) : OBJETIVO_META[r].pctDefault;
+    update(sid,{sessions:st.sessions.map(x=>x.id===cid?{...x,objetivoResult:{estado:r,pct}}:x)});
+    state.goalCelebrate={sid,estado:r};
+    render();
+    setTimeout(()=>{
+      if(state.goalCelebrate && state.goalCelebrate.sid===sid){ state.goalCelebrate=null; render(); }
+    }, 1600);
+    return;
   }
   else if(a==="del-session" && s){
     update(s.id,{sessions:s.sessions.filter(x=>x.id!==el.dataset.id)}); return;

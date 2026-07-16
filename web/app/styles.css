@@ -178,6 +178,27 @@
   .saveerr{background:var(--redbg);color:var(--red);padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:14px}
   .hint{font-size:11.5px;color:var(--faint)}
   .tareatag{font-size:11px;font-family:var(--mono);margin-left:8px}
+  .goaltag{color:var(--muted)}
+
+  /* ============ objetivo de clase: cierre + racha ============ */
+  @keyframes goalIn{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes goalPop{0%{transform:scale(.4) rotate(-8deg);opacity:0}55%{transform:scale(1.15) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+  .goalcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);
+            border-radius:10px;padding:14px 16px;margin-bottom:12px;animation:goalIn .25s ease-out}
+  .goalcard-q{font-weight:700;font-size:14.5px;margin-bottom:2px}
+  .goalcard-btns{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+  .goalbtn{border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-weight:700;font-size:14px;
+           background:var(--soft);color:var(--ink);flex:1;min-width:100px;transition:transform .1s ease}
+  .goalbtn:active{transform:scale(.96)}
+  .goalbtn.si{background:var(--greenbg);color:var(--tarea-hecha-fg)}
+  .goalbtn.medias{background:var(--amberbg);color:var(--tarea-intentada-fg)}
+  .goalbtn.no{background:var(--redbg);color:var(--tarea-no-fg)}
+  .goalcard-slider{display:flex;flex-direction:column;gap:4px}
+  .goalcard-slider input[type=range]{width:100%;accent-color:var(--accent)}
+  .goalcard-cel{display:flex;align-items:center;gap:12px;text-align:left}
+  .goalcard-emoji{font-size:34px;animation:goalPop .5s cubic-bezier(.34,1.56,.64,1)}
+  .goalcard-msg{font-weight:700;font-size:14.5px}
+  @media (prefers-reduced-motion:reduce){.goalcard,.goalcard-emoji{animation:none}}
   .aula-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--faint);margin-bottom:14px;align-items:center}
   .aula-legend .sw{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle}
   .aula-wrap{overflow-x:auto;padding-bottom:8px}

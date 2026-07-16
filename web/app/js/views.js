@@ -247,6 +247,7 @@ function vDetalle(){
     ${(s.examDate&&d!==null&&d>=0)?`<span class="count big ${d<=7?"urgent":""}">examen: ${d===0?"HOY":d+" día"+(d===1?"":"s")}</span>`:""}
   </div>`;
   h += alerts.map(a=>`<div class="alert" style="cursor:default"><span class="dot"></span><span class="t">${esc(a.text)}</span></div>`).join("");
+  h += vGoalClosure(s);
   h += `<div class="tabs" style="margin:16px 0 14px">` +
     tabbtn("tab-temas",state.tab==="temas","Temas") +
     tabbtn("tab-clases",state.tab==="clases",`Clases (${s.sessions.length})`) +
@@ -283,6 +284,8 @@ function vDetalle(){
       </div>
       <div class="field"><div class="flabel">Nota rápida (qué costó, tarea que dejaste)</div>
         <input id="c-note" placeholder="Ej: se traba en cadena+cociente. Tarea: guía 5, ej. 8-12"></div>
+      <div class="field"><div class="flabel">Objetivo de hoy (opcional)</div>
+        <input id="c-goal" placeholder="Ej: que resuelva sola sistemas 2x2"></div>
       <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-session">Guardar clase</button></div>`;
     const cobraPorClase = hasPagos(s) && s.modalidad==="clase";
     const sorted=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date));
@@ -290,7 +293,10 @@ function vDetalle(){
       : sorted.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
         <div class="body"><span style="font-weight:600">${esc(c.topic||"Clase")}</span>
         ${c.tarea&&c.tarea!=="sd"?`<span class="tareatag" style="color:${TAREA_META[c.tarea].fg}">tarea: ${TAREA_META[c.tarea].label}</span>`:""}
-        ${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div>
+        ${c.note?`<div class="note">${esc(c.note)}</div>`:""}
+        ${c.objetivo?`<div class="note goaltag">🎯 ${esc(c.objetivo)}${c.objetivoResult
+          ? ` <span style="color:${OBJETIVO_META[c.objetivoResult.estado].fg}">· ${OBJETIVO_META[c.objetivoResult.estado].emoji} ${OBJETIVO_META[c.objetivoResult.estado].label}${c.objetivoResult.pct!=null?` (${c.objetivoResult.pct}%)`:""}</span>`
+          : ` <span class="hint">· sin evaluar todavía</span>`}</div>` : ""}</div>
         ${cobraPorClase?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
         <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar">×</button></div>`).join("");
   }
@@ -315,6 +321,11 @@ function vDetalle(){
 
   if(state.tab==="ficha"){
     const opt=(v,cur,l)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(l)}</option>`;
+    const streak = goalStreak(s);
+    if(streak>0) h += `<div class="formcard" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:20px">🔥</span>
+      <span style="font-size:13.5px"><b>${streak}</b> objetivo${streak===1?"":"s"} de clase cumplido${streak===1?"":"s"} seguido${streak===1?"":"s"}</span>
+    </div>`;
     h += `<div class="formcard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div><div class="ftitle" style="margin-bottom:2px">Informe de progreso</div>
         <div class="hint">Un resumen prolijo para compartir con el alumno o la familia.</div></div>
@@ -378,6 +389,37 @@ function vExamResultPrompt(s){
         <button class="chip" style="background:var(--redbg);color:var(--red)" data-a="exam-result" data-id="${s.id}" data-r="desaprobo">No aprobó</button>
         <button class="chip" data-a="exam-result" data-id="${s.id}" data-r="norindio">No rindió</button>
       </div>
+    </div>
+  </div>`;
+}
+
+/* ============ cierre de objetivo de clase: mini-tarjeta al entrar a la ficha o registrar la clase
+   siguiente (ver pendingGoalClosure en helpers.js). Tras responder, se muestra una celebración
+   breve (state.goalCelebrate, transient) en vez del formulario habitual — la desarma un setTimeout
+   en events.js, no queda guardada en el estado persistido. ============ */
+function vGoalClosure(s){
+  const cel = state.goalCelebrate;
+  if(cel && cel.sid===s.id){
+    const m = OBJETIVO_META[cel.estado];
+    const msg = cel.estado==="si" ? "¡Buenísimo! Así se construye una racha." :
+                cel.estado==="medias" ? "Un paso más y lo tiene — anotado." : "A seguir insistiendo con eso.";
+    return `<div class="goalcard goalcard-cel" style="border-color:${m.fg};background:${m.bg}">
+      <div class="goalcard-emoji">${m.emoji}</div>
+      <div class="goalcard-msg" style="color:${m.fg}">${msg}</div>
+    </div>`;
+  }
+  const c = pendingGoalClosure(s); if(!c) return "";
+  return `<div class="goalcard">
+    <div class="goalcard-q">¿Se cumplió «${esc(c.objetivo)}»?</div>
+    <div class="hint" style="margin-bottom:8px">Clase del ${esc(fmtDate(c.date))}</div>
+    <div class="goalcard-btns">
+      <button class="goalbtn si" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="si">✅ Sí</button>
+      <button class="goalbtn medias" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="medias">🤏 A medias</button>
+      <button class="goalbtn no" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="no">❌ No</button>
+    </div>
+    <div class="goalcard-slider">
+      <span class="hint">Afiná el % si querés (opcional)</span>
+      <input type="range" min="0" max="100" step="5" value="50" id="goal-pct-${c.id}">
     </div>
   </div>`;
 }
@@ -794,7 +836,15 @@ function vInforme(){
         sessions.map(c=>`<div class="informe-row">
           <div class="informe-date">${esc(fmtDate(c.date))}</div>
           <div class="informe-rowbody"><b>${esc(c.topic||"Clase")}</b>${c.tarea&&c.tarea!=="sd"?` <span style="color:${TAREA_META[c.tarea].fg}">· tarea ${esc(TAREA_META[c.tarea].label)}</span>`:""}
-          ${c.note?`<div class="informe-note">${esc(c.note)}</div>`:""}</div></div>`).join("")}
+          ${c.note?`<div class="informe-note">${esc(c.note)}</div>`:""}
+          ${c.objetivo?`<div class="informe-note">🎯 ${esc(c.objetivo)}${c.objetivoResult?` — ${esc(OBJETIVO_META[c.objetivoResult.estado].label)}`:" — sin evaluar"}</div>`:""}</div></div>`).join("")}
+    </div>
+
+    <div class="informe-section">
+      <div class="informe-stitle">Objetivos de clase del período</div>
+      ${(()=>{ const g=goalCounts([{sessions}]);
+        return g.total===0 ? `<div class="informe-empty">Sin objetivos de clase evaluados en este período.</div>`
+          : `<div class="informe-empty">${(g.si/g.total*100).toFixed(0)}% cumplidos sobre ${g.total} objetivo${g.total===1?"":"s"} evaluado${g.total===1?"":"s"}.</div>`; })()}
     </div>
 
     <div class="informe-section">
@@ -837,7 +887,12 @@ function buildInformeText(s){
     if(c.tarea && c.tarea!=="sd") l += ` (tarea ${TAREA_META[c.tarea].label})`;
     lines.push(l);
     if(c.note) lines.push(`  ${c.note}`);
+    if(c.objetivo) lines.push(`  🎯 ${c.objetivo}${c.objetivoResult?` — ${OBJETIVO_META[c.objetivoResult.estado].label}`:" — sin evaluar"}`);
   });
+  lines.push("");
+  const goalTotals = goalCounts([{sessions}]);
+  if(goalTotals.total>0)
+    lines.push(`*Objetivos de clase cumplidos:* ${(goalTotals.si/goalTotals.total*100).toFixed(0)}% (${goalTotals.si}/${goalTotals.total})`);
   lines.push("");
   lines.push(`*Simulacros (${simulacros.length}):*`);
   if(simulacros.length===0) lines.push("Sin simulacros registrados.");
@@ -1261,9 +1316,39 @@ function vEstadisticas(){
     ? `<div class="empty">Sin resultados de examen registrados en esta materia todavía.</div>`
     : `<div class="stats"><div class="stat"><b>${(materiaResult.aprobo/materiaResult.total*100).toFixed(0)}%</b><span>aprobados sobre ${materiaResult.total} examen${materiaResult.total===1?"":"es"} rendido${materiaResult.total===1?"":"s"}</span></div></div>`;
 
+  h += `<div class="stitle">Objetivos de clase cumplidos en esta materia</div>`;
+  const materiaGoals = goalCounts(alive().filter(s=>s.subjectId===curId));
+  h += materiaGoals.total===0
+    ? `<div class="empty">Sin objetivos de clase evaluados todavía en esta materia.</div>`
+    : `<div class="stats"><div class="stat"><b>${(materiaGoals.si/materiaGoals.total*100).toFixed(0)}%</b><span>cumplidos sobre ${materiaGoals.total} objetivo${materiaGoals.total===1?"":"s"} evaluado${materiaGoals.total===1?"":"s"}</span></div></div>`;
+
   h += vAula(grupo);
   h += vTuActividad();
   h += vTasaAprobacionGeneral();
+  h += vObjetivosGeneral();
+  return h;
+}
+
+// Tasa de objetivos de clase cumplidos (todas las materias) + desglose por materia — mismo
+// patrón que vTasaAprobacionGeneral, independiente de la materia seleccionada arriba.
+function vObjetivosGeneral(){
+  let h = `<div class="stitle" style="margin-top:30px">Objetivos de clase cumplidos (todas las materias)</div>`;
+  const students = alive();
+  const general = goalCounts(students);
+  if(general.total===0) return h + `<div class="empty">Todavía no hay objetivos de clase evaluados.</div>`;
+  const pct = general.si/general.total*100;
+  h += `<div class="stats" style="margin-bottom:8px"><div class="stat"><b>${pct.toFixed(0)}%</b><span>cumplidos sobre ${general.total} objetivo${general.total===1?"":"s"} evaluado${general.total===1?"":"s"}</span></div></div>
+  <div style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:16px">
+    <div style="height:100%;width:${pct.toFixed(1)}%;background:var(--green);border-radius:99px"></div>
+  </div>`;
+
+  const bySubject = state.catalog.subjects
+    .map(m=>({label:m.name, c:goalCounts(students.filter(s=>s.subjectId===m.id))}))
+    .filter(x=>x.c.total>0)
+    .map(x=>({label:x.label, c:{aprobo:x.c.si, total:x.c.total}}));
+  const sinMateria = goalCounts(students.filter(s=>!s.subjectId));
+  if(sinMateria.total>0) bySubject.push({label:"Materia s/d", c:{aprobo:sinMateria.si, total:sinMateria.total}});
+  if(bySubject.length>1) h += tasaAprobacionBars(bySubject);
   return h;
 }
 
