@@ -601,7 +601,10 @@ async function signMaterialUrl(s, path, expiresInSec){
 // que sumarse antes como checkbox explícito en la ficha (vPortalAlumnoCard, views.js).
 function buildAlumnoBlock(s){
   const share=portalShareFor(s);
-  const block={nombre:s.name}; // el nombre propio del alumno, para el saludo — no es un dato privado frente a sí mismo
+  const block={nombre:s.name, subjectId:s.subjectId||null};
+  // subjectId (paso 105): no se muestra en el portal — sólo la usa portal_publico() del lado del
+  // backend para filtrar qué avisos dirigidos "a una materia" le corresponden a este alumno. Se
+  // saca del JSON de vuelta antes de responder (ver la función), así que nunca llega al navegador.
   if(share.proximaClase){
     const n=nextClaseForStudent(s);
     block.proximaClase = n ? {date:n.date, time:n.time, duration:n.duration} : null;
