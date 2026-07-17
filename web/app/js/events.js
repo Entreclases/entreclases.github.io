@@ -660,6 +660,28 @@ document.addEventListener("click", (e)=>{
       .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
     return;
   }
+  else if(a==="informe-share-image" && s){
+    state.informeImgBusy=true; render();
+    buildInformeImageBlob(s).then(async blob=>{
+      const slug=(s.name||"alumno").toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu,"").replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
+      const fileName=`informe-${slug||"alumno"}.png`;
+      const file=new File([blob], fileName, {type:"image/png"});
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+        try{ await navigator.share({files:[file], title:`Informe de ${s.name}`}); }
+        catch(err){ /* cancelado por el usuario o falló el share nativo — no hace falta avisar */ }
+      }else{
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement("a"); link.href=url; link.download=fileName; link.click();
+        URL.revokeObjectURL(url);
+        toast("Imagen descargada");
+      }
+      state.informeImgBusy=false; render();
+    }).catch(()=>{
+      state.informeImgBusy=false;
+      toast("No se pudo generar la imagen.","error");
+    });
+    return;
+  }
   else if(a==="open-contrato" && s){ state.view="contrato"; }
   else if(a==="close-contrato"){ state.view="detalle"; state.tab="resumen"; }
   else if(a==="contrato-print"){ window.print(); return; }

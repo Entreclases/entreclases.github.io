@@ -107,7 +107,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               newVersionTag:null, updateBannerDismissed:false,
               swUpdateReady:false, swRegistration:null, swCheckStatus:"idle",
               pagosMonth:null,
-              informePeriod:"3m",
+              informePeriod:"3m", informeImgBusy:false,
               agendaWeekOffset:0, sessionPrefillDate:"",
               agendaViewMode:"semana", agendaMonthOffset:0, agendaSelectedDay:null, agendaQuickAddOpen:false,
               puntualCancelAskId:null, cobrosBannerOpen:false,

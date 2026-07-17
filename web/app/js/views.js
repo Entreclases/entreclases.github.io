@@ -1467,6 +1467,7 @@ function vInforme(){
         ${Object.entries(INFORME_PERIODS).map(([k,p])=>`<option value="${k}" ${k===periodKey?"selected":""}>${esc(p.label)}</option>`).join("")}
       </select>
       <button class="chip" data-a="informe-copy">Copiar resumen para WhatsApp</button>
+      <button class="chip" data-a="informe-share-image" ${state.informeImgBusy?"disabled":""}>${state.informeImgBusy?"Generando…":"Compartir como imagen"}</button>
       <button class="primary" style="margin-left:0" data-a="informe-print">Descargar PDF</button>
     </div>
   </div>`;
@@ -1567,6 +1568,124 @@ function buildInformeText(s){
   lines.push("");
   lines.push("_Generado con Entreclases_");
   return lines.join("\n");
+}
+
+/* ============ informe como imagen (paso 107): PNG del resumen, dibujado a mano en un
+   <canvas> (Canvas 2D nativo, sin ninguna librería) — pensado para mandar por WhatsApp a los
+   padres. Usa siempre los colores de marca fijos (navy/teal), nunca el acento elegible del
+   paso 106: es un documento que sale de la app hacia terceros, tiene que verse igual sin
+   importar la preferencia personal de quien lo genera (mismo criterio que portal/landing en
+   ese paso). Ver buildInformeImageBlob() más abajo y "informe-share-image" en events.js. */
+function roundedRectPath(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+// Corta texto en varias líneas por ancho máximo, con un tope de líneas (el resto se recorta con
+// "…") — no hace falta medir de antemano: mide letra a letra con measureText mientras dibuja.
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines){
+  const words = String(text||"").split(/\s+/).filter(Boolean);
+  let line = "", lines = 0, yy = y;
+  for(let i=0;i<words.length;i++){
+    const test = line ? line+" "+words[i] : words[i];
+    if(ctx.measureText(test).width > maxWidth && line){
+      lines++;
+      if(lines>=maxLines){ ctx.fillText(line.replace(/\s*$/,"")+"…", x, yy); return yy; }
+      ctx.fillText(line, x, yy);
+      yy += lineHeight;
+      line = words[i];
+    } else line = test;
+  }
+  if(line) ctx.fillText(line, x, yy);
+  return yy;
+}
+function statTile(ctx, x, y, w, h, value, label){
+  ctx.fillStyle = "#EEF1F9";
+  roundedRectPath(ctx, x, y, w, h, 12); ctx.fill();
+  ctx.fillStyle = "#12192E";
+  ctx.font = "800 34px Poppins, sans-serif";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(value, x+18, y+48);
+  ctx.fillStyle = "#5C6480";
+  ctx.font = "600 12.5px Inter, sans-serif";
+  wrapCanvasText(ctx, label, x+18, y+72, w-36, 15, 2);
+}
+function canvasToPngBlob(canvas){
+  return new Promise(resolve=>canvas.toBlob(resolve, "image/png"));
+}
+async function buildInformeImageBlob(s){
+  const { periodKey, fromDate, sessions } = informeFilteredData(s);
+  const units = unitsFor(s), topics = s.topics||{};
+  const rel = units.filter(t=>topics[t]!=="noentra").length || 1;
+  const seenCount = units.filter(t=>["visto","practica","parcial"].includes(topics[t])).length;
+  const avancePct = units.length ? Math.round(seenCount/rel*100) : null;
+  const goalTotals = goalCounts([{sessions}]);
+  const objetivosPct = goalTotals.total>0 ? Math.round(goalTotals.si/goalTotals.total*100) : null;
+  const comentario = (s.informeComment||"").trim();
+
+  const W=900, H=comentario?1180:1020, SC=2; // se dibuja al doble de resolución, no se ve pixelado al abrirla en el celular
+  const canvas=document.createElement("canvas");
+  canvas.width=W*SC; canvas.height=H*SC;
+  const ctx=canvas.getContext("2d");
+  ctx.scale(SC,SC);
+  if(document.fonts && document.fonts.ready) await document.fonts.ready; // evita que la tipografía caiga a un fallback genérico
+
+  ctx.fillStyle="#F6F8FC"; ctx.fillRect(0,0,W,H);
+
+  const grad=ctx.createLinearGradient(40,40,88,88);
+  grad.addColorStop(0,"#1E2B4D"); grad.addColorStop(1,"#2F4272");
+  ctx.fillStyle=grad; roundedRectPath(ctx,40,40,48,48,14); ctx.fill();
+  ctx.strokeStyle="#fff"; ctx.lineWidth=3; ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.beginPath(); ctx.moveTo(52,65); ctx.lineTo(61,75); ctx.lineTo(76,55); ctx.stroke();
+
+  ctx.fillStyle="#12192E";
+  ctx.font="700 21px Poppins, sans-serif";
+  ctx.fillText("Entreclases", 100, 71);
+
+  ctx.fillStyle="#8B90A0";
+  ctx.font="700 12.5px ui-monospace, Consolas, monospace";
+  ctx.fillText("INFORME DE PROGRESO", 40, 122);
+
+  ctx.fillStyle="#12192E";
+  ctx.font="800 40px Poppins, sans-serif";
+  let yy = wrapCanvasText(ctx, s.name||"—", 40, 168, W-80, 44, 2);
+
+  ctx.fillStyle="#5C6480";
+  ctx.font="600 16px Inter, sans-serif";
+  yy += 34;
+  ctx.fillText(`${s.career||""} · ${s.subject||"materia s/d"}`, 40, yy);
+
+  ctx.fillStyle="#8B90A0";
+  ctx.font="500 13.5px Inter, sans-serif";
+  ctx.fillText(`Período: ${periodRangeLabel(periodKey,fromDate)}`, 40, yy+26);
+
+  ctx.strokeStyle="#E4E9F5"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(40,yy+52); ctx.lineTo(W-40,yy+52); ctx.stroke();
+
+  const tilesY = yy+80, tileW=(W-80-2*16)/3, tileH=120;
+  statTile(ctx, 40, tilesY, tileW, tileH, avancePct!==null?avancePct+"%":"—", "avance por unidades");
+  statTile(ctx, 40+tileW+16, tilesY, tileW, tileH, String(sessions.length), `clase${sessions.length===1?"":"s"} en el período`);
+  statTile(ctx, 40+2*(tileW+16), tilesY, tileW, tileH, objetivosPct!==null?objetivosPct+"%":"—", "objetivos cumplidos");
+
+  let cy = tilesY+tileH+40;
+  if(comentario){
+    ctx.fillStyle="#8B90A0";
+    ctx.font="700 11.5px ui-monospace, Consolas, monospace";
+    ctx.fillText("COMENTARIO DEL PROFESOR", 40, cy);
+    ctx.fillStyle="#12192E";
+    ctx.font="500 16px Inter, sans-serif";
+    cy = wrapCanvasText(ctx, comentario, 40, cy+30, W-80, 24, 5) + 30;
+  }
+
+  ctx.fillStyle="#9AA3BE";
+  ctx.font="500 12px ui-monospace, Consolas, monospace";
+  ctx.fillText(`Generado con Entreclases — ${fmtDate(today())}`, 40, H-32);
+
+  return canvasToPngBlob(canvas);
 }
 
 /* ============ contrato de servicio: modelo precargado con lo que la app ya sabe del alumno,
