@@ -59,8 +59,56 @@ function navShell(isAdmin){
   return `<nav class="appnav no-print">
     <div class="appnav-brand"><span class="logo-mark">${ICON_CHECK}</span>Cuaderno</div>
     <div class="appnav-list">${itemsHtml}</div>
-    <div class="appnav-foot">${themeNavBtn()}</div>
+    <div class="appnav-foot">${syncChip()}${themeNavBtn()}</div>
   </nav>`;
+}
+
+/* ============ chip de estado de datos: guardado/sincronizando/sin conexión/error, siempre
+   visible en el nav. El id="syncStatus" en el span interno es a propósito: setStatus() (sync.js)
+   ya lo pisa directo con innerHTML en cada tick de sync, sin pasar por un render() completo. */
+function syncToneOf(){
+  if(!getSes()) return "idle";
+  const st=state.syncStatus;
+  if(st==="sync") return "sync";
+  if(st==="offline") return "offline";
+  if(st==="error") return "error";
+  if(st==="ok") return "ok";
+  return "idle";
+}
+function syncChip(){
+  return `<span class="statuschip statuschip-${syncToneOf()}" title="Estado de los datos">
+    <span class="statuschip-dot"></span><span class="statuschip-label" id="syncStatus">${syncStatusText()}</span>
+  </span>`;
+}
+
+/* ============ estado vacío con acción: ícono + frase + un botón claro para empezar,
+   en vez de un espacio en blanco (reusado en las secciones sin datos de cada vista) ============ */
+function emptyState(icon,title,text,actionHtml){
+  return `<div class="empty-state">
+    <div class="empty-state-icon">${icon}</div>
+    <div class="empty-state-title">${esc(title)}</div>
+    <div class="empty-state-text">${esc(text)}</div>
+    ${actionHtml||""}
+  </div>`;
+}
+const ICON_INBOX=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h5l2 3h4l2-3h5"/><path d="M5.5 5h13l2.5 7v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-7z"/></svg>`;
+const ICON_LINK=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"/><path d="M13 18l-1 1a4 4 0 0 1-6-6l1-1"/></svg>`;
+
+/* ============ skeletons: placeholders con animación mientras carga/sincroniza una sección
+   (reemplaza los "Cargando…" sueltos) ============ */
+function skeletonRows(n){
+  return Array.from({length:n||3}).map((_,i)=>
+    `<div class="skel-card"><div class="skel skel-row ${i%2?"w60":"w80"}"></div><div class="skel skel-row w40" style="margin-bottom:0"></div></div>`
+  ).join("");
+}
+
+/* ============ toasts: pila de confirmaciones breves, renderizada aparte del contenido
+   principal para que sobreviva a cualquier re-render de la vista de abajo ============ */
+function toastWrap(){
+  if(!state.toasts.length) return "";
+  return `<div class="toast-wrap no-print">${state.toasts.map(t=>
+    `<div class="toast ${t.tone==="error"?"toast-error":""}"><span class="dot"></span>${esc(t.text)}</div>`
+  ).join("")}</div>`;
 }
 
 /* ============ vistas ============ */
@@ -161,12 +209,12 @@ function vTablero(){
         </button>`;}).join("") + `</div>`;
 
   if(alive().length===0)
-    h += `<div class="empty" style="margin-top:24px;text-align:center;padding:32px">
-      El cuaderno está vacío. Elegí por dónde arrancar:
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px">
-        <button class="primary" style="margin-left:0" data-a="load-sample">Cargar un alumno de ejemplo</button>
-        <button class="chip" data-a="new">Empezar con mis alumnos</button>
-      </div></div>`;
+    h += emptyState(ICON_USERS, "Todavía no cargaste a nadie",
+      "Elegí por dónde arrancar: probá la app con un alumno de ejemplo o sumá directamente a los tuyos.",
+      `<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" data-a="load-sample">Cargar un alumno de ejemplo</button>
+        <button class="btn btn-secondary" data-a="new">Empezar con mis alumnos</button>
+      </div>`);
 
   h += `<div class="stitle">Respaldo</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -262,7 +310,11 @@ function vLista(){
 
   h += `<div class="hint" style="margin-bottom:10px">${shown.length} resultado${shown.length===1?"":"s"}</div>`;
 
-  if(shown.length===0) return h + `<div class="empty">Nadie en esta categoría por ahora.</div>`;
+  if(shown.length===0) return h + (alive().length===0
+    ? emptyState(ICON_USERS, "Todavía no hay alumnos",
+        "Agregá tu primer alumno para empezar a llevar el seguimiento.",
+        `<button class="btn btn-primary" data-a="new">+ Agregá tu primer alumno</button>`)
+    : `<div class="empty">Nadie coincide con estos filtros.</div>`);
 
   h += shown.map(s=>{
     const d=daysTo(s.examDate);
@@ -493,7 +545,7 @@ function vGoalClosure(s){
 function vPortalAlumnoCard(s){
   let h = `<div class="formcard"><div class="ftitle">Portal para este alumno</div>`;
   if(!state.portalLoaded){
-    h += `<div class="empty">Cargando…</div></div>`;
+    h += skeletonRows(2) + `</div>`;
     return h;
   }
   if(state.portalError && !state.portal){
@@ -515,7 +567,6 @@ function vPortalAlumnoCard(s){
       <button class="chip" data-a="portal-alumno-regen" ${busy?"disabled":""}>Regenerar llave</button>
       <button class="danger" data-a="portal-alumno-revoke" ${busy?"disabled":""}>Revocar</button>
     </div>
-    ${state.portalAlumnoCopyMsg && state.portalAlumnoCopyId===s.id?`<div class="hint" style="margin-top:6px;color:var(--green)">${esc(state.portalAlumnoCopyMsg)}</div>`:""}
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--soft)">
       <div class="flabel" style="margin-bottom:6px">Qué ve este alumno en su portal</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -653,7 +704,9 @@ function vAgendaSemana(){
 
   const events = markOverlaps(agendaWeekEvents(weekStart));
   if(events.length===0){
-    h += `<div class="empty">Sin clases agendadas esta semana. Cargá horarios habituales o clases puntuales desde la ficha de cada alumno (pestaña «Ficha»).</div>`;
+    h += emptyState(ICON_CALENDAR, "Sin clases agendadas esta semana",
+      "Cargá horarios habituales o clases puntuales desde la ficha de cada alumno (pestaña «Ficha»).",
+      `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`);
     return h;
   }
 
@@ -861,7 +914,9 @@ function vPagosResumen(){
   const rows = alive().filter(hasPagos).map(s=>({s, r:pagoResumen(s,mk)}));
   const seniaRes = pagosSeniaResumen(mk);
   if(rows.length===0 && seniaRes.rows.length===0)
-    return h + `<div class="empty">Todavía no hay alumnos con tarifa cargada ni señas registradas este mes. Se configuran desde la pestaña «Ficha» de cada alumno.</div>`;
+    return h + emptyState(ICON_WALLET, "Todavía no hay nada para cobrar acá",
+      "Cargá una tarifa o activá la seña desde la pestaña «Ficha» de cada alumno para que aparezcan los cobros de este mes.",
+      `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`);
 
   if(rows.length){
     const totalCobrado = rows.reduce((a,x)=>a+x.r.cobrado,0);
@@ -1037,7 +1092,6 @@ function vInforme(){
       <button class="primary" style="margin-left:0" data-a="informe-print">Descargar PDF</button>
     </div>
   </div>`;
-  if(state.informeCopyMsg) h += `<div class="hint no-print" style="margin:-10px 0 14px">${esc(state.informeCopyMsg)}</div>`;
 
   h += `<div class="informe-doc">
     <div class="informe-eyebrow">Informe de progreso</div>
@@ -1162,7 +1216,6 @@ function vContrato(){
       <button class="primary" style="margin-left:0" data-a="contrato-print">Descargar PDF</button>
     </div>
   </div>`;
-  if(state.contratoCopyMsg) h += `<div class="hint no-print" style="margin:-10px 0 14px">${esc(state.contratoCopyMsg)}</div>`;
 
   h += `<div class="informe-doc">
     <div class="informe-eyebrow">Contrato de prestación de servicios educativos</div>
@@ -1457,7 +1510,7 @@ function vPortalCard(){
     return h;
   }
   if(!state.portalLoaded || !state.portal){
-    h += `<div class="empty">Cargando…</div></div>`;
+    h += skeletonRows(2) + `</div>`;
     return h;
   }
   const p=state.portal;
@@ -1466,6 +1519,10 @@ function vPortalCard(){
     <button class="chip ${!p.habilitado?"on":""}" data-a="portal-toggle" data-f="no">Desactivado</button>
     <button class="chip ${p.habilitado?"on":""}" data-a="portal-toggle" data-f="si">Activado</button>
   </div>`;
+  if(!p.habilitado){
+    h += emptyState(ICON_LINK,"El portal está apagado","Activalo para darles a tus alumnos un link propio, sin login, con lo que quieras compartirles.",
+      `<button class="btn btn-primary" data-a="portal-toggle" data-f="si">Activar portal</button>`);
+  }
   if(p.habilitado){
     h += `<div class="field"><div class="flabel">Link para compartir</div>
       <input readonly value="${esc(portalUrl(p.token))}" onclick="this.select()"></div>
@@ -1473,7 +1530,6 @@ function vPortalCard(){
       <button class="chip" data-a="portal-copy">Copiar link</button>
       <button class="chip" data-a="portal-regen">Regenerar llave</button>
     </div>
-    ${state.portalCopyMsg?`<div class="hint" style="margin-top:6px;color:var(--green)">${esc(state.portalCopyMsg)}</div>`:""}
     <div class="hint" style="margin-top:10px">Regenerar la llave hace que el link de arriba deje de funcionar — cualquier alumno que ya lo tenga guardado pierde el acceso.</div>
     <div class="hint" style="margin-top:6px">Los archivos de la Biblioteca usan un link propio (vencimiento a los ${PORTAL_LINK_TTL_DAYS} días, se renueva solo): quien lo tenga puede reenviarlo hasta esa fecha, y regenerar la llave de arriba no lo corta.</div>`;
   }
@@ -1489,7 +1545,7 @@ function vPortalCard(){
 
 function vBackupsList(){
   if(state.backupsError) return `<div class="saveerr">${esc(state.backupsError)}</div>`;
-  if(!state.backupsLoaded) return `<div class="empty">Cargando respaldos…</div>`;
+  if(!state.backupsLoaded) return skeletonRows(3);
   const list = state.backups||[];
   if(list.length===0) return `<div class="empty">Todavía no hay respaldos guardados. El primero se crea en la próxima sincronización.</div>`;
   let h = list.map(b=>{
@@ -1599,7 +1655,7 @@ function vMateriales(subjectId){
     return h;
   }
   if(state.materialesSubjectId!==subjectId || !state.materialesLoaded){
-    h += `<div class="empty">Cargando materiales…</div></div>`;
+    h += skeletonRows(2) + `</div>`;
     return h;
   }
   if(state.materialesError){
@@ -1617,7 +1673,7 @@ function vMateriales(subjectId){
   <div class="hint" style="margin-bottom:10px">${fmtBytes(totalBytes)} de ${fmtBytes(MATERIAL_MAX_TOTAL_BYTES)} usados (entre todas tus materias)</div>
   <div class="hint" style="margin-bottom:10px">${list.length}/${MATERIAL_MAX_COUNT} archivos · máx. ${fmtBytes(MATERIAL_MAX_BYTES)} cada uno</div>`;
   h += `<div class="hint" style="margin-bottom:8px">Tocá «Compartir» para incluir un archivo en la Biblioteca del portal para alumnos — después hace falta tocar «Publicar cambios» en Cuenta para que se vea (dejar de compartir o borrar el archivo lo saca del portal al toque).</div>`;
-  h += list.length===0 ? `<div class="empty">Sin materiales todavía.</div>` : list.map(f=>{
+  h += list.length===0 ? emptyState(ICON_BOOK,"Sin materiales todavía","Subí guías, resúmenes o ejercicios con el botón de abajo — quedan disponibles en cualquier dispositivo.") : list.map(f=>{
     const dn=materialDisplayName(f.name);
     const size=(f.metadata&&f.metadata.size)||0;
     const confirming = state.materialesConfirmDelName===f.name;
@@ -1968,7 +2024,7 @@ function vReportes(){
     ).join("")}
   </div>`;
   if(state.reportesError) h += `<div class="saveerr">${esc(state.reportesError)}</div>`;
-  else if(!state.reportesLoaded) h += `<div class="empty">Cargando reportes…</div>`;
+  else if(!state.reportesLoaded) h += skeletonRows(4);
   else if(list.length===0) h += `<div class="empty">No hay reportes en esta categoría.</div>`;
   else h += list.map(r=>`<div class="log" style="align-items:flex-start">
       <div class="body">
@@ -1988,7 +2044,7 @@ function vUsuarios(){
     <button class="chip" data-a="refresh-usuarios">Actualizar</button></div>`;
   if(state.usersDeleteMsg) h += `<div class="hint" style="color:var(--green);margin-bottom:8px">${esc(state.usersDeleteMsg)}</div>`;
   if(state.usersError) return h + `<div class="saveerr">${esc(state.usersError)}</div>`;
-  if(!state.usersLoaded) return h + `<div class="empty">Cargando usuarios…</div>`;
+  if(!state.usersLoaded) return h + skeletonRows(5);
   const list = state.users||[];
   const now = Date.now();
   const ONLINE_MS = 10*60*1000, WEEK_MS = 7*86400000, INACTIVE_MS = 30*86400000, FINAL_MS = 5*30*86400000;
@@ -2062,7 +2118,7 @@ function vInactividad(){
   let h = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
     <button class="chip" data-a="refresh-inactividad">Actualizar</button></div>`;
   if(state.inactividadError) return h + `<div class="saveerr">${esc(state.inactividadError)}</div>`;
-  if(!state.inactividadLoaded) return h + `<div class="empty">Cargando…</div>`;
+  if(!state.inactividadLoaded) return h + skeletonRows(3);
   const notifs = state.notificacionesInactividad||[];
   const cerradas = state.cuentasCerradas||[];
   h += `<div class="stitle">Notificaciones (últimas ${notifs.length})</div>`;
@@ -2229,7 +2285,7 @@ function vActividadDia(){
 function hourKey(d){ const h=new Date(d); h.setUTCMinutes(0,0,0); return h.toISOString(); }
 function vActividadHora(){
   if(state.metricasHorariasError) return `<div class="saveerr">${esc(state.metricasHorariasError)}</div>`;
-  if(!state.metricasHorariasLoaded) return `<div class="empty">Cargando métricas por hora…</div>`;
+  if(!state.metricasHorariasLoaded) return skeletonRows(3);
 
   const hourKeys=[]; for(let i=47;i>=0;i--) hourKeys.push(hourKey(new Date(Date.now()-i*3600000)));
   const byHour={}; hourKeys.forEach(k=>byHour[k]={users:new Set(),aperturas:0,syncs:0});
@@ -2268,7 +2324,7 @@ function vActividad(){
 
   if(mode==="dia"){
     if(state.actividadError) h += `<div class="saveerr">${esc(state.actividadError)}</div>`;
-    else if(!state.actividadLoaded) h += `<div class="empty">Cargando métricas…</div>`;
+    else if(!state.actividadLoaded) h += skeletonRows(3);
     else h += vActividadDia();
   }else{
     h += vActividadHora();
@@ -2298,7 +2354,7 @@ function vRecursos(){
   let h = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
     <button class="chip" data-a="refresh-recursos">Actualizar</button></div>`;
   if(state.recursosError) return h + `<div class="saveerr">${esc(state.recursosError)}</div>`;
-  if(!state.recursosLoaded) return h + `<div class="empty">Cargando recursos…</div>`;
+  if(!state.recursosLoaded) return h + skeletonRows(4);
   const data = state.recursos;
   if(!data) return h + `<div class="empty">No se pudieron cargar los recursos.</div>`;
 
@@ -2391,11 +2447,11 @@ function render(){
   }
   if(state.view==="informe"){
     if(!sel()){ state.view="tablero"; }
-    else{ document.body.classList.remove("has-nav"); document.getElementById("app").innerHTML = vInforme(); return; }
+    else{ document.body.classList.remove("has-nav"); document.getElementById("app").innerHTML = vInforme()+toastWrap(); return; }
   }
   if(state.view==="contrato"){
     if(!sel()){ state.view="tablero"; }
-    else{ document.body.classList.remove("has-nav"); document.getElementById("app").innerHTML = vContrato(); return; }
+    else{ document.body.classList.remove("has-nav"); document.getElementById("app").innerHTML = vContrato()+toastWrap(); return; }
   }
   document.body.classList.add("has-nav");
   const ses = getSes();
@@ -2420,7 +2476,7 @@ function render(){
   if(state.view==="agenda") m += vAgenda();
   if(state.showNew) m += vModal();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
-  document.getElementById("app").innerHTML = navShell(isAdmin) + `<main class="appmain">${m}</main>`;
+  document.getElementById("app").innerHTML = navShell(isAdmin) + `<main class="appmain">${m}</main>` + toastWrap();
   const fi = document.getElementById("importFile");
   if(fi) fi.addEventListener("change", e=>{
     const f = e.target.files && e.target.files[0]; if(!f) return;

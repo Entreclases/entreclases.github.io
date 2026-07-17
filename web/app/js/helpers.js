@@ -81,17 +81,30 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               materialesConfirmDelName:null, materialesDeleteStatus:"idle",
               newVersionTag:null, updateBannerDismissed:false,
               pagosMonth:null,
-              informePeriod:"3m", informeCopyMsg:"",
+              informePeriod:"3m",
               agendaWeekOffset:0, sessionPrefillDate:"",
               agendaViewMode:"semana", agendaMonthOffset:0, agendaSelectedDay:null, agendaQuickAddOpen:false,
               puntualCancelAskId:null, cobrosBannerOpen:false,
               portal:null, portalLoaded:false, portalError:"",
-              portalSaving:false, portalSaveMsg:"", portalCopyMsg:"" };
+              portalSaving:false, portalSaveMsg:"", portalCopyMsg:"",
+              toasts:[] };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
 function careerOptions(cur){ const l=[...state.catalog.careers]; if(cur && !l.includes(cur)) l.push(cur); return l; }
 function touchCatalog(){ state.catalog.updatedAt=Date.now(); save(); render(); }
+// Feedback breve y no intrusivo tras una acción (ver .toast-wrap en styles.css) — se apila en
+// state.toasts y se autodescarta solo pasado TOAST_MS, sin bloquear ni pedir click.
+const TOAST_MS = 2600;
+function toast(text, tone){
+  const id = uid();
+  state.toasts = [...state.toasts, {id, text, tone: tone||"ok"}];
+  render();
+  setTimeout(()=>{
+    state.toasts = state.toasts.filter(t=>t.id!==id);
+    render();
+  }, TOAST_MS);
+}
 // packs: agrupan materias existentes para dar de alta un alumno en todas de una (ver events.js
 // "create"). Catálogos guardados antes de este campo no tienen packs — se completa acá.
 function packsContaining(subjectId){ return (state.catalog.packs||[]).filter(p=>p.subjectIds.includes(subjectId)); }

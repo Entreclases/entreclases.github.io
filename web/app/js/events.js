@@ -334,8 +334,8 @@ document.addEventListener("click", (e)=>{
   else if(a==="portal-regen"){ regenerarPortalToken(); return; }
   else if(a==="portal-copy"){
     copyToClipboard(portalUrl(state.portal.token))
-      .then(()=>{ state.portalCopyMsg="Copiado."; render(); })
-      .catch(()=>{ state.portalCopyMsg="No se pudo copiar. Seleccioná el texto manualmente."; render(); });
+      .then(()=>toast("Link copiado"))
+      .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
     return;
   }
   else if(a==="portal-publicar"){ publicarPortal(); return; }
@@ -345,8 +345,8 @@ document.addEventListener("click", (e)=>{
   else if(a==="portal-alumno-copy" && s){
     const token=tokenForStudent(s.id); if(!token) return;
     copyToClipboard(portalUrl(token))
-      .then(()=>{ state.portalAlumnoCopyMsg="Copiado."; state.portalAlumnoCopyId=s.id; render(); })
-      .catch(()=>{ state.portalAlumnoCopyMsg="No se pudo copiar. Seleccioná el texto manualmente."; state.portalAlumnoCopyId=s.id; render(); });
+      .then(()=>toast("Link copiado"))
+      .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
     return;
   }
   else if(a==="portal-alumno-share-toggle" && s){
@@ -422,12 +422,14 @@ document.addEventListener("click", (e)=>{
       save();
       state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=created[0].id; state.tab="temas";
       if(skipped.length) alert(`Se creó la ficha en ${created.length} materia${created.length===1?"":"s"} del pack. Se salteó ${skipped.join(", ")} porque ya tenías una ficha ahí.`);
+      toast(created.length===1?"Estudiante creado":`${created.length} fichas creadas`); return;
     }else{
       const dup=findDuplicateStudent(name,subjectVal,null);
       if(dup){ state.newStudentError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
       const st=makeStudent(subjById(subjectVal));
       state.students.push(st); save();
       state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=st.id; state.tab="temas";
+      toast("Estudiante creado"); return;
     }
   }
   else if(a.startsWith("tab-")){
@@ -442,6 +444,7 @@ document.addEventListener("click", (e)=>{
     const entry={id:uid(), date:st.examDate, result, grade};
     const newStatus = result==="aprobo" ? "aprobo" : result==="desaprobo" ? "desaprobo" : st.status;
     update(id,{examResults:[...(st.examResults||[]), entry], status:newStatus});
+    toast("Resultado guardado");
     return;
   }
   else if(a==="wa-free-send" && s){
@@ -450,22 +453,22 @@ document.addEventListener("click", (e)=>{
     window.open(waLink(s,text),"_blank","noopener");
     return;
   }
-  else if(a==="open-informe" && s){ state.view="informe"; state.informeCopyMsg=""; }
-  else if(a==="close-informe"){ state.view="detalle"; state.informeCopyMsg=""; }
+  else if(a==="open-informe" && s){ state.view="informe"; }
+  else if(a==="close-informe"){ state.view="detalle"; }
   else if(a==="informe-print"){ window.print(); return; }
   else if(a==="informe-copy" && s){
     copyToClipboard(buildInformeText(s))
-      .then(()=>{ state.informeCopyMsg="Copiado — pegalo en WhatsApp."; render(); })
-      .catch(()=>{ state.informeCopyMsg="No se pudo copiar. Seleccioná el texto manualmente."; render(); });
+      .then(()=>toast("Copiado — pegalo en WhatsApp"))
+      .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
     return;
   }
-  else if(a==="open-contrato" && s){ state.view="contrato"; state.contratoCopyMsg=""; }
-  else if(a==="close-contrato"){ state.view="detalle"; state.tab="ficha"; state.contratoCopyMsg=""; }
+  else if(a==="open-contrato" && s){ state.view="contrato"; }
+  else if(a==="close-contrato"){ state.view="detalle"; state.tab="ficha"; }
   else if(a==="contrato-print"){ window.print(); return; }
   else if(a==="contrato-copy" && s){
     copyToClipboard(buildContratoText(s))
-      .then(()=>{ state.contratoCopyMsg="Copiado al portapapeles."; render(); })
-      .catch(()=>{ state.contratoCopyMsg="No se pudo copiar. Seleccioná el texto manualmente."; render(); });
+      .then(()=>toast("Copiado al portapapeles"))
+      .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
     return;
   }
   else if(a==="filter"){ state.filter=el.dataset.f; }
@@ -493,7 +496,8 @@ document.addEventListener("click", (e)=>{
       note:document.getElementById("c-note").value,
       duration,
       objetivo:goal, objetivoResult:null,
-      cobrada:false}]}); return;
+      cobrada:false}]});
+    toast("Clase registrada"); return;
   }
   else if(a==="goal-resultado"){
     const sid=el.dataset.sid, st=state.students.find(x=>x.id===sid); if(!st) return;
@@ -509,16 +513,19 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="del-session" && s){
-    update(s.id,{sessions:s.sessions.filter(x=>x.id!==el.dataset.id)}); return;
+    update(s.id,{sessions:s.sessions.filter(x=>x.id!==el.dataset.id)});
+    toast("Clase eliminada"); return;
   }
   else if(a==="add-horario" && s){
     const day=parseInt(document.getElementById("h-day").value,10);
     const time=document.getElementById("h-time").value; if(!time) return;
     const duration=parseInt(document.getElementById("h-duration").value,10)||60;
-    update(s.id,{horarios:[...(s.horarios||[]), {id:uid(), day, time, duration}]}); return;
+    update(s.id,{horarios:[...(s.horarios||[]), {id:uid(), day, time, duration}]});
+    toast("Horario agregado"); return;
   }
   else if(a==="del-horario" && s){
-    update(s.id,{horarios:(s.horarios||[]).filter(x=>x.id!==el.dataset.id)}); return;
+    update(s.id,{horarios:(s.horarios||[]).filter(x=>x.id!==el.dataset.id)});
+    toast("Horario eliminado"); return;
   }
   else if(a==="add-puntual" && s){
     const date=document.getElementById("p-date").value; if(!date) return;
@@ -526,10 +533,12 @@ document.addEventListener("click", (e)=>{
     const duration=parseInt(document.getElementById("p-duration").value,10)||60;
     const {warning}=addPuntualClase(s.id, date, time, duration);
     if(warning) alert(warning);
+    else toast("Clase puntual agregada");
     return;
   }
   else if(a==="del-puntual" && s){
-    update(s.id,{clasesPuntuales:(s.clasesPuntuales||[]).filter(x=>x.id!==el.dataset.id)}); return;
+    update(s.id,{clasesPuntuales:(s.clasesPuntuales||[]).filter(x=>x.id!==el.dataset.id)});
+    toast("Clase puntual eliminada"); return;
   }
   else if(a==="toggle-senia" && s){
     update(s.id,{seniaActiva:el.dataset.f==="si", seniaTipo:s.seniaTipo||"monto"}); return;
@@ -540,12 +549,14 @@ document.addEventListener("click", (e)=>{
     const p=(st.clasesPuntuales||[]).find(x=>x.id===el.dataset.id); if(!p || p.cancelada) return;
     if(p.seniaEstado!=="pendiente" && p.seniaEstado!=="cobrada") return;
     const next = p.seniaEstado==="pendiente" ? "cobrada" : "pendiente";
-    update(sid,{clasesPuntuales:st.clasesPuntuales.map(x=>x.id===p.id?{...x,seniaEstado:next}:x)}); return;
+    update(sid,{clasesPuntuales:st.clasesPuntuales.map(x=>x.id===p.id?{...x,seniaEstado:next}:x)});
+    toast(next==="cobrada"?"Seña marcada como cobrada":"Seña marcada como pendiente"); return;
   }
   else if(a==="cobros-toggle"){ state.cobrosBannerOpen = !state.cobrosBannerOpen; }
   else if(a==="cobro-marcar-clase"){
     const sid=el.dataset.sid, st=state.students.find(x=>x.id===sid); if(!st) return;
-    update(sid,{sessions:st.sessions.map(x=>x.id===el.dataset.id?{...x,cobrada:true}:x)}); return;
+    update(sid,{sessions:st.sessions.map(x=>x.id===el.dataset.id?{...x,cobrada:true}:x)});
+    toast("Clase marcada como cobrada"); return;
   }
   else if(a==="toggle-recordatorios"){
     state.catalog.recordatorios = {...recordatoriosFor(), activo: el.dataset.f==="si"};
@@ -575,18 +586,24 @@ document.addEventListener("click", (e)=>{
   else if(a==="puntual-cancel-confirm" && s){
     state.puntualCancelAskId=null;
     applyCancelacion(s.id, el.dataset.id);
+    toast("Clase cancelada");
     return;
   }
   else if(a==="toggle-cobrada" && s){
-    update(s.id,{sessions:s.sessions.map(x=>x.id===el.dataset.id?{...x,cobrada:!x.cobrada}:x)}); return;
+    const sessionEl = s.sessions.find(x=>x.id===el.dataset.id);
+    const wasCobrada = sessionEl && sessionEl.cobrada;
+    update(s.id,{sessions:s.sessions.map(x=>x.id===el.dataset.id?{...x,cobrada:!x.cobrada}:x)});
+    toast(wasCobrada?"Clase marcada como pendiente":"Clase marcada como cobrada"); return;
   }
   else if(a==="save-pago" && s){
     const date=document.getElementById("pago-date").value; if(!date) return;
     const amount=parseFloat(document.getElementById("pago-amount").value); if(!amount) return;
-    update(s.id,{pagos:[...(s.pagos||[]),{id:uid(),date,amount}]}); return;
+    update(s.id,{pagos:[...(s.pagos||[]),{id:uid(),date,amount}]});
+    toast("Pago registrado"); return;
   }
   else if(a==="del-pago" && s){
-    update(s.id,{pagos:(s.pagos||[]).filter(x=>x.id!==el.dataset.id)}); return;
+    update(s.id,{pagos:(s.pagos||[]).filter(x=>x.id!==el.dataset.id)});
+    toast("Pago eliminado"); return;
   }
   else if(a==="pagos-tab"){ state.pagosTab=el.dataset.t; }
   else if(a==="add-costo-fijo"){
@@ -620,10 +637,12 @@ document.addEventListener("click", (e)=>{
     update(s.id,{simulacros:[...s.simulacros,{id:uid(),date,
       grade:document.getElementById("s-grade").value,
       note:document.getElementById("s-note").value}]});
-    state.simPrefillNote=""; return;
+    state.simPrefillNote="";
+    toast("Simulacro registrado"); return;
   }
   else if(a==="del-sim" && s){
-    update(s.id,{simulacros:s.simulacros.filter(x=>x.id!==el.dataset.id)}); return;
+    update(s.id,{simulacros:s.simulacros.filter(x=>x.id!==el.dataset.id)});
+    toast("Simulacro eliminado"); return;
   }
   else if(a==="sim-timer-start"){
     const min=Math.max(1, parseInt(document.getElementById("sim-timer-min").value,10)||90);
@@ -644,7 +663,8 @@ document.addEventListener("click", (e)=>{
   else if(a==="confirm-del" && s){
     state.view="lista"; state.confirmDel=false;
     const id=s.id; state.selId=null;
-    update(id,{deleted:true}); return;
+    update(id,{deleted:true});
+    toast(s.sample?"Ejemplo eliminado":"Estudiante eliminado"); return;
   }
   else if(a==="export"){
     const blob=new Blob([JSON.stringify({students:state.students},null,2)],{type:"application/json"});
@@ -653,6 +673,7 @@ document.addEventListener("click", (e)=>{
     link.href=url; link.download=`seguimiento-estudiantes-${today()}.json`;
     link.click(); URL.revokeObjectURL(url);
     markExported();
+    toast("Copia descargada"); return;
   }
   else return;
   render();
@@ -706,7 +727,7 @@ document.addEventListener("change",(e)=>{
   if(cf && cf.dataset.cf==="stats-subject"){ state.statsSubjectId=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="pagos-month"){ state.pagosMonth=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="renta-month"){ state.rentaMonth=cf.value; render(); return; }
-  if(cf && cf.dataset.cf==="informe-period"){ state.informePeriod=cf.value; state.informeCopyMsg=""; render(); return; }
+  if(cf && cf.dataset.cf==="informe-period"){ state.informePeriod=cf.value; render(); return; }
   const lf=e.target.closest("[data-lf]");
   if(lf){
     if(lf.dataset.lf==="subject") state.listSubject=lf.value;

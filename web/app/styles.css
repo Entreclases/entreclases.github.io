@@ -419,3 +419,61 @@
   .ds-input,.ds-select{font-family:inherit;font-size:var(--fs-base);width:100%;border:1px solid var(--line);
     border-radius:var(--radius-sm);padding:10px 12px;background:var(--input-bg);color:var(--ink)}
   .ds-input:focus-visible,.ds-select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+  /* ============ estados vacíos con acción ============ */
+  .empty-state{background:var(--card);border:1px dashed var(--gray);border-radius:var(--radius-lg);
+    padding:30px 20px;text-align:center}
+  .empty-state-icon{width:42px;height:42px;margin:0 auto 12px;border-radius:12px;background:var(--soft);
+    display:flex;align-items:center;justify-content:center;color:var(--muted)}
+  .empty-state-icon svg{width:21px;height:21px}
+  .empty-state-title{font-weight:700;font-size:14.5px;color:var(--ink);margin-bottom:4px}
+  .empty-state-text{font-size:12.5px;color:var(--muted);max-width:380px;margin:0 auto;line-height:1.5}
+  .empty-state .btn{margin-top:14px}
+
+  /* ============ toasts: feedback breve y no intrusivo tras una acción ============ */
+  .toast-wrap{position:fixed;left:0;right:0;bottom:72px;z-index:70;display:flex;flex-direction:column;
+    align-items:center;gap:8px;pointer-events:none;padding:0 12px}
+  .toast{background:var(--ink);color:var(--bg);font-size:13px;font-weight:600;padding:10px 16px;
+    border-radius:10px;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:9px;
+    max-width:340px;animation:toastIn .22s ease-out;pointer-events:auto}
+  .toast .dot{width:7px;height:7px;border-radius:99px;flex-shrink:0;background:var(--green)}
+  .toast.toast-error .dot{background:var(--red)}
+  @keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  @media (min-width:860px){
+    .toast-wrap{left:auto;right:24px;bottom:24px;align-items:flex-end}
+  }
+
+  /* ============ chip de estado de datos (guardado/sincronizando/sin conexión), en el nav ============ */
+  .statuschip{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;
+    color:var(--muted);padding:2px 2px}
+  .statuschip-dot{width:8px;height:8px;border-radius:99px;background:var(--gray2);flex-shrink:0}
+  .statuschip-sync .statuschip-dot{background:var(--blue);animation:statusPulse 1.1s ease-in-out infinite}
+  .statuschip-ok .statuschip-dot{background:var(--green)}
+  .statuschip-offline .statuschip-dot{background:var(--amber)}
+  .statuschip-error .statuschip-dot{background:var(--red)}
+  @keyframes statusPulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .statuschip-label{display:none}
+  @media (min-width:860px){
+    .statuschip-label{display:inline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  }
+
+  /* ============ skeletons: placeholders mientras carga/sincroniza ============ */
+  .skel{background:linear-gradient(90deg,var(--soft) 25%,var(--line) 37%,var(--soft) 63%);
+    background-size:400% 100%;animation:skelShine 1.4s ease infinite;border-radius:7px}
+  .skel-row{height:13px;margin-bottom:8px}
+  .skel-row.w80{width:80%} .skel-row.w60{width:60%} .skel-row.w40{width:40%}
+  .skel-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:7px}
+  @keyframes skelShine{0%{background-position:100% 0}100%{background-position:0 0}}
+  @media (prefers-reduced-motion:reduce){.skel{animation:none;background:var(--soft)}}
+
+  /* ============ microinteracciones sobrias: hover/press en tarjetas y botones ============ */
+  .row,.examcard,.topic,.cal-cell,.desk-body{transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
+  .row:hover,.examcard:hover{box-shadow:0 4px 14px -7px var(--shadow-ring2);border-color:var(--gray)}
+  .row-click:active,.examcard:active,.topic:active{transform:scale(.985)}
+  .btn,.primary,.chip,.tabbtn,.danger,.goalbtn,.navitem,.sembtn{
+    transition:transform .1s ease,filter .12s ease,background-color .12s ease,border-color .12s ease,color .12s ease}
+  .btn:active,.primary:active,.chip:active,.danger:active,.goalbtn:active{transform:scale(.96)}
+  .formcard,.ds-card,.examresult,.goalcard{transition:box-shadow .15s ease}
+  @media (prefers-reduced-motion:reduce){
+    .row,.examcard,.topic,.cal-cell,.desk-body,.btn,.primary,.chip,.tabbtn,.danger,.goalbtn,.navitem,.sembtn{transition:none}
+  }
