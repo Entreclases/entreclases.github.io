@@ -242,21 +242,16 @@
   .fc-teal .icon-circle{background:var(--accent-soft);color:var(--accent-dark)}
 
   /* usala / plataformas */
-  .platform-grid{display:grid;gap:22px}
-  .platform-grid.single{max-width:440px;margin:0 auto}
-  .platform-card{background:var(--card);border:1px solid var(--border);border-radius:18px;
-    padding:30px 26px;text-align:center;box-shadow:0 20px 40px -28px var(--shadow-3)}
-  .platform-card.highlight{border:2px solid var(--accent);box-shadow:0 20px 44px -20px rgba(20,184,166,.35)}
-  .platform-icon{width:52px;height:52px;border-radius:15px;margin:0 auto 18px;
-    display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--navy),var(--navy-2))}
-  .platform-icon svg{width:26px;height:26px;color:#fff}
-  .platform-card h3{font-size:18px;font-weight:700;color:var(--ink);margin-bottom:8px}
-  .platform-card p{font-size:13.5px;color:var(--text-soft);line-height:1.55;margin-bottom:16px}
-  .platform-card .subnote{font-size:11.5px;color:var(--text-soft);line-height:1.4;margin-top:14px}
   .badge{display:inline-block;font-size:11.5px;font-weight:700;padding:6px 14px;border-radius:20px;letter-spacing:.03em}
   .badge-live{background:var(--accent-soft);color:var(--accent-dark)}
+  .badge-soon{background:var(--bg-alt);color:var(--text-soft);border:1px solid var(--border)}
   .section-note{margin-top:26px;font-size:12px;color:var(--text-soft);text-align:center}
+
+  .platform-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .platform-grid-3 .feature-card{display:flex;flex-direction:column;align-items:flex-start}
+  .platform-grid-3 .feature-card p{flex:1}
+  .platform-grid-3 .btn{margin-top:14px}
+  .platform-grid-3 .badge{margin-top:14px}
 
   footer.site{padding:40px 20px;text-align:center;border-top:1px solid var(--border)}
   footer.site .brand{justify-content:center;margin-bottom:10px}
@@ -268,6 +263,7 @@
     .hero-grid{grid-template-columns:1fr}
     .hero-visual{order:-1;max-width:460px;margin:0 auto 8px}
     .feature-grid{grid-template-columns:repeat(2,1fr)}
+    .platform-grid-3{grid-template-columns:repeat(2,1fr)}
   }
   @media (max-width:680px){
     .nav-links{display:none}
@@ -275,6 +271,7 @@
     .hero h1{font-size:29px}
     section{padding:44px 16px}
     .feature-grid{grid-template-columns:1fr}
+    .platform-grid-3{grid-template-columns:1fr}
     .floating-badge{left:8px}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -527,19 +524,36 @@
       <h2>En la compu, en el celular, con o sin internet</h2>
       <p>Empezá ahora desde el navegador — no requiere instalación ni cuenta técnica, y sincroniza sola entre tus dispositivos.</p>
     </div>
-    <div class="platform-grid single">
-      <div class="platform-card highlight">
-        <div class="platform-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>
-        </div>
-        <h3>Versión web</h3>
+    <div class="platform-grid-3">
+      <div class="feature-card fc-green">
+        <span class="icon-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>
+        </span>
+        <h3>Web</h3>
         <p>Se abre directo en el navegador, en la compu o el celular. No requiere instalación, funciona con o sin conexión, y sincroniza sola entre tus dispositivos.</p>
         <a class="btn btn-primary btn-block" href="./app/index.html">Abrir la aplicación</a>
-        <span class="badge badge-live" style="margin-top:14px">● Disponible ahora</span>
-        <div class="subnote">Desde el navegador del celular podés tocar "Agregar a la pantalla de inicio" para tenerla como una app más, con su propio ícono.</div>
+        <span class="badge badge-live">● Disponible</span>
+      </div>
+
+      <div class="feature-card fc-blue">
+        <span class="icon-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+        </span>
+        <h3>App móvil</h3>
+        <p>Versión para Android, para tenerla como una app instalada más, sin pasar por el navegador.</p>
+        <span class="badge badge-soon">Próximamente</span>
+      </div>
+
+      <div class="feature-card fc-amber">
+        <span class="icon-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </span>
+        <h3>App de escritorio</h3>
+        <p>Versión para Windows, instalable como un programa más de tu compu.</p>
+        <span class="badge badge-soon">Próximamente</span>
       </div>
     </div>
-    <p class="section-note">Las aplicaciones instalables para Windows y Android vuelven más adelante.</p>
+    <p class="section-note">Desde el navegador del celular podés tocar "Agregar a la pantalla de inicio" para tener la versión web como una app más, con su propio ícono.</p>
   </div>
 </section>
 

@@ -24,6 +24,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
+- Plataformas próximamente (paso 97, `web/index.html`): la sección "Usala donde quieras" pasa de una sola tarjeta destacada con la leyenda "vuelven más adelante" a tres tarjetas iguales estilo Características — Web (Disponible, con su botón), App móvil y App de escritorio (Próximamente cada una) —, sin ningún texto de "vuelven más adelante". Revisado el resto de la landing: sigue al día con lo que hace la app 2.1.x. Precache del service worker en `cuaderno-v87`.
 - Renombre a Entreclases (paso 96, `web/index.html`, `web/app/index.html`, `web/app/portal.html`, `web/app/manifest.webmanifest`, `web/app/js/views.js`, `helpers.js`, `events.js`, `sw.js`): el nombre visible pasa de "Cuaderno de seguimiento" a "Entreclases" en landing (título, header, hero, footer), app (barra lateral, login, manifest), portal y en los documentos generados (informe, contrato, recibo, notificación de cobros, `.ics`). Tagline nueva "Vos enseñás, del resto nos ocupamos." en el hero de la landing, como subtítulo del login y discreta en el pie del portal. Nada interno (claves de `localStorage`, tablas, buckets, prefijo del caché) se tocó. Precache del service worker en `cuaderno-v86`.
 
 ## [2.1.1] - 2026-07-17
