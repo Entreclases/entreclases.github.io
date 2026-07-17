@@ -33,8 +33,57 @@ function applyTheme(theme){
   if(theme==="light") root.classList.add("theme-light");
   else if(theme==="dark") root.classList.add("theme-dark");
 }
-function setTheme(theme){ localStorage.setItem(THEME_KEY, theme); applyTheme(theme); }
+function isDarkEffective(theme){
+  if(theme==="dark") return true;
+  if(theme==="light") return false;
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+function setTheme(theme){ localStorage.setItem(THEME_KEY, theme); applyTheme(theme); applyAccent(getAccent()); }
 applyTheme(getTheme()); // se aplica de entrada, antes del primer render, para evitar parpadeo
+// Color de acento (paso 106): 6 colores predefinidos, cada uno con su propio par claro/oscuro
+// (mismo criterio de contraste que el teal original — texto bien oscuro sobre el acento, no
+// blanco, porque ninguno de estos tonos llega a 4.5:1 con blanco en ninguno de los dos temas,
+// ver el comentario de --on-accent en styles.css) — el portal y la landing no lo leen, se quedan
+// con el acento de marca fijo (archivos aparte, sin este JS). Preferencia local, mismo criterio
+// que THEME_KEY/DENSITY_KEY: no viaja en el JSON del cuaderno, es por dispositivo.
+const ACCENT_KEY = "tutoria-accent";
+const ACCENT_DEFAULT = "teal";
+const ACCENT_PALETTE = {
+  teal:   {label:"Verde azulado", light:{accent:"#14B8A6",accentDark:"#0E9488",accentSoft:"#CFF7F0",onAccent:"#062824",shadow:"rgba(20,184,166,.45)"},
+                                    dark:{accent:"#2DD4C0",accentDark:"#14B8A6",accentSoft:"#123C38",onAccent:"#062824",shadow:"rgba(45,212,192,.4)"}},
+  blue:   {label:"Azul",          light:{accent:"#3B82F6",accentDark:"#2563EB",accentSoft:"#DBEAFE",onAccent:"#0B1E3D",shadow:"rgba(59,130,246,.45)"},
+                                    dark:{accent:"#60A5FA",accentDark:"#3B82F6",accentSoft:"#1B2340",onAccent:"#0B1E3D",shadow:"rgba(96,165,250,.4)"}},
+  violeta:{label:"Violeta",       light:{accent:"#8B5CF6",accentDark:"#7C3AED",accentSoft:"#EDE9FE",onAccent:"#1E1033",shadow:"rgba(139,92,246,.45)"},
+                                    dark:{accent:"#A78BFA",accentDark:"#8B5CF6",accentSoft:"#2E1F5E",onAccent:"#1E1033",shadow:"rgba(167,139,250,.4)"}},
+  verde:  {label:"Verde",         light:{accent:"#22C55E",accentDark:"#16A34A",accentSoft:"#DCFCE7",onAccent:"#0B2E17",shadow:"rgba(34,197,94,.45)"},
+                                    dark:{accent:"#4ADE80",accentDark:"#22C55E",accentSoft:"#173324",onAccent:"#0B2E17",shadow:"rgba(74,222,128,.4)"}},
+  naranja:{label:"Naranja",       light:{accent:"#F59E0B",accentDark:"#D97706",accentSoft:"#FEF3C7",onAccent:"#3D2B04",shadow:"rgba(245,158,11,.45)"},
+                                    dark:{accent:"#FBBF24",accentDark:"#F59E0B",accentSoft:"#3A2E10",onAccent:"#3D2B04",shadow:"rgba(251,191,36,.4)"}},
+  rosa:   {label:"Rosa",          light:{accent:"#F43F5E",accentDark:"#E11D48",accentSoft:"#FFE4E6",onAccent:"#3D0A1A",shadow:"rgba(244,63,94,.45)"},
+                                    dark:{accent:"#FB7185",accentDark:"#F43F5E",accentSoft:"#4C1424",onAccent:"#3D0A1A",shadow:"rgba(251,113,133,.4)"}},
+};
+function getAccent(){ const v=localStorage.getItem(ACCENT_KEY); return (v && ACCENT_PALETTE[v]) ? v : ACCENT_DEFAULT; }
+// Variables inline en <html>: pisan cualquier valor de las reglas de styles.css (base, media
+// prefers-color-scheme, .theme-dark) sin importar el tema — por eso hay que recalcularlas cada
+// vez que el tema efectivo puede haber cambiado (setTheme() de arriba, y el listener de más
+// abajo para cuando el sistema cambia solo estando en tema "Automático").
+function applyAccent(key){
+  const pal = ACCENT_PALETTE[key] || ACCENT_PALETTE[ACCENT_DEFAULT];
+  const vars = isDarkEffective(getTheme()) ? pal.dark : pal.light;
+  const root = document.documentElement.style;
+  root.setProperty("--accent", vars.accent);
+  root.setProperty("--accent-dark", vars.accentDark);
+  root.setProperty("--accent-soft", vars.accentSoft);
+  root.setProperty("--on-accent", vars.onAccent);
+  root.setProperty("--shadow-accent", "0 8px 20px -6px "+vars.shadow);
+}
+function setAccent(key){ localStorage.setItem(ACCENT_KEY, key); applyAccent(key); }
+applyAccent(getAccent()); // igual que el tema, aplicada de entrada para evitar parpadeo
+if(window.matchMedia){
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{
+    if(getTheme()==="system") applyAccent(getAccent());
+  });
+}
 // Densidad (paso 102): "comoda" (default) | "compacta" — preferencia local, mismo criterio que
 // THEME_KEY (no viaja en el JSON del cuaderno, es por dispositivo). Sólo achica paddings/alto de
 // fila/margen vía variables CSS (ver body.density-compact en styles.css); el texto no se achica.

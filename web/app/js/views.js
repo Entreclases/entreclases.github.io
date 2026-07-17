@@ -1933,6 +1933,13 @@ function vCuenta(){
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${densityBtn("comoda","Cómoda")}${densityBtn("compacta","Compacta")}
     </div>
+    <div class="flabel" style="margin:14px 0 6px">Color de la app</div>
+    <div class="hint" style="margin-bottom:8px">El acento de botones, pestañas y barras en toda la app — el portal para tus alumnos y la landing siguen con el color de marca.</div>
+    <div class="subj-swatches">${Object.keys(ACCENT_PALETTE).map(k=>{
+      const sel = getAccent()===k;
+      return `<button class="subj-swatch ${sel?"sel":""}" data-a="set-accent" data-f="${k}"
+        style="background:${ACCENT_PALETTE[k].light.accent}" title="${esc(ACCENT_PALETTE[k].label)}">${sel?ICON_CHECK:""}</button>`;
+    }).join("")}</div>
   </div>
   <div class="formcard"><div class="ftitle">Respaldos automáticos</div>
     <div class="hint" style="margin-bottom:10px">Se guarda una copia completa una vez por día, en la primera sincronización. Se conservan las últimas ${MAX_BACKUPS}. Esto no reemplaza la copia manual (.json) del tablero — conviven.</div>
