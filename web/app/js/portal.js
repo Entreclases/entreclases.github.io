@@ -145,6 +145,17 @@ function observeUnitBars(){
   }, {threshold:.2});
   bars.forEach(el=>io.observe(el));
 }
+// Avisos (paso 105): mensajes cortos del docente, arriba de todo — el filtrado por destino
+// (todos/materia/alumno puntual) ya viene resuelto del backend según la llave usada
+// (portal_publico()), portal.js sólo los pinta como vienen, nunca decide a quién le corresponde
+// cada uno (esa decisión tiene que ser del servidor, no del cliente, para no poder filtrarla).
+function avisosHtml(list){
+  if(!Array.isArray(list) || list.length===0) return "";
+  return list.map(a=>`<div class="card aviso">
+    <div class="avisotxt">${esc(a.texto)}</div>
+    <div class="avisofecha">${fmtDiaLocal(a.fecha)}</div>
+  </div>`).join("");
+}
 function showPortal(res){
   const nombre = (res.data && res.data.nombre) ? res.data.nombre.trim() : "";
   const esGrupo = res.tipo==="grupo" && res.grupo;
@@ -154,7 +165,10 @@ function showPortal(res){
     : (nombre ? `Portal de ${nombre}` : "Portal de tu profesor");
   const biblioteca = esGrupo ? (Array.isArray(res.grupo.biblioteca) ? res.grupo.biblioteca : [])
     : ((res.data && Array.isArray(res.data.biblioteca)) ? res.data.biblioteca : []);
+  const avisos = esGrupo ? (res.grupo.avisos||[])
+    : (res.tipo==="alumno" ? ((res.alumno&&res.alumno.avisos)||[]) : ((res.data&&res.data.avisos)||[]));
   let h = `<h1>${esc(titulo)}</h1>`;
+  h += avisosHtml(avisos);
   // Llave de alumno: su bloque personal va primero, arriba de lo general (biblioteca/links) —
   // es lo que más le importa a él en particular.
   if(res.tipo==="alumno" && res.alumno) h += personalHtml(res.alumno);

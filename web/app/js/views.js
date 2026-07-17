@@ -1922,6 +1922,7 @@ function vCuenta(){
     </div>
   </div>
   ${vPortalCard()}
+  ${vPortalAvisosCard()}
   ${vPortalGruposCard()}
   <div class="formcard"><div class="ftitle">Apariencia</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2028,6 +2029,51 @@ function vPortalCard(){
   </div>`;
   if(state.portalError) h += `<div class="saveerr" style="margin-top:10px">${esc(state.portalError)}</div>`;
   return h + `</div>`;
+}
+
+// Avisos del portal (paso 105): mensajes cortos con fecha que el docente publica dirigidos a
+// todos los alumnos, a una materia o a un alumno puntual — aparecen como tarjeta destacada
+// arriba de todo en el portal del alumno. Se guardan en publicado.avisos (saveAvisos() en
+// sync.js); qué aviso ve cada llave lo decide el backend (portal_publico()), nunca el cliente.
+function avisoTargetOptionsHtml(){
+  let h = `<option value="">Todos los alumnos</option>`;
+  if(state.catalog.subjects.length){
+    h += `<optgroup label="Por materia">` + state.catalog.subjects.map(m=>
+      `<option value="m:${m.id}">${esc(m.name)}</option>`).join("") + `</optgroup>`;
+  }
+  const studs = alive();
+  if(studs.length){
+    h += `<optgroup label="Por alumno">` + studs.map(s=>
+      `<option value="s:${s.id}">${esc(s.name)}</option>`).join("") + `</optgroup>`;
+  }
+  return h;
+}
+function avisoTargetLabel(target){
+  if(!target) return "Todos los alumnos";
+  if(target.tipo==="materia"){ const m=subjById(target.subjectId); return m?"Materia: "+m.name:"Materia eliminada"; }
+  if(target.tipo==="alumno"){ const s=state.students.find(x=>x.id===target.studentId); return s?s.name:"Alumno eliminado"; }
+  return "Todos los alumnos";
+}
+function vPortalAvisosCard(){
+  if(!state.portalLoaded || !state.portal) return "";
+  const avisos = (state.portal.publicado && state.portal.publicado.avisos) || [];
+  let h = `<div class="formcard"><div class="ftitle">Avisos para el portal</div>
+    <div class="hint" style="margin-bottom:10px">Un mensaje corto que tus alumnos ven arriba de todo al entrar al portal — ej. «El jueves traé la guía 3» o «Recordá el examen del lunes» — dirigido a todos, a una materia o a un alumno puntual.</div>`;
+  h += avisos.length===0 ? `<div class="hint" style="margin-bottom:10px">Todavía no publicaste ningún aviso.</div>`
+    : avisos.map(a=>`<div class="log" style="align-items:flex-start">
+        <div class="body">${esc(a.texto)}<div class="note">${esc(avisoTargetLabel(a.target))} · ${fmtDate(a.fecha)}</div></div>
+        <button class="del" data-a="aviso-del" data-id="${a.id}" title="Borrar aviso" aria-label="Borrar aviso">×</button>
+      </div>`).join("");
+  h += `<div class="frow" style="margin-top:10px">
+    <div class="field"><div class="flabel">Aviso</div>
+      <input id="aviso-texto" placeholder="Ej: El jueves traé la guía 3" data-enter="aviso-add"></div>
+    <div class="field" style="max-width:220px"><div class="flabel">Para</div>
+      <select id="aviso-target">${avisoTargetOptionsHtml()}</select></div>
+  </div>
+  <button class="chip" data-a="aviso-add" ${state.avisoSaving?"disabled":""}>${state.avisoSaving?"Publicando…":"+ Publicar aviso"}</button>
+  ${state.avisoError?`<div class="saveerr" style="margin-top:8px">${esc(state.avisoError)}</div>`:""}
+  </div>`;
+  return h;
 }
 
 // Llaves grupales (Cuenta → Portal, paso 94): una llave por materia, para compartirle a un grupo

@@ -115,6 +115,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               portalSaving:false, portalSaveMsg:"", portalCopyMsg:"",
               portalGrupoBusy:null, portalGrupoError:"", portalGrupoCopyMsg:"",
               portalGrupoEditing:null, portalGrupoDraftAlumnos:[],
+              avisoSaving:false, avisoError:"",
               toasts:[],
               fabOpen:false, fabPick:null,
               searchOpen:false, searchQuery:"", searchSel:0,
@@ -587,6 +588,14 @@ function parseScopeValue(v){
   if(v && v.startsWith("m:")) return {subjectId:v.slice(2), studentId:""};
   if(v && v.startsWith("s:")) return {subjectId:"", studentId:v.slice(2)};
   return {subjectId:"", studentId:""};
+}
+// Destino de un aviso del portal (paso 105) — mismo prefijo "m:"/"s:" que parseScopeValue()
+// arriba, sin valor = todos los alumnos. Ver vPortalAvisosCard()/avisoTargetOptionsHtml() en
+// views.js y saveAvisos() en sync.js.
+function parseAvisoTarget(v){
+  if(v && v.startsWith("m:")) return {tipo:"materia", subjectId:v.slice(2)};
+  if(v && v.startsWith("s:")) return {tipo:"alumno", studentId:v.slice(2)};
+  return {tipo:"todos"};
 }
 // todo lo pendiente de un alumno (mes actual + señas), sin filtrar por días de atraso — lo usa
 // el mensaje de WhatsApp de recordatorio de pago, que tiene sentido mandar apenas hay algo

@@ -545,6 +545,30 @@ async function togglePortalHabilitado(next){
     render();
   }
 }
+// Avisos del portal (paso 105): mensajes cortos con fecha y destino ("todos"/una materia/un
+// alumno puntual) que el docente publica desde Cuenta → Portal, guardados en
+// publicado.avisos (mismo objeto jsonb "publicado" que biblioteca/alumnos/grupos) — no hace
+// falta ningún campo nuevo en la tabla. Filtrar qué avisos ve cada llave (individual = los
+// "todos" + los de su materia + los suyos puntuales; grupal = los "todos" + los de su materia;
+// general = sólo los "todos") lo tiene que hacer portal_publico() del lado del backend, porque
+// es la única forma segura de no exponerle a un alumno un aviso dirigido a otro — ver la
+// migración aparte que acompaña este paso. Mismo patrón optimista que togglePortalHabilitado():
+// se actualiza state.portal ya mismo, se guarda en segundo plano, y si falla se revierte.
+async function saveAvisos(newAvisos){
+  if(!state.portal) return;
+  const prevAvisos = (state.portal.publicado && state.portal.publicado.avisos) || [];
+  state.portal.publicado = {...state.portal.publicado, avisos:newAvisos};
+  state.avisoSaving=true; state.avisoError=""; render();
+  if(IS_DEMO){ state.avisoSaving=false; render(); return; }
+  try{
+    const {uid_, h} = await fetchPortalRow("publicado");
+    await patchPortalRow(uid_, h, {publicado: state.portal.publicado});
+  }catch(e){
+    state.portal.publicado = {...state.portal.publicado, avisos:prevAvisos};
+    state.avisoError = !navigator.onLine ? "Sin conexión a internet." : "No se pudo guardar el aviso. Probá de nuevo.";
+  }
+  state.avisoSaving=false; render();
+}
 async function regenerarPortalToken(){
   if(!state.portal) return;
   if(!confirm("La llave anterior deja de funcionar de inmediato: cualquier alumno que la tenga guardada pierde el acceso. ¿Regenerar?")) return;

@@ -469,6 +469,16 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="portal-publicar"){ publicarPortal(); return; }
+  else if(a==="aviso-add"){
+    const texto=(document.getElementById("aviso-texto").value||"").trim(); if(!texto) return;
+    const target=parseAvisoTarget(document.getElementById("aviso-target").value);
+    const avisos=[{id:uid(), texto, fecha:today(), target}, ...((state.portal.publicado&&state.portal.publicado.avisos)||[])];
+    saveAvisos(avisos); return;
+  }
+  else if(a==="aviso-del"){
+    const avisos=((state.portal.publicado&&state.portal.publicado.avisos)||[]).filter(x=>x.id!==el.dataset.id);
+    saveAvisos(avisos); return;
+  }
   else if(a==="portal-alumno-generar" && s){ generarLlaveAlumno(s.id); return; }
   else if(a==="portal-alumno-regen" && s){ regenerarLlaveAlumno(s.id); return; }
   else if(a==="portal-alumno-revoke" && s){ revocarLlaveAlumno(s.id); return; }
