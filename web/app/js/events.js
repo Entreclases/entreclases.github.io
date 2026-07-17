@@ -843,6 +843,19 @@ document.addEventListener("click", (e)=>{
     markExported();
     toast("Copia descargada"); return;
   }
+  else if(a==="export-pagos-csv"){
+    const mk = state.pagosMonth || currentMonthKey();
+    const n = parseInt(state.pagosExportPeriod||"3",10);
+    const monthKeys = monthKeysEndingAt(mk, n);
+    const csv = buildPagosCsv(monthKeys);
+    const bom = String.fromCharCode(0xFEFF);
+    const blob=new Blob([bom+csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url; link.download=`pagos-${monthKeys[0]}_a_${monthKeys[monthKeys.length-1]}.csv`;
+    link.click(); URL.revokeObjectURL(url);
+    toast("CSV descargado"); return;
+  }
   else return;
   render();
 });
@@ -948,6 +961,7 @@ document.addEventListener("change",(e)=>{
   }
   if(cf && cf.dataset.cf==="stats-subject"){ state.statsSubjectId=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="pagos-month"){ state.pagosMonth=cf.value; render(); return; }
+  if(cf && cf.dataset.cf==="pagos-export-period"){ state.pagosExportPeriod=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="renta-month"){ state.rentaMonth=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="informe-period"){ state.informePeriod=cf.value; render(); return; }
   const lf=e.target.closest("[data-lf]");

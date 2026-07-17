@@ -1193,13 +1193,24 @@ function vPagos(){
   </div>`;
   return h + (tab==="rentabilidad" ? vRentabilidad() : vPagosResumen());
 }
+// Opciones de período para el export contable (paso 83) — termina en el mes elegido en el
+// selector de arriba, así "exportar" siempre coincide con lo que se está mirando en pantalla.
+const PAGOS_EXPORT_PERIODS = {"1":"Este mes","3":"Últimos 3 meses","6":"Últimos 6 meses","12":"Último año"};
 function vPagosResumen(){
   const mk = state.pagosMonth || currentMonthKey();
-  let h = `<div class="field" style="max-width:280px;margin-bottom:14px">
-    <div class="flabel">Mes</div>
-    <select data-cf="pagos-month">
-      ${recentMonthKeys(12).map(k=>`<option value="${k}" ${k===mk?"selected":""}>${esc(monthLabel(k))}</option>`).join("")}
-    </select></div>`;
+  let h = `<div class="frow" style="margin-bottom:14px;align-items:flex-end">
+    <div class="field" style="max-width:280px">
+      <div class="flabel">Mes</div>
+      <select data-cf="pagos-month">
+        ${recentMonthKeys(12).map(k=>`<option value="${k}" ${k===mk?"selected":""}>${esc(monthLabel(k))}</option>`).join("")}
+      </select></div>
+    <div class="field" style="max-width:220px">
+      <div class="flabel">Exportar (termina en el mes de arriba)</div>
+      <select data-cf="pagos-export-period">
+        ${Object.entries(PAGOS_EXPORT_PERIODS).map(([k,l])=>`<option value="${k}" ${k===(state.pagosExportPeriod||"3")?"selected":""}>${esc(l)}</option>`).join("")}
+      </select></div>
+    <button class="chip" data-a="export-pagos-csv" style="margin-bottom:2px">Exportar CSV</button>
+  </div>`;
 
   const rows = alive().filter(hasPagos).map(s=>({s, r:pagoResumen(s,mk)}));
   const seniaRes = pagosSeniaResumen(mk);

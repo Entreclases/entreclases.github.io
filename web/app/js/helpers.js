@@ -387,6 +387,70 @@ function buildReciboText(s, r){
   return lines.join("\n");
 }
 
+/* ============ export contable (paso 83): CSV local (Blob + download, sin backend) de los
+   movimientos de un rango de meses — una fila por clase cobrada/pendiente, pago mensual
+   registrado o seña, más un resumen por mes al final. BOM UTF-8 + separador ";" para que Excel
+   en español lo abra bien de entrada (ver buildPagosCsv() más abajo). ============ */
+function monthKeysEndingAt(mk, n){
+  const out=[]; const d=new Date(mk+"-01T12:00:00");
+  for(let i=0;i<n;i++){ out.push(d.toISOString().slice(0,7)); d.setMonth(d.getMonth()-1); }
+  return out.reverse();
+}
+function pagosCsvRows(monthKeys){
+  const mkSet = new Set(monthKeys);
+  const rows = [];
+  alive().forEach(s=>{
+    if(hasPagos(s) && s.modalidad==="clase"){
+      (s.sessions||[]).forEach(c=>{
+        if(!mkSet.has(monthKeyOf(c.date))) return;
+        rows.push({date:c.date, alumno:s.name, materia:s.subject||"", concepto:"Clase",
+          monto:Number(s.tarifa)||0, estado:c.cobrada?"Cobrada":"Pendiente"});
+      });
+    }
+    if(hasPagos(s) && s.modalidad==="mensual"){
+      (s.pagos||[]).forEach(p=>{
+        if(!mkSet.has(monthKeyOf(p.date))) return;
+        rows.push({date:p.date, alumno:s.name, materia:s.subject||"", concepto:"Mensualidad",
+          monto:Number(p.amount)||0, estado:"Cobrado"});
+      });
+    }
+    (s.clasesPuntuales||[]).forEach(p=>{
+      if(!hasSenia(s) || (p.seniaEstado!=="pendiente" && p.seniaEstado!=="cobrada" && p.seniaEstado!=="retenida")) return;
+      if(!mkSet.has(monthKeyOf(p.date))) return;
+      rows.push({date:p.date, alumno:s.name, materia:s.subject||"", concepto:"Seña",
+        monto:Number(p.seniaMonto)||0, estado:SENIA_ESTADO_META[p.seniaEstado].label});
+    });
+  });
+  rows.sort((a,b)=>a.date.localeCompare(b.date));
+  return rows;
+}
+function pagosCsvMonthlySummary(rows, monthKeys){
+  const byMonth = {};
+  monthKeys.forEach(mk=>byMonth[mk]={mk, cobrado:0, pendiente:0});
+  rows.forEach(r=>{
+    const mk = monthKeyOf(r.date);
+    if(!byMonth[mk]) return;
+    if(r.estado==="Pendiente") byMonth[mk].pendiente += r.monto;
+    else byMonth[mk].cobrado += r.monto;
+  });
+  return monthKeys.map(mk=>byMonth[mk]);
+}
+function csvField(v){
+  const s = String(v??"");
+  return /[;"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function buildPagosCsv(monthKeys){
+  const rows = pagosCsvRows(monthKeys);
+  const lines = [["Fecha","Alumno","Materia","Concepto","Monto","Estado"].map(csvField).join(";")];
+  rows.forEach(r=>lines.push([fmtDate(r.date), r.alumno, r.materia, r.concepto, r.monto, r.estado].map(csvField).join(";")));
+  lines.push("");
+  lines.push("Resumen por mes");
+  lines.push(["Mes","Cobrado","Pendiente"].map(csvField).join(";"));
+  pagosCsvMonthlySummary(rows, monthKeys).forEach(m=>
+    lines.push([monthLabel(m.mk), m.cobrado, m.pendiente].map(csvField).join(";")));
+  return lines.join("\r\n");
+}
+
 /* ============ recordatorios de cobro: clases sin cobrar + mensualidades vencidas + señas
    pendientes, todo junto, para el aviso diario del tablero (ver events.js: maybeNotifyCobros) ============ */
 function recordatoriosFor(){ return state.catalog.recordatorios || defaultRecordatorios(); }
