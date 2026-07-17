@@ -441,18 +441,29 @@ function vCobroItemRow(s,i){
 
 const SEM_SHORT = {sd:"Sin evaluar", verde:"Verde", amarillo:"Amarillo", rojo:"Rojo"};
 function listFiltersActive(){
-  return !!(state.listSearch || state.listSubject!=="todas" || state.listCareer!=="todas" || state.listSem!=="todos" || state.filter!=="activo");
+  return !!(state.listSearch || state.listSubject!=="todas" || state.listCareer!=="todas" || state.listSem!=="todos" ||
+    state.filter!=="activo" || (state.listDeuda||"todas")!=="todas" || (state.listSort||"examen")!=="examen");
+}
+// Última clase dictada (para ordenar/mostrar "por actividad") — null si nunca tuvo una.
+function lastSessionDate(s){
+  return (s.sessions||[]).reduce((max,c)=>(!max||c.date>max)?c.date:max, null);
 }
 function vLista(){
   const order=["activo","pausado","desaprobo","aprobo","dejo","todos"];
   const q = (state.listSearch||"").trim().toLowerCase();
+  const listDeuda = state.listDeuda||"todas", listSort = state.listSort||"examen";
   const shown = alive()
     .filter(s=>state.filter==="todos"||s.status===state.filter)
     .filter(s=>!q || s.name.toLowerCase().includes(q))
     .filter(s=>state.listSubject==="todas"||s.subjectId===state.listSubject)
     .filter(s=>state.listCareer==="todas"||s.career===state.listCareer)
     .filter(s=>state.listSem==="todos"||(s.semaforo||"sd")===state.listSem)
-    .sort((a,b)=>((a.examDate||"9999").localeCompare(b.examDate||"9999"))||a.name.localeCompare(b.name));
+    .filter(s=>listDeuda==="todas" || (listDeuda==="debe" ? pendienteTotalFor(s)>0 : pendienteTotalFor(s)<=0))
+    .sort((a,b)=>{
+      if(listSort==="actividad") return (lastSessionDate(b)||"0000-00-00").localeCompare(lastSessionDate(a)||"0000-00-00") || a.name.localeCompare(b.name);
+      if(listSort==="nombre") return a.name.localeCompare(b.name);
+      return ((a.examDate||"9999").localeCompare(b.examDate||"9999"))||a.name.localeCompare(b.name);
+    });
 
   let h = pageHead("Estudiantes","Tus alumnos",`<button class="btn btn-primary" data-a="new">+ Nuevo estudiante</button>`);
   h += `<div class="field" style="margin-bottom:10px">
@@ -475,6 +486,16 @@ function vLista(){
       <option value="todos" ${state.listSem==="todos"?"selected":""}>Todo el semáforo</option>
       ${Object.entries(SEM_SHORT).map(([k,l])=>`<option value="${k}" ${k===state.listSem?"selected":""}>${esc(l)}</option>`).join("")}
     </select>
+    <select data-lf="deuda" style="width:auto">
+      <option value="todas" ${listDeuda==="todas"?"selected":""}>Deuda: todos</option>
+      <option value="debe" ${listDeuda==="debe"?"selected":""}>Debe</option>
+      <option value="aldia" ${listDeuda==="aldia"?"selected":""}>Al día</option>
+    </select>
+    <select data-lf="sort" style="width:auto">
+      <option value="examen" ${listSort==="examen"?"selected":""}>Ordenar: por examen</option>
+      <option value="actividad" ${listSort==="actividad"?"selected":""}>Por última clase</option>
+      <option value="nombre" ${listSort==="nombre"?"selected":""}>Por nombre</option>
+    </select>
     ${listFiltersActive()?`<button class="chip" data-a="clear-filters">Limpiar filtros</button>`:""}</div>`;
 
   h += `<div class="hint" style="margin-bottom:10px">${shown.length} resultado${shown.length===1?"":"s"}</div>`;
@@ -491,14 +512,17 @@ function vLista(){
     const units=unitsFor(s);
     const seen=units.filter(t=>["visto","practica","parcial"].includes((s.topics||{})[t])).length;
     const rel=units.filter(t=>(s.topics||{})[t]!=="noentra").length||1;
+    const deuda=pendienteTotalFor(s);
+    const lastAct=lastSessionDate(s);
     const right = (d!==null&&d>=0&&s.status==="activo")
       ? `<span style="color:${d<=7?"var(--red)":"var(--ink)"};font-weight:600">examen en ${d}d</span>`
       : `<span style="color:var(--faint)">${s.examDate?fmtDate(s.examDate):"sin fecha"}</span>`;
     return `<div class="row">
       <button class="row-click" data-a="open" data-id="${s.id}">
         <div class="main"><div class="name">${esc(s.name)} ${semDot(s.semaforo,13,false)} ${pill(s.status)} ${examplePill(s)}
-          ${na?`<span class="mini-alert">${na} alerta${na>1?"s":""}</span>`:""}</div>
-        <div class="sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")} · temas ${seen}/${rel}</div></div>
+          ${na?`<span class="mini-alert">${na} alerta${na>1?"s":""}</span>`:""}
+          ${deuda>0?`<span class="pill" style="color:var(--status-desaprobo-fg);background:var(--redbg)">debe ${fmtMoney(deuda)}</span>`:""}</div>
+        <div class="sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")} · temas ${seen}/${rel}${(state.listSort||"examen")==="actividad"?` · última clase ${lastAct?esc(fmtDate(lastAct)):"nunca"}`:""}</div></div>
         <div class="right">${right}</div>
       </button>
       ${hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">${ICON_CHAT}</a>`:""}
@@ -523,139 +547,220 @@ function vDetalle(){
   </div>`;
   h += alerts.map(a=>`<div class="alert" style="cursor:default"><span class="dot"></span><span class="t">${esc(a.text)}</span></div>`).join("");
   h += vGoalClosure(s);
+  // Pestañas (paso 78): Resumen / Clases / Pagos / Objetivos / Materiales / Portal — cada una
+  // acotada a lo suyo, en vez de la ficha larga de antes. Resumen es la que abre por defecto y
+  // concentra lo que no tiene pestaña propia (unidades, datos de contacto, informe/contrato,
+  // borrar) además del vistazo rápido de arriba (ver vFichaResumenGlance).
   h += `<div class="tabs" style="margin:16px 0 14px">` +
-    tabbtn("tab-temas",state.tab==="temas","Temas") +
+    tabbtn("tab-resumen",state.tab==="resumen","Resumen") +
     tabbtn("tab-clases",state.tab==="clases",`Clases (${s.sessions.length})`) +
-    tabbtn("tab-simulacros",state.tab==="simulacros",`Simulacros (${s.simulacros.length})`) +
-    tabbtn("tab-ficha",state.tab==="ficha","Ficha") + `</div>`;
+    tabbtn("tab-pagos",state.tab==="pagos","Pagos") +
+    tabbtn("tab-objetivos",state.tab==="objetivos","Objetivos") +
+    tabbtn("tab-materiales",state.tab==="materiales","Materiales") +
+    tabbtn("tab-portal",state.tab==="portal","Portal") + `</div>`;
 
-  if(state.tab==="temas"){
-    const units=unitsFor(s);
-    if(units.length===0){
-      h += `<div class="empty">Este alumno no tiene una materia elegida. Entrá a la pestaña «Ficha» y elegí su materia: la grilla de unidades se arma sola. Las materias y sus unidades se administran desde «Materias y carreras».</div>`;
-    } else {
-      h += `<div class="hint" style="margin-bottom:10px">Tocá cada unidad para avanzar el estado: Pendiente → Visto → Práctica → Nivel parcial → No entra. «Nivel parcial» significa que resuelve solo ejercicios de nivel examen.</div>
-      <div class="topicgrid">` + units.map(t=>{
-        const st=(s.topics||{})[t]||"pendiente";
-        const m=TOPIC_META[st];
-        return `<button class="topic" data-a="cycle-topic" data-t="${esc(t)}"
-          style="background:${m.bg};border-color:${m.bd}">
-          <b style="color:${st==="noentra"?"var(--gray2)":"var(--ink)"}">${esc(t)}</b>
-          <small style="color:${m.fg}">${m.label}</small></button>`;
-      }).join("") + `</div>`;
-    }
-  }
+  if(state.tab==="resumen") h += vFichaResumen(s);
+  if(state.tab==="clases") h += vFichaClases(s);
+  if(state.tab==="pagos") h += vFichaPagos(s);
+  if(state.tab==="objetivos") h += vFichaObjetivos(s);
+  if(state.tab==="materiales") h += vFichaMateriales(s);
+  if(state.tab==="portal") h += vPortalAlumnoCard(s);
+  return h;
+}
 
-  if(state.tab==="clases"){
-    h += `<div class="formcard"><div class="ftitle">Registrar clase (30 segundos, apenas termina)</div>
-      <div class="frow">
-        <div class="field"><div class="flabel">Fecha</div><input type="date" id="c-date" value="${esc(state.sessionPrefillDate||today())}"></div>
-        <div class="field"><div class="flabel">Tema principal</div><select id="c-topic"><option value="">—</option>
-          ${unitsFor(s).map(t=>`<option>${esc(t)}</option>`).join("")}
-          <option>Nivelación</option><option>Repaso / parciales viejos</option></select></div>
-        <div class="field"><div class="flabel">¿Trajo la tarea?</div><select id="c-tarea">
-          <option value="sd">—</option><option value="hecha">Hecha</option>
-          <option value="intentada">Intentada</option><option value="no">No hecha</option></select></div>
-        <div class="field" style="max-width:130px"><div class="flabel">Duración (min)</div>
-          <input type="number" min="1" id="c-duration" value="60"></div>
-      </div>
-      <div class="field"><div class="flabel">Nota rápida (qué costó, tarea que dejaste)</div>
-        <input id="c-note" placeholder="Ej: se traba en cadena+cociente. Tarea: guía 5, ej. 8-12"></div>
-      <div class="field"><div class="flabel">Objetivo de hoy (opcional)</div>
-        <input id="c-goal" placeholder="Ej: que resuelva sola sistemas 2x2"></div>
-      <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-session">Guardar clase</button></div>`;
-    const cobraPorClase = hasPagos(s) && s.modalidad==="clase";
-    const sorted=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date));
-    h += sorted.length===0 ? `<div class="empty">Todavía no hay clases registradas.</div>`
-      : sorted.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
-        <div class="body"><span style="font-weight:600">${esc(c.topic||"Clase")}</span>
-        <span class="tareatag">${c.duration!=null&&c.duration!==""?Math.round(c.duration)+" min":"60 min (asumido)"}</span>
-        ${c.tarea&&c.tarea!=="sd"?`<span class="tareatag" style="color:${TAREA_META[c.tarea].fg}">tarea: ${TAREA_META[c.tarea].label}</span>`:""}
-        ${c.note?`<div class="note">${esc(c.note)}</div>`:""}
-        ${c.objetivo?`<div class="note goaltag"><span class="icon-inline">${ICON_TARGET}</span> ${esc(c.objetivo)}${c.objetivoResult
-          ? ` <span style="color:${OBJETIVO_META[c.objetivoResult.estado].fg}">· <span class="icon-inline">${OBJETIVO_ICONS[c.objetivoResult.estado]}</span> ${OBJETIVO_META[c.objetivoResult.estado].label}${c.objetivoResult.pct!=null?` (${c.objetivoResult.pct}%)`:""}</span>`
-          : ` <span class="hint">· sin evaluar todavía</span>`}</div>` : ""}</div>
-        ${cobraPorClase?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
-        <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
-  }
+// Fila de tarjetas "de un vistazo" arriba de Resumen (reusa hoyCard, la misma tarjeta del panel
+// "Hoy" del tablero) — próxima clase, deuda, racha de objetivos y avance de temas, cada una con
+// acceso directo a su pestaña.
+function vFichaResumenGlance(s){
+  const next = nextClaseForStudent(s);
+  const deuda = pendienteTotalFor(s);
+  const streak = goalStreak(s);
+  const units = unitsFor(s);
+  const seen = units.filter(t=>["visto","practica","parcial"].includes((s.topics||{})[t])).length;
+  const rel = units.filter(t=>(s.topics||{})[t]!=="noentra").length||1;
+  const avancePct = units.length ? Math.round(seen/rel*100) : null;
+  return `<div class="hoy-grid" style="margin-bottom:16px">
+    ${hoyCard("Próxima clase", next?fmtDate(next.date):"—",
+      next?`<div class="hint">${esc(DIAS_SEMANA[weekdayIdx(next.date)])} ${esc(next.time)}</div>`:`<div class="hint">Sin clases agendadas</div>`,
+      {a:"tab-clases", label:"Ver clases"})}
+    ${hoyCard("Deuda", deuda>0?fmtMoney(deuda):"Al día",
+      deuda>0?`<div class="hint">pendiente de cobro</div>`:`<div class="hint">nada pendiente</div>`,
+      {a:"tab-pagos", label:"Ver pagos"})}
+    ${hoyCard("Racha de objetivos", String(streak),
+      `<div class="hint">objetivo${streak===1?"":"s"} cumplido${streak===1?"":"s"} seguido${streak===1?"":"s"}</div>`,
+      {a:"tab-objetivos", label:"Ver objetivos"})}
+    ${hoyCard("Avance", avancePct!==null?avancePct+"%":"—",
+      avancePct!==null?`<div class="hint">${seen}/${rel} unidades</div>`:`<div class="hint">sin materia elegida</div>`)}
+  </div>`;
+}
 
-  if(state.tab==="simulacros"){
-    h += vSimTimer();
-    h += `<div class="formcard"><div class="ftitle">Registrar simulacro (parcial viejo, cronometrado)</div>
-      <div class="frow">
-        <div class="field"><div class="flabel">Fecha</div><input type="date" id="s-date" value="${today()}"></div>
-        <div class="field"><div class="flabel">Nota</div><input id="s-grade" placeholder="Ej: 5.5 / 10"></div>
-      </div>
-      <div class="field"><div class="flabel">Diagnóstico: errores conceptuales / de cuenta / de tiempo</div>
-        <input id="s-note" placeholder="Ej: 2 conceptuales en límites, 1 de cuenta, le faltó tiempo en el último" value="${esc(state.simPrefillNote||"")}"></div>
-      <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-sim">Guardar simulacro</button></div>`;
-    const sorted=[...s.simulacros].sort((a,b)=>b.date.localeCompare(a.date));
-    h += sorted.length===0 ? `<div class="empty">Sin simulacros. Idealmente el primero va 10–14 días antes del examen.</div>`
-      : sorted.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
-        <div class="body"><span style="font-weight:700;font-family:var(--mono)">${esc(c.grade||"s/nota")}</span>
-        ${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div>
-        <button class="del" data-a="del-sim" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
+/* ============ ficha → Resumen: vistazo rápido, avance por unidades, datos de contacto,
+   informe/contrato y borrar alumno — todo lo que no tiene pestaña propia ============ */
+function vFichaResumen(s){
+  const opt=(v,cur,l)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(l)}</option>`;
+  let h = vFichaResumenGlance(s);
+  const units=unitsFor(s);
+  if(units.length===0){
+    h += `<div class="empty">Este alumno no tiene una materia elegida. Elegila más abajo: la grilla de unidades se arma sola. Las materias y sus unidades se administran desde «Materias».</div>`;
+  } else {
+    h += `<div class="formcard"><div class="ftitle">Avance por unidades</div>
+    <div class="hint" style="margin-bottom:10px">Tocá cada unidad para avanzar el estado: Pendiente → Visto → Práctica → Nivel parcial → No entra. «Nivel parcial» significa que resuelve solo ejercicios de nivel examen.</div>
+    <div class="topicgrid">` + units.map(t=>{
+      const st=(s.topics||{})[t]||"pendiente";
+      const m=TOPIC_META[st];
+      return `<button class="topic" data-a="cycle-topic" data-t="${esc(t)}"
+        style="background:${m.bg};border-color:${m.bd}">
+        <b style="color:${st==="noentra"?"var(--gray2)":"var(--ink)"}">${esc(t)}</b>
+        <small style="color:${m.fg}">${m.label}</small></button>`;
+    }).join("") + `</div></div>`;
   }
+  if(hasPhone(s)) h += vWhatsApp(s);
+  h += `<div class="formcard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <div><div class="ftitle" style="margin-bottom:2px">Informe de progreso</div>
+      <div class="hint">Un resumen prolijo para compartir con el alumno o la familia.</div></div>
+    <button class="chip" data-a="open-informe">Generar informe</button></div>`;
+  h += `<div class="formcard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <div><div class="ftitle" style="margin-bottom:2px">Contrato de servicio</div>
+      <div class="hint">Modelo precargado con los datos de esta ficha, listo para completar y firmar.</div></div>
+    <button class="chip" data-a="open-contrato">Generar contrato</button></div>`;
+  if(state.fichaError) h += `<div class="saveerr">${esc(state.fichaError)}</div>`;
+  h += `<div class="formcard">
+    <div class="frow">
+      <div class="field"><div class="flabel">Nombre</div><input data-f="name" value="${esc(s.name)}"></div>
+      <div class="field"><div class="flabel">Carrera</div><select data-f="career">
+        ${careerOptions(s.career).map(c=>opt(c,s.career,c)).join("")}</select></div></div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Materia</div><select data-f="subjectId">
+        <option value="" ${!s.subjectId?"selected":""}>${s.subjectId?"—":esc(s.subject||"—")}</option>
+        ${state.catalog.subjects.map(m=>`<option value="${m.id}" ${m.id===s.subjectId?"selected":""}>${esc(m.name)}</option>`).join("")}
+      </select></div>
+      <div class="field"><div class="flabel">Cátedra / universidad</div><input data-f="chair" value="${esc(s.chair)}"></div>
+      <div class="field"><div class="flabel">Teléfono (WhatsApp)</div><input data-f="phone" placeholder="Ej: 11 2345-6789" value="${esc(s.phone||"")}"></div></div>
+    <div class="hint" style="margin:-4px 0 8px">Cargalo sin el 0 del área ni el 15 — ej: código de área + número.</div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Estado</div><select data-f="status">
+        ${Object.entries(STATUS_META).map(([k,m])=>opt(k,s.status,m.label)).join("")}</select></div>
+      <div class="field"><div class="flabel">Fecha de examen / parcial</div><input type="date" data-f="examDate" value="${esc(s.examDate)}"></div>
+      <div class="field"><div class="flabel">Empezó clases</div><input type="date" data-f="startDate" value="${esc(s.startDate)}"></div></div>
+    <div class="field"><div class="flabel">Notas del alumno (diagnóstico inicial, agujeros de secundaria, cómo estudia)</div>
+      <textarea data-f="notes">${esc(s.notes)}</textarea></div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--soft)">
+      ${!state.confirmDel
+        ? `<button class="danger" data-a="ask-del">${s.sample?"Eliminar ejemplo":"Eliminar estudiante…"}</button>`
+        : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:13px;color:var(--status-desaprobo-fg)">${s.sample?"Se borra este alumno de ejemplo. ¿Seguro?":"Se borra todo su historial. ¿Seguro?"}</span>
+            <button class="danger" data-a="confirm-del">Sí, eliminar</button>
+            <button class="chip" data-a="cancel-del">Cancelar</button></div>`}
+      ${s.sample?"":`<div class="hint" style="margin-top:8px">Consejo: si dejó o rindió, cambiá el estado en vez de borrarlo — si vuelve (pasa seguido), retomás con todo el historial.</div>`}
+    </div></div>`;
+  return h;
+}
 
-  if(state.tab==="ficha"){
-    const opt=(v,cur,l)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(l)}</option>`;
-    const streak = goalStreak(s);
-    if(streak>0) h += `<div class="formcard" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
-      <span class="icon-inline" style="width:20px;height:20px;color:var(--tarea-intentada-fg)">${ICON_FLAME}</span>
-      <span style="font-size:13.5px"><b>${streak}</b> objetivo${streak===1?"":"s"} de clase cumplido${streak===1?"":"s"} seguido${streak===1?"":"s"}</span>
-    </div>`;
-    h += `<div class="formcard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div><div class="ftitle" style="margin-bottom:2px">Informe de progreso</div>
-        <div class="hint">Un resumen prolijo para compartir con el alumno o la familia.</div></div>
-      <button class="chip" data-a="open-informe">Generar informe</button></div>`;
-    h += `<div class="formcard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-      <div><div class="ftitle" style="margin-bottom:2px">Contrato de servicio</div>
-        <div class="hint">Modelo precargado con los datos de esta ficha, listo para completar y firmar.</div></div>
-      <button class="chip" data-a="open-contrato">Generar contrato</button></div>`;
-    h += vPortalAlumnoCard(s);
-    h += vHorariosCard(s);
-    h += vPuntualesCard(s);
-    h += vSeniaCard(s);
-    if(hasPhone(s)) h += vWhatsApp(s);
-    if(state.fichaError) h += `<div class="saveerr">${esc(state.fichaError)}</div>`;
-    h += `<div class="formcard">
-      <div class="frow">
-        <div class="field"><div class="flabel">Nombre</div><input data-f="name" value="${esc(s.name)}"></div>
-        <div class="field"><div class="flabel">Carrera</div><select data-f="career">
-          ${careerOptions(s.career).map(c=>opt(c,s.career,c)).join("")}</select></div></div>
-      <div class="frow">
-        <div class="field"><div class="flabel">Materia</div><select data-f="subjectId">
-          <option value="" ${!s.subjectId?"selected":""}>${s.subjectId?"—":esc(s.subject||"—")}</option>
-          ${state.catalog.subjects.map(m=>`<option value="${m.id}" ${m.id===s.subjectId?"selected":""}>${esc(m.name)}</option>`).join("")}
-        </select></div>
-        <div class="field"><div class="flabel">Cátedra / universidad</div><input data-f="chair" value="${esc(s.chair)}"></div>
-        <div class="field"><div class="flabel">Teléfono (WhatsApp)</div><input data-f="phone" placeholder="Ej: 11 2345-6789" value="${esc(s.phone||"")}"></div></div>
-      <div class="hint" style="margin:-4px 0 8px">Cargalo sin el 0 del área ni el 15 — ej: código de área + número.</div>
-      <div class="frow">
-        <div class="field"><div class="flabel">Estado</div><select data-f="status">
-          ${Object.entries(STATUS_META).map(([k,m])=>opt(k,s.status,m.label)).join("")}</select></div>
-        <div class="field"><div class="flabel">Fecha de examen / parcial</div><input type="date" data-f="examDate" value="${esc(s.examDate)}"></div>
-        <div class="field"><div class="flabel">Empezó clases</div><input type="date" data-f="startDate" value="${esc(s.startDate)}"></div></div>
-      <div class="field"><div class="flabel">Notas del alumno (diagnóstico inicial, agujeros de secundaria, cómo estudia)</div>
-        <textarea data-f="notes">${esc(s.notes)}</textarea></div>
-      <div class="frow" style="margin-top:4px">
-        <div class="field"><div class="flabel">Tarifa (pesos)</div><input type="number" min="0" data-f="tarifa" placeholder="Sin cargar = sin cobro" value="${esc(s.tarifa||"")}"></div>
-        <div class="field"><div class="flabel">Modalidad de cobro</div><select data-f="modalidad">
-          <option value="" ${!s.modalidad?"selected":""}>—</option>
-          <option value="clase" ${s.modalidad==="clase"?"selected":""}>Por clase</option>
-          <option value="mensual" ${s.modalidad==="mensual"?"selected":""}>Mensual</option></select></div></div>
-      ${hasPagos(s)&&s.modalidad==="clase"?`<div class="hint" style="margin-top:2px">Marcá cada clase como cobrada desde la pestaña «Clases».</div>`:""}
-      ${hasPagos(s)&&s.modalidad==="mensual"?vPagosMensuales(s):""}
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--soft)">
-        ${!state.confirmDel
-          ? `<button class="danger" data-a="ask-del">${s.sample?"Eliminar ejemplo":"Eliminar estudiante…"}</button>`
-          : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <span style="font-size:13px;color:var(--status-desaprobo-fg)">${s.sample?"Se borra este alumno de ejemplo. ¿Seguro?":"Se borra todo su historial. ¿Seguro?"}</span>
-              <button class="danger" data-a="confirm-del">Sí, eliminar</button>
-              <button class="chip" data-a="cancel-del">Cancelar</button></div>`}
-        ${s.sample?"":`<div class="hint" style="margin-top:8px">Consejo: si dejó o rindió, cambiá el estado en vez de borrarlo — si vuelve (pasa seguido), retomás con todo el historial.</div>`}
-      </div></div>`;
-  }
+/* ============ ficha → Clases: registrar/revisar clases dictadas, horarios habituales, clases
+   puntuales y simulacros — todo lo que es "actividad" con el alumno ============ */
+function vFichaClases(s){
+  let h = `<div class="formcard"><div class="ftitle">Registrar clase (30 segundos, apenas termina)</div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Fecha</div><input type="date" id="c-date" value="${esc(state.sessionPrefillDate||today())}"></div>
+      <div class="field"><div class="flabel">Tema principal</div><select id="c-topic"><option value="">—</option>
+        ${unitsFor(s).map(t=>`<option>${esc(t)}</option>`).join("")}
+        <option>Nivelación</option><option>Repaso / parciales viejos</option></select></div>
+      <div class="field"><div class="flabel">¿Trajo la tarea?</div><select id="c-tarea">
+        <option value="sd">—</option><option value="hecha">Hecha</option>
+        <option value="intentada">Intentada</option><option value="no">No hecha</option></select></div>
+      <div class="field" style="max-width:130px"><div class="flabel">Duración (min)</div>
+        <input type="number" min="1" id="c-duration" value="60"></div>
+    </div>
+    <div class="field"><div class="flabel">Nota rápida (qué costó, tarea que dejaste)</div>
+      <input id="c-note" placeholder="Ej: se traba en cadena+cociente. Tarea: guía 5, ej. 8-12"></div>
+    <div class="field"><div class="flabel">Objetivo de hoy (opcional)</div>
+      <input id="c-goal" placeholder="Ej: que resuelva sola sistemas 2x2"></div>
+    <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-session">Guardar clase</button></div>`;
+  const cobraPorClase = hasPagos(s) && s.modalidad==="clase";
+  const sorted=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date));
+  h += sorted.length===0 ? `<div class="empty">Todavía no hay clases registradas.</div>`
+    : sorted.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
+      <div class="body"><span style="font-weight:600">${esc(c.topic||"Clase")}</span>
+      <span class="tareatag">${c.duration!=null&&c.duration!==""?Math.round(c.duration)+" min":"60 min (asumido)"}</span>
+      ${c.tarea&&c.tarea!=="sd"?`<span class="tareatag" style="color:${TAREA_META[c.tarea].fg}">tarea: ${TAREA_META[c.tarea].label}</span>`:""}
+      ${c.note?`<div class="note">${esc(c.note)}</div>`:""}
+      ${c.objetivo?`<div class="note goaltag"><span class="icon-inline">${ICON_TARGET}</span> ${esc(c.objetivo)}${c.objetivoResult
+        ? ` <span style="color:${OBJETIVO_META[c.objetivoResult.estado].fg}">· <span class="icon-inline">${OBJETIVO_ICONS[c.objetivoResult.estado]}</span> ${OBJETIVO_META[c.objetivoResult.estado].label}${c.objetivoResult.pct!=null?` (${c.objetivoResult.pct}%)`:""}</span>`
+        : ` <span class="hint">· sin evaluar todavía</span>`}</div>` : ""}</div>
+      ${cobraPorClase?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
+      <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
+  h += vHorariosCard(s);
+  h += vPuntualesCard(s);
+  h += vSimTimer();
+  h += `<div class="formcard"><div class="ftitle">Registrar simulacro (parcial viejo, cronometrado)</div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Fecha</div><input type="date" id="s-date" value="${today()}"></div>
+      <div class="field"><div class="flabel">Nota</div><input id="s-grade" placeholder="Ej: 5.5 / 10"></div>
+    </div>
+    <div class="field"><div class="flabel">Diagnóstico: errores conceptuales / de cuenta / de tiempo</div>
+      <input id="s-note" placeholder="Ej: 2 conceptuales en límites, 1 de cuenta, le faltó tiempo en el último" value="${esc(state.simPrefillNote||"")}"></div>
+    <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-sim">Guardar simulacro</button></div>`;
+  const sortedSim=[...s.simulacros].sort((a,b)=>b.date.localeCompare(a.date));
+  h += sortedSim.length===0 ? `<div class="empty">Sin simulacros. Idealmente el primero va 10–14 días antes del examen.</div>`
+    : sortedSim.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
+      <div class="body"><span style="font-weight:700;font-family:var(--mono)">${esc(c.grade||"s/nota")}</span>
+      ${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div>
+      <button class="del" data-a="del-sim" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
+  return h;
+}
+
+/* ============ ficha → Pagos: tarifa/modalidad, pagos mensuales y seña ============ */
+function vFichaPagos(s){
+  let h = `<div class="formcard">
+    <div class="frow">
+      <div class="field"><div class="flabel">Tarifa (pesos)</div><input type="number" min="0" data-f="tarifa" placeholder="Sin cargar = sin cobro" value="${esc(s.tarifa||"")}"></div>
+      <div class="field"><div class="flabel">Modalidad de cobro</div><select data-f="modalidad">
+        <option value="" ${!s.modalidad?"selected":""}>—</option>
+        <option value="clase" ${s.modalidad==="clase"?"selected":""}>Por clase</option>
+        <option value="mensual" ${s.modalidad==="mensual"?"selected":""}>Mensual</option></select></div></div>
+    ${hasPagos(s)&&s.modalidad==="clase"?`<div class="hint" style="margin-top:2px">Marcá cada clase como cobrada desde la pestaña «Clases».</div>`:""}
+    ${hasPagos(s)&&s.modalidad==="mensual"?vPagosMensuales(s):""}
+    ${!hasPagos(s)?`<div class="hint" style="margin-top:8px">Cargá una tarifa y elegí una modalidad para empezar a llevar el cobro de este alumno.</div>`:""}
+  </div>`;
+  h += vSeniaCard(s);
+  return h;
+}
+
+/* ============ ficha → Objetivos: racha + historial de objetivos de clase con su resultado ============ */
+function vFichaObjetivos(s){
+  const streak = goalStreak(s);
+  let h = "";
+  if(streak>0) h += `<div class="formcard" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
+    <span class="icon-inline" style="width:20px;height:20px;color:var(--tarea-intentada-fg)">${ICON_FLAME}</span>
+    <span style="font-size:13.5px"><b>${streak}</b> objetivo${streak===1?"":"s"} de clase cumplido${streak===1?"":"s"} seguido${streak===1?"":"s"}</span>
+  </div>`;
+  const withGoal=[...s.sessions].filter(c=>c.objetivo).sort((a,b)=>b.date.localeCompare(a.date));
+  h += `<div class="formcard"><div class="ftitle">Objetivos de clase</div>`;
+  h += withGoal.length===0
+    ? `<div class="empty">Todavía no cargaste ningún objetivo — se agregan al registrar una clase, en la pestaña «Clases».</div>`
+    : withGoal.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
+      <div class="body"><span class="note goaltag" style="margin:0"><span class="icon-inline">${ICON_TARGET}</span> ${esc(c.objetivo)}</span>
+      ${c.objetivoResult
+        ? `<div class="note" style="color:${OBJETIVO_META[c.objetivoResult.estado].fg}"><span class="icon-inline">${OBJETIVO_ICONS[c.objetivoResult.estado]}</span> ${OBJETIVO_META[c.objetivoResult.estado].label}${c.objetivoResult.pct!=null?` (${c.objetivoResult.pct}%)`:""}</div>`
+        : `<div class="hint">Sin evaluar todavía — se pregunta solo al abrir la ficha.</div>`}</div></div>`).join("");
+  h += `</div>`;
+  return h;
+}
+
+/* ============ ficha → Materiales: lo que este alumno ve en su portal (si tiene uno activo),
+   solo lectura — para subir/compartir/borrar hay que ir a Materias ============ */
+function vFichaMateriales(s){
+  if(!s.subjectId) return `<div class="empty">Este alumno no tiene una materia elegida — elegila desde la pestaña «Resumen» para ver acá sus materiales.</div>`;
+  const list = materialesIndexFor(s.subjectId).filter(f=>f.compartido);
+  let h = `<div class="formcard"><div class="ftitle" style="display:flex;align-items:center;gap:7px">${subjectDot(s.subjectId)}Materiales compartidos de ${esc(s.subject||"la materia")}</div>
+    <div class="hint" style="margin-bottom:10px">Lo que este alumno ve en su portal, si tiene uno activo. Para subir, compartir o borrar materiales, andá a Materias.</div>`;
+  h += list.length===0
+    ? emptyState(ICON_BOOK,"Sin materiales compartidos","Compartí archivos de esta materia desde Materias para que aparezcan acá.",
+        `<button class="btn btn-ghost" data-a="goto-subject-materials" data-id="${s.subjectId}">Ir a Materias</button>`)
+    : list.map(f=>`<div class="log" style="align-items:center">
+        <div class="body">${esc(materialDisplayName(f.name))}<div class="note">${fmtBytes(f.bytes)}</div></div>
+      </div>`).join("") + `<button class="chip" style="margin-top:8px" data-a="goto-subject-materials" data-id="${s.subjectId}">Ir a Materias</button>`;
+  h += `</div>`;
   return h;
 }
 
@@ -874,7 +979,7 @@ function vAgendaSemana(){
   const events = markOverlaps(agendaWeekEvents(weekStart));
   if(events.length===0){
     h += emptyState(ICON_CALENDAR, "Sin clases agendadas esta semana",
-      "Cargá horarios habituales o clases puntuales desde la ficha de cada alumno (pestaña «Ficha»).",
+      "Cargá horarios habituales o clases puntuales desde la ficha de cada alumno (pestaña «Clases»).",
       `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`);
     return h;
   }
@@ -1085,7 +1190,7 @@ function vPagosResumen(){
   const seniaRes = pagosSeniaResumen(mk);
   if(rows.length===0 && seniaRes.rows.length===0)
     return h + emptyState(ICON_WALLET, "Todavía no hay nada para cobrar acá",
-      "Cargá una tarifa o activá la seña desde la pestaña «Ficha» de cada alumno para que aparezcan los cobros de este mes.",
+      "Cargá una tarifa o activá la seña desde la pestaña «Pagos» de cada alumno para que aparezcan los cobros de este mes.",
       `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`);
 
   if(rows.length){

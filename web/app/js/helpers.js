@@ -62,6 +62,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               newPackName:"", newPackSubjects:[], newPackError:"",
               view:"tablero", selId:null, filter:"activo", tab:"temas",
               listSearch:"", listSubject:"todas", listCareer:"todas", listSem:"todos",
+              listDeuda:"todas", listSort:"examen",
               simTimer:null, simTimerLastMin:90, simPrefillNote:"",
               statsSubjectId:null,
               showNew:false, newStudentError:"", confirmDel:false, catConfirmDelId:null, trashPurgeConfirmKey:null, fichaError:"", saveErr:false,
@@ -810,7 +811,7 @@ function openSearchResult(item){
   if(!item) return;
   state.searchOpen=false;
   if(item.type==="student"){
-    state.view="detalle"; state.selId=item.id; state.tab="temas"; state.confirmDel=false;
+    state.view="detalle"; state.selId=item.id; state.tab="resumen"; state.confirmDel=false;
     state.simTimer=null; state.simPrefillNote=""; state.fichaError=""; state.sessionPrefillDate="";
   }else{
     state.view="catalog"; state.selId=null; state.editSubjectId=item.id; state.editPackId=null;

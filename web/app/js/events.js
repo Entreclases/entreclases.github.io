@@ -400,7 +400,7 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="auth-logout"){ setSes(null); state.view="tablero"; render(); return; }
   else if(a==="open"){
-    state.view="detalle"; state.selId=el.dataset.id; state.tab="temas"; state.confirmDel=false;
+    state.view="detalle"; state.selId=el.dataset.id; state.tab="resumen"; state.confirmDel=false;
     state.simTimer=null; state.simPrefillNote=""; state.fichaError=""; state.sessionPrefillDate="";
   }
   else if(a==="back"){ state.view="lista"; state.selId=null; state.simTimer=null; state.simPrefillNote=""; }
@@ -408,7 +408,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="load-sample"){
     const st=sampleStudent();
     state.students.push(st); save();
-    state.view="detalle"; state.selId=st.id; state.tab="temas";
+    state.view="detalle"; state.selId=st.id; state.tab="resumen";
   }
   else if(a==="dismiss-tips"){ dismissTips(); }
   // FAB de acciones rápidas (paso 77): siempre visible, con las 3 acciones más repetitivas.
@@ -423,12 +423,12 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="fab-new-pago"){
     state.fabOpen=false;
-    if(sel()){ state.tab="ficha"; state.confirmDel=false; state.fichaError=""; }
-    else state.fabPick={target:"ficha"};
+    if(sel()){ state.tab="pagos"; state.confirmDel=false; state.fichaError=""; }
+    else state.fabPick={target:"pagos"};
   }
   else if(a==="fab-pick-close"){ state.fabPick=null; }
   else if(a==="fab-pick-student"){
-    const target=(state.fabPick&&state.fabPick.target)||"temas";
+    const target=(state.fabPick&&state.fabPick.target)||"resumen";
     state.fabPick=null;
     state.view="detalle"; state.selId=el.dataset.id; state.tab=target; state.confirmDel=false; state.fichaError="";
     if(target==="clases") state.sessionPrefillDate=today();
@@ -464,7 +464,7 @@ document.addEventListener("click", (e)=>{
         state.newStudentError=`Ya tenés a ${name} en todas las materias de ese pack.`; render(); return;
       }
       save();
-      state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=created[0].id; state.tab="temas";
+      state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=created[0].id; state.tab="resumen";
       if(skipped.length) alert(`Se creó la ficha en ${created.length} materia${created.length===1?"":"s"} del pack. Se salteó ${skipped.join(", ")} porque ya tenías una ficha ahí.`);
       toast(created.length===1?"Estudiante creado":`${created.length} fichas creadas`); return;
     }else{
@@ -472,13 +472,17 @@ document.addEventListener("click", (e)=>{
       if(dup){ state.newStudentError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
       const st=makeStudent(subjById(subjectVal));
       state.students.push(st); save();
-      state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=st.id; state.tab="temas";
+      state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=st.id; state.tab="resumen";
       toast("Estudiante creado"); return;
     }
   }
   else if(a.startsWith("tab-")){
     state.tab=a.slice(4); state.confirmDel=false; state.fichaError=""; state.sessionPrefillDate="";
-    if(state.tab==="ficha" && !state.portalLoaded){ state.portalError=""; loadPortal(); }
+    if(state.tab==="portal" && !state.portalLoaded){ state.portalError=""; loadPortal(); }
+  }
+  else if(a==="goto-subject-materials"){
+    state.view="catalog"; state.selId=null; state.editSubjectId=el.dataset.id; state.editPackId=null; state.catConfirmDelId=null;
+    loadMateriales(el.dataset.id); return;
   }
   else if(a==="exam-result"){
     const id=el.dataset.id, result=el.dataset.r;
@@ -507,7 +511,7 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="open-contrato" && s){ state.view="contrato"; }
-  else if(a==="close-contrato"){ state.view="detalle"; state.tab="ficha"; }
+  else if(a==="close-contrato"){ state.view="detalle"; state.tab="resumen"; }
   else if(a==="contrato-print"){ window.print(); return; }
   else if(a==="contrato-copy" && s){
     copyToClipboard(buildContratoText(s))
@@ -518,6 +522,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="filter"){ state.filter=el.dataset.f; }
   else if(a==="clear-filters"){
     state.filter="activo"; state.listSearch=""; state.listSubject="todas"; state.listCareer="todas"; state.listSem="todos";
+    state.listDeuda="todas"; state.listSort="examen";
   }
   else if(a==="cycle-topic" && s){
     const t=el.dataset.t, cur=s.topics[t]||"pendiente";
@@ -908,6 +913,8 @@ document.addEventListener("change",(e)=>{
     if(lf.dataset.lf==="subject") state.listSubject=lf.value;
     else if(lf.dataset.lf==="career") state.listCareer=lf.value;
     else if(lf.dataset.lf==="sem") state.listSem=lf.value;
+    else if(lf.dataset.lf==="deuda") state.listDeuda=lf.value;
+    else if(lf.dataset.lf==="sort") state.listSort=lf.value;
     render(); return;
   }
   const el=e.target.closest("[data-f]"); if(!el) return;
