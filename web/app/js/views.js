@@ -835,18 +835,25 @@ function vGoalClosure(s){
     </div>`;
   }
   const c = pendingGoalClosure(s); if(!c) return "";
-  return `<div class="goalcard">
-    <div class="goalcard-q">¿Se cumplió «${esc(c.objetivo)}»?</div>
-    <div class="hint" style="margin-bottom:8px">Clase del ${esc(fmtDate(c.date))}</div>
+  const body = escalaObjetivoFor()==="porcentaje" ? `
+    <div class="goalcard-slider">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="hint">Arrastrá para elegir el %</span>
+        <b id="goal-pct-label-${c.id}" style="font-family:var(--mono)">50%</b>
+      </div>
+      <input type="range" min="0" max="100" step="5" value="50" id="goal-pct-${c.id}"
+        oninput="document.getElementById('goal-pct-label-${c.id}').textContent=this.value+'%'">
+    </div>
+    <button class="primary" style="margin-top:10px;margin-left:0" data-a="goal-resultado-pct" data-sid="${s.id}" data-id="${c.id}">Guardar</button>` : `
     <div class="goalcard-btns">
       <button class="goalbtn si" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="si"><span class="goalbtn-icon">${OBJETIVO_ICONS.si}</span> Sí</button>
       <button class="goalbtn medias" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="medias"><span class="goalbtn-icon">${OBJETIVO_ICONS.medias}</span> A medias</button>
       <button class="goalbtn no" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="no"><span class="goalbtn-icon">${OBJETIVO_ICONS.no}</span> No</button>
-    </div>
-    <div class="goalcard-slider">
-      <span class="hint">Afiná el % si querés (opcional)</span>
-      <input type="range" min="0" max="100" step="5" value="50" id="goal-pct-${c.id}">
-    </div>
+    </div>`;
+  return `<div class="goalcard">
+    <div class="goalcard-q">¿Se cumplió «${esc(c.objetivo)}»?</div>
+    <div class="hint" style="margin-bottom:8px">Clase del ${esc(fmtDate(c.date))}</div>
+    ${body}
   </div>`;
 }
 
@@ -1820,6 +1827,20 @@ function vRecordatoriosCard(){
   }
   return h + `</div>`;
 }
+// Escala para el cierre de objetivo de clase (paso 91): Simple (Sí/A medias/No, default) o
+// Porcentaje (un solo número 0-100). El resultado siempre se guarda igual (estado+pct, ver
+// escalaObjetivoFor en helpers.js), así que cambiar de escala no rompe el historial ni las
+// estadísticas — sólo cambia qué formulario se muestra al cerrar la próxima clase.
+function vEscalaObjetivoCard(){
+  const escala = escalaObjetivoFor();
+  return `<div class="formcard"><div class="ftitle">Escala de valoración del objetivo de clase</div>
+    <div class="hint" style="margin-bottom:10px">Cómo se responde «¿Se cumplió el objetivo?» al cerrar una clase.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="chip ${escala==="simple"?"on":""}" data-a="set-escala-objetivo" data-f="simple">Simple (Sí / A medias / No)</button>
+      <button class="chip ${escala==="porcentaje"?"on":""}" data-a="set-escala-objetivo" data-f="porcentaje">Porcentaje</button>
+    </div>
+  </div>`;
+}
 function vCuenta(){
   const ses=getSes();
   const pol=cancelPolicyFor();
@@ -1834,6 +1855,7 @@ function vCuenta(){
     </div>
   </div>
   ${vRecordatoriosCard()}
+  ${vEscalaObjetivoCard()}
   <div class="formcard"><div class="ftitle" style="display:flex;align-items:center;gap:7px">Política de cancelación${helpTip("cancelPolicy")}</div>
     <div class="hint" style="margin-bottom:10px">Se aplica al cancelar una clase puntual con seña ya cobrada (ver la ficha de cada alumno). El texto queda guardado para reutilizarlo donde haga falta.</div>
     <div class="frow">

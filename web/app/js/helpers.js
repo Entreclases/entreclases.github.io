@@ -305,6 +305,20 @@ function pendingGoalClosure(s){
   if(withGoal.length===0) return null;
   return [...withGoal].sort((a,b)=>a.date.localeCompare(b.date))[0];
 }
+// Escala con la que se cierra el objetivo de clase (paso 91, configurable en Cuenta): "simple"
+// (Sí/A medias/No, default) o "porcentaje" (un solo número 0-100). Cualquiera sea la elegida al
+// momento de cerrar, el resultado se guarda siempre igual — {estado, pct} — así que todo lo que
+// ya lee objetivoResult (streak, stats, informes, portal) funciona igual con datos históricos de
+// ambos formatos, sin migrar nada.
+function escalaObjetivoFor(){ return state.catalog.escalaObjetivo || "simple"; }
+// Deriva un estado categórico (si/medias/no) desde el % continuo de la escala "Porcentaje", con
+// los mismos umbrales que separarían a un valor de cuál de los tres anclas de la escala Simple
+// (0/50/100) tiene más cerca: <25 no, 25-74 medias, >=75 sí.
+function estadoFromPct(pct){
+  if(pct>=75) return "si";
+  if(pct>=25) return "medias";
+  return "no";
+}
 // racha de objetivos cumplidos ("si") seguidos, contando desde el más reciente evaluado hacia atrás;
 // "medias" y "no" cortan la racha.
 function goalStreak(s){

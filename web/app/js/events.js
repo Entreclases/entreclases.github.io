@@ -578,8 +578,21 @@ document.addEventListener("click", (e)=>{
   else if(a==="goal-resultado"){
     const sid=el.dataset.sid, st=state.students.find(x=>x.id===sid); if(!st) return;
     const cid=el.dataset.id, r=el.dataset.r;
+    const pct = OBJETIVO_META[r].pctDefault;
+    update(sid,{sessions:st.sessions.map(x=>x.id===cid?{...x,objetivoResult:{estado:r,pct}}:x)});
+    state.goalCelebrate={sid,estado:r};
+    render();
+    setTimeout(()=>{
+      if(state.goalCelebrate && state.goalCelebrate.sid===sid){ state.goalCelebrate=null; render(); }
+    }, 1600);
+    return;
+  }
+  else if(a==="goal-resultado-pct"){
+    const sid=el.dataset.sid, st=state.students.find(x=>x.id===sid); if(!st) return;
+    const cid=el.dataset.id;
     const sliderEl=document.getElementById("goal-pct-"+cid);
-    const pct = sliderEl ? parseInt(sliderEl.value,10) : OBJETIVO_META[r].pctDefault;
+    const pct = sliderEl ? parseInt(sliderEl.value,10) : 50;
+    const r = estadoFromPct(pct);
     update(sid,{sessions:st.sessions.map(x=>x.id===cid?{...x,objetivoResult:{estado:r,pct}}:x)});
     state.goalCelebrate={sid,estado:r};
     render();
@@ -666,6 +679,7 @@ document.addEventListener("click", (e)=>{
     state.catalog.recordatorios = {...recordatoriosFor(), activo: el.dataset.f==="si"};
     touchCatalog(); return;
   }
+  else if(a==="set-escala-objetivo"){ state.catalog.escalaObjetivo=el.dataset.f; touchCatalog(); return; }
   else if(a==="toggle-notif-os"){
     const rec = recordatoriosFor();
     if(rec.notificacionesOS){
