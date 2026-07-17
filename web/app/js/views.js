@@ -30,6 +30,7 @@ const ICON_ACCOUNT=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_SHIELD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>`;
 const ICON_SEARCH=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>`;
 const ICON_CHEVRON=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
+const ICON_LOGOUT=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>`;
 /* ============ iconografía unificada (paso 73): mismo set de línea (viewBox 24, stroke-width 2,
    stroke-linecap/linejoin round) para todo lo que antes era un emoji suelto — WhatsApp, objetivo
    de clase, racha, superposición de horario y los tres resultados de objetivo (sí/a medias/no).
@@ -64,6 +65,9 @@ function themeNavBtn(){
   return `<button class="navitem" data-a="set-theme" data-f="${next}"
     title="Tema: ${THEME_NAV_LABELS[cur]} — tocá para cambiar">${THEME_NAV_ICONS[cur]}<span class="navitem-label">Tema</span></button>`;
 }
+function logoutNavBtn(){
+  return `<button class="navitem" data-a="nav-logout" title="Cerrar sesión">${ICON_LOGOUT}<span class="navitem-label">Salir</span></button>`;
+}
 function navShell(isAdmin){
   const items = isAdmin ? [...NAV_ITEMS,{view:"panel",action:"nav-panel",label:"Panel",icon:ICON_SHIELD}] : NAV_ITEMS;
   const isOn = (it) => state.view===it.view || (it.altViews||[]).includes(state.view);
@@ -71,10 +75,10 @@ function navShell(isAdmin){
     `<button class="navitem ${isOn(it)?"on":""}" data-a="${it.action}">${it.icon}<span class="navitem-label">${esc(it.label)}</span></button>`
   ).join("");
   return `<nav class="appnav no-print">
-    <div class="appnav-brand"><span class="logo-mark">${ICON_CHECK}</span>Cuaderno</div>
+    <button class="appnav-brand" data-a="nav-tablero" aria-label="Ir al tablero"><span class="logo-mark">${ICON_CHECK}</span>Cuaderno</button>
     <button class="navitem navitem-search" data-a="open-search" title="Buscar (atajo: /)">${ICON_SEARCH}<span class="navitem-label">Buscar</span></button>
     <div class="appnav-list">${itemsHtml}</div>
-    <div class="appnav-foot">${syncChip()}${themeNavBtn()}</div>
+    <div class="appnav-foot">${syncChip()}${themeNavBtn()}${logoutNavBtn()}</div>
   </nav>`;
 }
 

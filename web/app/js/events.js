@@ -85,6 +85,10 @@ document.addEventListener("click", (e)=>{
   else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; state.editPackId=null; state.catConfirmDelId=null; }
   else if(a==="nav-pagos"){ state.view="pagos"; state.selId=null; if(!state.pagosMonth) state.pagosMonth=currentMonthKey(); }
   else if(a==="nav-agenda"){ state.view="agenda"; state.selId=null; }
+  else if(a==="nav-logout"){
+    if(!confirm("¿Cerrar sesión?")) return;
+    setSes(null); state.view="tablero"; render(); return;
+  }
   else if(a==="agenda-view-semana"){ state.agendaViewMode="semana"; }
   else if(a==="agenda-view-mes"){ state.agendaViewMode="mes"; }
   else if(a==="agenda-prev"){ state.agendaWeekOffset=(state.agendaWeekOffset||0)-1; }

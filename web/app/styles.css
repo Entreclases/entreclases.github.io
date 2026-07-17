@@ -159,7 +159,7 @@
     align-items:stretch;gap:2px;padding:5px 6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
   .appnav-brand{display:none}
   .appnav-list{display:flex;gap:2px;flex:1}
-  .appnav-foot{display:flex;align-items:center;flex-shrink:0}
+  .appnav-foot{display:flex;align-items:center;flex-shrink:0;gap:4px}
   .navitem{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
     flex:1;min-width:58px;padding:6px 4px;border-radius:10px;border:none;background:none;
     color:var(--muted);font-size:9.5px;font-weight:600;font-family:inherit;cursor:pointer;
@@ -171,9 +171,12 @@
     .appnav{top:0;left:0;bottom:0;right:auto;width:220px;flex-direction:column;
       border-top:none;border-right:1px solid var(--line);padding:22px 14px;overflow-x:visible}
     .appnav-brand{display:flex;align-items:center;gap:9px;margin-bottom:20px;padding:0 8px;
-      font-family:var(--display);font-weight:700;font-size:14.5px;color:var(--ink)}
+      font-family:var(--display);font-weight:700;font-size:14.5px;color:var(--ink);
+      border:none;background:none;text-align:left;cursor:pointer;width:100%}
     .appnav-list{flex-direction:column;flex:1;gap:2px}
-    .appnav-foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
+    .appnav-foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--line);
+      flex-direction:column;align-items:stretch;gap:2px}
+    .appnav-foot .statuschip{padding:2px 12px 8px}
     .navitem{flex-direction:row;justify-content:flex-start;gap:11px;padding:10px 12px;
       font-size:13.5px;flex:none;width:100%}
     .navitem svg{width:18px;height:18px}
