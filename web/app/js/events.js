@@ -706,14 +706,37 @@ document.addEventListener("keydown",(e)=>{
   if(btn) btn.click();
 });
 
-// Búsqueda global (paso 72): atajo "/" para abrir desde cualquier lado (salvo si ya se está
-// escribiendo en otro campo) y navegación por teclado dentro del overlay una vez abierto.
+// Trampa de foco (paso 75): mientras haya un diálogo abierto (overlay .modal/.search-modal),
+// Tab/Shift+Tab quedan dando vueltas dentro de él en vez de escaparse hacia la página de atrás.
+function trapFocus(e){
+  const overlay = document.querySelector(".overlay");
+  if(!overlay) return;
+  const focusables = [...overlay.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+    .filter(el=>!el.disabled && el.offsetParent!==null);
+  if(!focusables.length) return;
+  const first=focusables[0], last=focusables[focusables.length-1];
+  if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+}
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="Tab" && (state.searchOpen || state.showNew)) trapFocus(e);
+});
+
+// Atajos de teclado en escritorio (paso 75): "/" busca, "n" nuevo alumno, "c" nueva clase
+// (dentro de la ficha de un alumno, va a la pestaña "Clases"), Esc cierra diálogos/popovers.
+// Listados en el centro de ayuda (ver vCentroAyuda en views.js). Ninguno dispara si ya se está
+// escribiendo en un campo, para no pisar lo que el profesor esté tipeando.
 document.addEventListener("keydown",(e)=>{
   const typing = /^(input|textarea|select)$/i.test(e.target.tagName);
   if(!state.searchOpen && e.key==="/" && !typing && getSes() && !state.recovery){
     e.preventDefault(); state.searchOpen=true; state.searchQuery=""; state.searchSel=0; render(); return;
   }
+  if(!state.searchOpen && !state.showNew && !typing && getSes() && !state.recovery && !e.ctrlKey && !e.metaKey && !e.altKey){
+    if(e.key==="n"){ e.preventDefault(); state.showNew=true; state.newStudentError=""; render(); return; }
+    if(e.key==="c" && state.view==="detalle" && sel()){ e.preventDefault(); state.tab="clases"; render(); return; }
+  }
   if(!state.searchOpen){
+    if(e.key==="Escape" && state.showNew){ state.showNew=false; state.newStudentError=""; render(); return; }
     if(e.key==="Escape" && state.helpOpen){ state.helpOpen=null; render(); }
     return;
   }

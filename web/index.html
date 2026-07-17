@@ -102,6 +102,8 @@
     --sans:'Inter',-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
     --display:'Poppins',var(--sans);
     --mono:ui-monospace,"Cascadia Mono",Consolas,"Roboto Mono",monospace;
+    /* accesibilidad: #fff sobre --accent no llega a 4.5:1 en ningún tema (paso 75) */
+    --on-accent:#062824;
   }
   /* modo automático: sigue prefers-color-scheme, salvo que haya una elección explícita
      (clase theme-light/theme-dark en <html>, puesta por cycleTheme() de arriba) */
@@ -140,6 +142,8 @@
   h1,h2,h3{font-family:var(--display)}
   a{text-decoration:none;color:inherit}
   ul{list-style:none}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
 
   /* header */
@@ -166,7 +170,7 @@
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
     border-radius:11px;padding:11px 20px;font-weight:600;font-size:14.5px;cursor:pointer;
     border:1px solid transparent;white-space:nowrap}
-  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:var(--on-accent);
     box-shadow:0 8px 20px -6px rgba(20,184,166,.55)}
   .btn-primary:hover{box-shadow:0 10px 24px -6px rgba(20,184,166,.65)}
   .btn-ghost{color:var(--ink);font-weight:600}

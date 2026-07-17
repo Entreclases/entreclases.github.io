@@ -3,12 +3,12 @@
 const semDot = (v,size,btn) => {
   const m=SEM_META[v||"sd"];
   const dot=`<span class="sem" title="${esc(m.label)}" style="width:${size}px;height:${size}px;background:${m.color}"></span>`;
-  return btn ? `<button class="sembtn" data-a="cycle-sem" title="${esc(m.label)} — tocá para cambiar">${dot}</button>` : dot;
+  return btn ? `<button class="sembtn" data-a="cycle-sem" title="${esc(m.label)} — tocá para cambiar" aria-label="Semáforo: ${esc(m.label)}. Tocá para cambiar de estado">${dot}</button>` : dot;
 };
 const pill = (st) => { const m=STATUS_META[st];
   return `<span class="pill" style="color:${m.fg};background:${m.bg}">${m.label}</span>`; };
 const tabbtn = (a,on,label) => `<button class="tabbtn ${on?"on":""}" data-a="${a}">${label}</button>`;
-const examplePill = (s) => s.sample ? `<span class="pill" style="color:var(--blue);background:var(--bluebg)">Ejemplo</span>` : "";
+const examplePill = (s) => s.sample ? `<span class="pill" style="color:var(--status-aprobo-fg);background:var(--bluebg)">Ejemplo</span>` : "";
 
 /* ============ título de sección (eyebrow + h2 + acción principal opcional), reusado en cada
    vista de la app para dar jerarquía visual consistente ============ */
@@ -166,7 +166,7 @@ function vTips(){
         </button>`).join("")}
       </div>
     </div>
-    <button class="del" style="font-size:20px" data-a="dismiss-tips" title="Descartar">×</button>
+    <button class="del" style="font-size:20px" data-a="dismiss-tips" title="Descartar" aria-label="Descartar">×</button>
   </div>`;
 }
 function vSimTimer(){
@@ -188,7 +188,7 @@ function vSimTimer(){
     <div class="ftitle">Simulacro cronometrado</div>
     <div style="font-family:var(--mono);font-size:56px;font-weight:700;margin:10px 0;color:${done?"var(--red)":"var(--ink)"}">${mm}:${ss}</div>
     ${done
-      ? `<div style="color:var(--red);font-weight:600;margin-bottom:10px">¡Tiempo cumplido!</div>`
+      ? `<div style="color:var(--status-desaprobo-fg);font-weight:600;margin-bottom:10px">¡Tiempo cumplido!</div>`
       : `<div class="hint" style="margin-bottom:10px">${t.paused?"En pausa":"Corriendo…"}</div>`}
     <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
       ${!done?`<button class="chip" data-a="sim-timer-toggle">${t.paused?"Reanudar":"Pausar"}</button>`:""}
@@ -202,7 +202,7 @@ function vBackupReminder(){
     <div style="font-size:13px;color:var(--muted)">Hace más de ${BACKUP_REMINDER_DAYS} días que no descargás una copia (.json) del cuaderno — es tu respaldo aparte de la sincronización.</div>
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
       <button class="chip" data-a="export">Descargar copia ahora</button>
-      <button class="del" style="font-size:20px" data-a="dismiss-backup-reminder" title="Descartar">×</button>
+      <button class="del" style="font-size:20px" data-a="dismiss-backup-reminder" title="Descartar" aria-label="Descartar">×</button>
     </div>
   </div>`;
 }
@@ -537,7 +537,7 @@ function vDetalle(){
           ? ` <span style="color:${OBJETIVO_META[c.objetivoResult.estado].fg}">· <span class="icon-inline">${OBJETIVO_ICONS[c.objetivoResult.estado]}</span> ${OBJETIVO_META[c.objetivoResult.estado].label}${c.objetivoResult.pct!=null?` (${c.objetivoResult.pct}%)`:""}</span>`
           : ` <span class="hint">· sin evaluar todavía</span>`}</div>` : ""}</div>
         ${cobraPorClase?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
-        <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar">×</button></div>`).join("");
+        <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
   }
 
   if(state.tab==="simulacros"){
@@ -555,14 +555,14 @@ function vDetalle(){
       : sorted.map(c=>`<div class="log"><div class="d">${fmtDate(c.date)}</div>
         <div class="body"><span style="font-weight:700;font-family:var(--mono)">${esc(c.grade||"s/nota")}</span>
         ${c.note?`<div class="note">${esc(c.note)}</div>`:""}</div>
-        <button class="del" data-a="del-sim" data-id="${c.id}" title="Borrar">×</button></div>`).join("");
+        <button class="del" data-a="del-sim" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
   }
 
   if(state.tab==="ficha"){
     const opt=(v,cur,l)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(l)}</option>`;
     const streak = goalStreak(s);
     if(streak>0) h += `<div class="formcard" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
-      <span class="icon-inline" style="width:20px;height:20px;color:var(--amber)">${ICON_FLAME}</span>
+      <span class="icon-inline" style="width:20px;height:20px;color:var(--tarea-intentada-fg)">${ICON_FLAME}</span>
       <span style="font-size:13.5px"><b>${streak}</b> objetivo${streak===1?"":"s"} de clase cumplido${streak===1?"":"s"} seguido${streak===1?"":"s"}</span>
     </div>`;
     h += `<div class="formcard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -611,7 +611,7 @@ function vDetalle(){
         ${!state.confirmDel
           ? `<button class="danger" data-a="ask-del">${s.sample?"Eliminar ejemplo":"Eliminar estudiante…"}</button>`
           : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <span style="font-size:13px;color:var(--red)">${s.sample?"Se borra este alumno de ejemplo. ¿Seguro?":"Se borra todo su historial. ¿Seguro?"}</span>
+              <span style="font-size:13px;color:var(--status-desaprobo-fg)">${s.sample?"Se borra este alumno de ejemplo. ¿Seguro?":"Se borra todo su historial. ¿Seguro?"}</span>
               <button class="danger" data-a="confirm-del">Sí, eliminar</button>
               <button class="chip" data-a="cancel-del">Cancelar</button></div>`}
         ${s.sample?"":`<div class="hint" style="margin-top:8px">Consejo: si dejó o rindió, cambiá el estado en vez de borrarlo — si vuelve (pasa seguido), retomás con todo el historial.</div>`}
@@ -629,8 +629,8 @@ function vExamResultPrompt(s){
       <div class="field" style="max-width:140px"><div class="flabel">Nota (opcional)</div>
         <input id="examgrade-${s.id}" placeholder="Ej: 7/10"></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px">
-        <button class="chip" style="background:var(--greenbg);color:var(--green)" data-a="exam-result" data-id="${s.id}" data-r="aprobo">Aprobó</button>
-        <button class="chip" style="background:var(--redbg);color:var(--red)" data-a="exam-result" data-id="${s.id}" data-r="desaprobo">No aprobó</button>
+        <button class="chip" style="background:var(--greenbg);color:var(--status-activo-fg)" data-a="exam-result" data-id="${s.id}" data-r="aprobo">Aprobó</button>
+        <button class="chip" style="background:var(--redbg);color:var(--status-desaprobo-fg)" data-a="exam-result" data-id="${s.id}" data-r="desaprobo">No aprobó</button>
         <button class="chip" data-a="exam-result" data-id="${s.id}" data-r="norindio">No rindió</button>
       </div>
     </div>
@@ -719,7 +719,7 @@ function vHorariosCard(s){
   h += list.length===0 ? `<div class="empty">Sin horarios cargados.</div>`
     : list.map(hr=>`<div class="log" style="align-items:center">
       <div class="body">${esc(DIAS_SEMANA[hr.day])} ${esc(hr.time)} · ${hr.duration||60} min</div>
-      <button class="del" data-a="del-horario" data-id="${hr.id}" title="Borrar">×</button></div>`).join("");
+      <button class="del" data-a="del-horario" data-id="${hr.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
   h += `<div class="frow" style="margin-top:8px;align-items:flex-end">
     <div class="field"><div class="flabel">Día</div><select id="h-day">
       ${DIAS_SEMANA.map((d,i)=>`<option value="${i}">${esc(d)}</option>`).join("")}</select></div>
@@ -752,7 +752,7 @@ function vPuntualRow(s,p){
   const confirming = state.puntualCancelAskId===p.id;
   let h = `<div class="log" style="align-items:center;flex-wrap:wrap">
     <div class="body">${esc(DIAS_SEMANA[weekdayIdx(p.date)])} ${esc(fmtDate(p.date))} ${esc(p.time)} · ${p.duration||60} min
-      ${p.cancelada?`<div class="note" style="color:var(--red)">Cancelada ${esc(fmtDateTime(p.canceladaAt))}${senia?" · seña "+SENIA_ESTADO_META[senia].label.toLowerCase():""}</div>`:""}
+      ${p.cancelada?`<div class="note" style="color:var(--status-desaprobo-fg)">Cancelada ${esc(fmtDateTime(p.canceladaAt))}${senia?" · seña "+SENIA_ESTADO_META[senia].label.toLowerCase():""}</div>`:""}
     </div>`;
   if(senia && !p.cancelada){
     h += canToggle
@@ -771,7 +771,7 @@ function vPuntualRow(s,p){
           ? ` La seña de ${fmtMoney(p.seniaMonto)} queda retenida (menos de ${pol.horasMinimas}hs de aviso).`
           : ` La seña de ${fmtMoney(p.seniaMonto)} se ${pol.siATiempo==="acredita"?"acredita a la próxima clase":"devuelve"} (aviso con ${pol.horasMinimas}hs o más).`);
       h += `<div style="flex-basis:100%;margin-top:8px;padding-top:8px;border-top:1px solid var(--soft)">
-        <div style="font-size:13px;color:var(--red);margin-bottom:6px">¿Cancelar esta clase?${consecuencia}</div>
+        <div style="font-size:13px;color:var(--status-desaprobo-fg);margin-bottom:6px">¿Cancelar esta clase?${consecuencia}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="danger" data-a="puntual-cancel-confirm" data-id="${p.id}">Sí, cancelar</button>
           <button class="chip" data-a="puntual-cancel-cancel">Volver</button>
@@ -779,7 +779,7 @@ function vPuntualRow(s,p){
       </div>`;
     }
   }
-  h += `<button class="del" data-a="del-puntual" data-id="${p.id}" title="Borrar">×</button></div>`;
+  h += `<button class="del" data-a="del-puntual" data-id="${p.id}" title="Borrar" aria-label="Borrar">×</button></div>`;
   return h;
 }
 // "¿Cobrás seña?" — opt-in por alumno; desactivada, no aparece nada de esto en ninguna otra
@@ -919,8 +919,8 @@ function vAgendaEvent(e, date){
     <div class="agenda-time">${esc(e.time)} <span class="hint">${e.duration}min</span></div>
     <div class="agenda-who">${e.subjectId?subjectDot(e.subjectId):""} <b>${esc(e.studentName)}</b>${e.subject?` <span class="hint">· ${esc(e.subject)}</span>`:""}</div>
     ${e.seniaEstado?`<span class="chip" style="margin-top:4px;color:${SENIA_ESTADO_META[e.seniaEstado].fg};border-color:${SENIA_ESTADO_META[e.seniaEstado].fg}">Seña ${SENIA_ESTADO_META[e.seniaEstado].label.toLowerCase()}</span>`:""}
-    ${e.overlap?`<div class="hint" style="color:var(--red);display:flex;align-items:center;gap:4px"><span class="icon-inline" style="width:12px;height:12px">${ICON_WARNING}</span> se superpone con otra clase</div>`:""}
-    ${past && already ? `<div class="hint" style="color:var(--green)">Ya registrada</div>` : ""}
+    ${e.overlap?`<div class="hint" style="color:var(--status-desaprobo-fg);display:flex;align-items:center;gap:4px"><span class="icon-inline" style="width:12px;height:12px">${ICON_WARNING}</span> se superpone con otra clase</div>`:""}
+    ${past && already ? `<div class="hint" style="color:var(--status-activo-fg)">Ya registrada</div>` : ""}
     ${past && !already ? `<button class="chip" style="margin-top:6px" data-a="agenda-log" data-id="${e.studentId}" data-date="${e.date}">Registrar esta clase</button>` : ""}
   </div>`;
 }
@@ -1018,7 +1018,7 @@ function vPagosMensuales(s){
   h += sorted.length===0 ? `<div class="empty" style="margin-top:8px">Sin pagos registrados todavía este mes ni anteriores.</div>`
     : sorted.map(p=>`<div class="log" style="margin-top:6px"><div class="d">${fmtDate(p.date)}</div>
       <div class="body">${fmtMoney(p.amount)}</div>
-      <button class="del" data-a="del-pago" data-id="${p.id}" title="Borrar">×</button></div>`).join("");
+      <button class="del" data-a="del-pago" data-id="${p.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
   h += `</div>`;
   return h;
 }
@@ -1171,7 +1171,7 @@ function vCostosConfig(){
     ${costos.fijos.map(c=>`<div class="log">
       <div class="body">${esc(c.name)} <span class="hint">· ${esc(scopeLabelOf(c))}</span></div>
       <div style="font-family:var(--mono);font-weight:600">${fmtMoney(c.monto)}</div>
-      <button class="del" data-a="del-costo-fijo" data-id="${c.id}" title="Borrar">×</button>
+      <button class="del" data-a="del-costo-fijo" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button>
     </div>`).join("")}
     <div class="frow" style="align-items:flex-end;margin-top:8px">
       <div class="field"><div class="flabel">Nombre</div><input id="costo-fijo-name" placeholder="Ej: alquiler de aula"></div>
@@ -1187,7 +1187,7 @@ function vCostosConfig(){
     ${costos.variables.map(c=>`<div class="log">
       <div class="body">${esc(c.name)} <span class="hint">· ${esc(scopeLabelOf(c))}</span></div>
       <div style="font-family:var(--mono);font-weight:600">${fmtMoney(c.monto)}/clase</div>
-      <button class="del" data-a="del-costo-variable" data-id="${c.id}" title="Borrar">×</button>
+      <button class="del" data-a="del-costo-variable" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button>
     </div>`).join("")}
     <div class="frow" style="align-items:flex-end;margin-top:8px">
       <div class="field"><div class="flabel">Nombre</div><input id="costo-var-name" placeholder="Ej: viáticos"></div>
@@ -1493,7 +1493,7 @@ function vAuth(){
         <input id="auth-pass" type="password" autocomplete="${isLogin?"current-password":"new-password"}" data-enter="${mainAction}" ${locked?"disabled":""}></div>
       <button class="primary" style="margin:14px 0 0;margin-left:0;width:100%" data-a="${mainAction}" ${locked?"disabled":""}>${isLogin?"Iniciar sesión":"Crear cuenta"}</button>
       ${isLogin?`<button class="chip" style="margin-top:10px;border:none;background:none;padding:2px 0;color:var(--muted)" data-a="auth-forgot" ${locked?"disabled":""}>¿Olvidaste tu contraseña?</button>`:""}
-      <div class="hint" id="authMsg" style="margin-top:10px;min-height:16px${locked?";color:var(--red)":""}">${locked?esc("Demasiados intentos. Probá de nuevo en "+fmtLockRemaining(lockMs)+"."):""}</div>
+      <div class="hint" id="authMsg" style="margin-top:10px;min-height:16px${locked?";color:var(--status-desaprobo-fg)":""}">${locked?esc("Demasiados intentos. Probá de nuevo en "+fmtLockRemaining(lockMs)+"."):""}</div>
     </div>
   </div>`;
 }
@@ -1562,7 +1562,7 @@ function vRecordatoriosCard(){
           ? `<button class="chip ${rec.notificacionesOS?"on":""}" data-a="toggle-notif-os">${rec.notificacionesOS?"Activada":"Desactivada"}</button>`
           : `<span class="hint">No disponible en este dispositivo</span>`}
       </div>
-      ${notifDenied?`<div class="hint" style="color:var(--red);margin-top:6px">Este navegador tiene los avisos bloqueados para el sitio — activalos desde su configuración y volvé a tocar el botón.</div>`:""}
+      ${notifDenied?`<div class="hint" style="color:var(--status-desaprobo-fg);margin-top:6px">Este navegador tiene los avisos bloqueados para el sitio — activalos desde su configuración y volvé a tocar el botón.</div>`:""}
     </div>`;
   }
   return h + `</div>`;
@@ -1624,9 +1624,21 @@ function vCuenta(){
 }
 // Mini centro de ayuda (paso 74): acordeón simple sobre FAQ_ITEMS (config.js), un ítem
 // abierto por vez (alcanza para preguntas cortas; no hace falta que convivan varias abiertas).
+const KEYBOARD_SHORTCUTS = [
+  {keys:"/", desc:"Buscar alumnos, materias o materiales"},
+  {keys:"N", desc:"Nuevo alumno"},
+  {keys:"C", desc:"Nueva clase (con la ficha de un alumno abierta)"},
+  {keys:"Esc", desc:"Cerrar el diálogo o popover abierto"},
+];
 function vCentroAyuda(){
   return `<div class="formcard"><div class="ftitle">Centro de ayuda</div>
-    <div class="hint" style="margin-bottom:8px">Preguntas frecuentes sobre la app.</div>
+    <div class="hint" style="margin-bottom:12px">Preguntas frecuentes sobre la app.</div>
+    <div class="flabel" style="margin-bottom:6px">Atajos de teclado (escritorio)</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+      ${KEYBOARD_SHORTCUTS.map(k=>`<div style="display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted)">
+        <kbd class="kbd">${esc(k.keys)}</kbd><span>${esc(k.desc)}</span>
+      </div>`).join("")}
+    </div>
     ${FAQ_ITEMS.map((it,i)=>{
       const open = state.faqOpenIdx===i;
       return `<div class="faq-item">
@@ -1705,7 +1717,7 @@ function vBackupsList(){
       ${!confirming
         ? `<button class="chip" data-a="restore-ask" data-id="${esc(bid)}">Restaurar</button>`
         : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:100%">
-            <span style="font-size:12.5px;color:var(--red)">Reemplaza tus datos actuales por los de este respaldo (antes se guarda uno extra del estado de ahora). ¿Confirmás?</span>
+            <span style="font-size:12.5px;color:var(--status-desaprobo-fg)">Reemplaza tus datos actuales por los de este respaldo (antes se guarda uno extra del estado de ahora). ¿Confirmás?</span>
             <button class="danger" data-a="restore-confirm" data-id="${esc(bid)}" ${state.restoreStatus==="restoring"?"disabled":""}>Sí, restaurar</button>
             <button class="chip" data-a="restore-cancel">Cancelar</button>
           </div>`}
@@ -1732,7 +1744,7 @@ function vCatalog(){
     }).join("")}</div>
     <div class="flabel" style="margin-top:12px">Unidades / temas (se muestran en este orden)</div>
     ${em.units.map((u,i)=>`<div class="log" style="padding:7px 12px"><div class="body">${esc(u)}</div>
-      <button class="del" data-a="cat-del-unit" data-i="${i}" title="Quitar unidad">×</button></div>`).join("") || `<div class="empty">Sin unidades todavía. Agregá la primera acá abajo.</div>`}
+      <button class="del" data-a="cat-del-unit" data-i="${i}" title="Quitar unidad" aria-label="Quitar unidad">×</button></div>`).join("") || `<div class="empty">Sin unidades todavía. Agregá la primera acá abajo.</div>`}
     <div class="frow" style="margin-top:8px;align-items:flex-end">
       <div class="field"><input id="new-unit" placeholder="Ej: Límites y continuidad"></div>
       <button class="chip" data-a="cat-add-unit" style="margin-bottom:2px">+ Agregar unidad</button></div>
@@ -1751,7 +1763,7 @@ function vCatalog(){
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">
       ${c.subjects.map(m=>`<button class="chip ${ep.subjectIds.includes(m.id)?"on":""}" data-a="pack-toggle-subject" data-id="${m.id}">${esc(m.name)}</button>`).join("") || `<div class="empty">Todavía no hay materias creadas.</div>`}
     </div>
-    ${ep.subjectIds.length<2?`<div class="hint" style="color:var(--red)">Este pack necesita al menos 2 materias para poder usarse al dar de alta un alumno.</div>`:""}
+    ${ep.subjectIds.length<2?`<div class="hint" style="color:var(--status-desaprobo-fg)">Este pack necesita al menos 2 materias para poder usarse al dar de alta un alumno.</div>`:""}
     <button class="primary" style="margin:12px 0 0;margin-left:0" data-a="cat-close-pack-edit">Listo</button>
     <div class="hint" style="margin-top:8px">Los cambios se guardan solos. Eliminar el pack no borra las materias que agrupa.</div>
     </div>`;
@@ -1759,7 +1771,7 @@ function vCatalog(){
   }
   h += `<div class="formcard"><div class="ftitle">Carreras</div>
   ${c.careers.map((x,i)=>`<div class="log" style="padding:7px 12px"><div class="body">${esc(x)}</div>
-    <button class="del" data-a="cat-del-career" data-i="${i}" title="Quitar">×</button></div>`).join("") || `<div class="empty">Sin carreras cargadas.</div>`}
+    <button class="del" data-a="cat-del-career" data-i="${i}" title="Quitar" aria-label="Quitar">×</button></div>`).join("") || `<div class="empty">Sin carreras cargadas.</div>`}
   <div class="frow" style="margin-top:8px;align-items:flex-end">
     <div class="field"><input id="new-career" placeholder="Ej: Contador Público"></div>
     <button class="chip" data-a="cat-add-career" style="margin-bottom:2px">+ Agregar carrera</button></div>
@@ -1768,9 +1780,9 @@ function vCatalog(){
   ${c.subjects.map(m=>{
     const packNames=packsContaining(m.id).map(p=>p.name);
     return `<div class="row" style="cursor:pointer" data-a="cat-edit-subject" data-id="${m.id}">
-    <div class="main"><b style="display:inline-flex;align-items:center;gap:7px">${subjectDot(m)}${esc(m.name)}</b> ${packNames.map(n=>`<span class="pill" style="color:var(--blue);background:var(--bluebg)">${esc(n)}</span>`).join(" ")}
+    <div class="main"><b style="display:inline-flex;align-items:center;gap:7px">${subjectDot(m)}${esc(m.name)}</b> ${packNames.map(n=>`<span class="pill" style="color:var(--status-aprobo-fg);background:var(--bluebg)">${esc(n)}</span>`).join(" ")}
       <div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
-    <button class="del" data-a="cat-del-subject" data-id="${m.id}" title="Eliminar materia">×</button></div>`;
+    <button class="del" data-a="cat-del-subject" data-id="${m.id}" title="Eliminar materia" aria-label="Eliminar materia">×</button></div>`;
   }).join("") || `<div class="empty">Sin materias cargadas.</div>`}
   <div class="flabel" style="margin-top:12px">Empezar desde una plantilla</div>
   <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">
@@ -1787,7 +1799,7 @@ function vCatalog(){
     const names=p.subjectIds.map(id=>{const m=subjById(id); return m?m.name:null;}).filter(Boolean);
     return `<div class="row" style="cursor:pointer" data-a="cat-edit-pack" data-id="${p.id}">
     <div class="main"><b>${esc(p.name)}</b><div class="sub">${names.length} materia${names.length===1?"":"s"}${names.length?": "+esc(names.join(", ")):""}</div></div>
-    <button class="del" data-a="cat-del-pack" data-id="${p.id}" title="Eliminar pack">×</button></div>`;
+    <button class="del" data-a="cat-del-pack" data-id="${p.id}" title="Eliminar pack" aria-label="Eliminar pack">×</button></div>`;
   }).join("") || `<div class="empty">Sin packs todavía.</div>`}
   <div class="field" style="margin-top:10px"><div class="flabel">Nombre del pack nuevo</div>
     <input id="new-pack-name" data-cf="new-pack-name" placeholder="Ej: Ingreso a Medicina" value="${esc(state.newPackName||"")}"></div>
@@ -1821,7 +1833,8 @@ function vMateriales(subjectId){
   const totalBytes = materialesTotalBytes();
   const totalPct = Math.min(100, totalBytes/MATERIAL_MAX_TOTAL_BYTES*100);
   const totalBarColor = totalPct>=90 ? "var(--red)" : totalPct>=70 ? "var(--amber)" : "var(--green)";
-  h += `<div style="background:var(--soft);border-radius:99px;height:10px;overflow:hidden;margin-bottom:6px">
+  h += `<div role="progressbar" aria-label="Espacio usado en materiales" aria-valuenow="${totalPct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"
+    style="background:var(--soft);border-radius:99px;height:10px;overflow:hidden;margin-bottom:6px">
     <div style="height:100%;width:${totalPct.toFixed(1)}%;background:${totalBarColor};border-radius:99px"></div>
   </div>
   <div class="hint" style="margin-bottom:10px">${fmtBytes(totalBytes)} de ${fmtBytes(MATERIAL_MAX_TOTAL_BYTES)} usados (entre todas tus materias)</div>
@@ -1837,8 +1850,8 @@ function vMateriales(subjectId){
       <div class="body">${esc(dn)}<div class="note">${fmtBytes(size)} · ${fmtDateTime(f.updated_at||f.created_at)}</div></div>
       ${!confirming ? `<button class="chip ${compartido?"on":""}" data-a="mat-toggle-share" data-id="${subjectId}" data-name="${esc(f.name)}" title="Compartir en el portal de alumnos">${compartido?"Compartido":"Compartir"}</button>
         <button class="chip" data-a="mat-download" data-id="${subjectId}" data-name="${esc(f.name)}">Descargar</button>
-        <button class="del" data-a="mat-del-ask" data-name="${esc(f.name)}" title="Borrar">×</button>`
-      : `<span style="font-size:12px;color:var(--red)">¿Borrar «${esc(dn)}»?</span>
+        <button class="del" data-a="mat-del-ask" data-name="${esc(f.name)}" title="Borrar" aria-label="Borrar">×</button>`
+      : `<span style="font-size:12px;color:var(--status-desaprobo-fg)">¿Borrar «${esc(dn)}»?</span>
         <button class="danger" data-a="mat-del-confirm" data-id="${subjectId}" data-name="${esc(f.name)}" ${state.materialesDeleteStatus==="deleting"?"disabled":""}>Sí, borrar</button>
         <button class="chip" data-a="mat-del-cancel">Cancelar</button>`}
     </div>`;
@@ -1932,7 +1945,8 @@ function vEstadisticas(){
   }else{
     const avg = progresos.reduce((a,b)=>a+b,0)/progresos.length;
     h += `<div class="stats" style="margin-bottom:8px"><div class="stat"><b>${avg.toFixed(0)}%</b><span>en nivel parcial, promedio del grupo</span></div></div>
-    <div style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:20px">
+    <div role="progressbar" aria-label="Avance promedio de temas" aria-valuenow="${avg.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"
+      style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:20px">
       <div style="height:100%;width:${avg.toFixed(1)}%;background:var(--green);border-radius:99px"></div>
     </div>`;
   }
@@ -1978,7 +1992,8 @@ function vObjetivosGeneral(){
   if(general.total===0) return h + `<div class="empty">Todavía no hay objetivos de clase evaluados.</div>`;
   const pct = general.si/general.total*100;
   h += `<div class="stats" style="margin-bottom:8px"><div class="stat"><b>${pct.toFixed(0)}%</b><span>cumplidos sobre ${general.total} objetivo${general.total===1?"":"s"} evaluado${general.total===1?"":"s"}</span></div></div>
-  <div style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:16px">
+  <div role="progressbar" aria-label="Objetivos de clase cumplidos" aria-valuenow="${pct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"
+    style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:16px">
     <div style="height:100%;width:${pct.toFixed(1)}%;background:var(--green);border-radius:99px"></div>
   </div>`;
 
@@ -2001,7 +2016,8 @@ function vTasaAprobacionGeneral(){
   if(general.total===0) return h + `<div class="empty">Todavía no hay resultados de examen registrados.</div>`;
   const pct = general.aprobo/general.total*100;
   h += `<div class="stats" style="margin-bottom:8px"><div class="stat"><b>${pct.toFixed(0)}%</b><span>aprobados sobre ${general.total} examen${general.total===1?"":"es"} rendido${general.total===1?"":"s"}</span></div></div>
-  <div style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:16px">
+  <div role="progressbar" aria-label="Tasa de aprobación general" aria-valuenow="${pct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"
+    style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;max-width:320px;margin-bottom:16px">
     <div style="height:100%;width:${pct.toFixed(1)}%;background:var(--green);border-radius:99px"></div>
   </div>`;
 
@@ -2021,7 +2037,8 @@ function tasaAprobacionBars(entries){
       <div style="width:130px;flex-shrink:0;font-size:12.5px;color:var(--muted);white-space:nowrap;
         overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px" title="${esc(label)}">
         ${subjectId?subjectDot(subjectId):""}${esc(label)}</div>
-      <div style="flex:1;background:var(--soft);border-radius:4px;overflow:hidden;height:14px">
+      <div role="progressbar" aria-label="${esc(label)}" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"
+        style="flex:1;background:var(--soft);border-radius:4px;overflow:hidden;height:14px">
         <div class="subj-bar" style="width:${pct}%;background:${color}"></div>
       </div>
       <div style="width:70px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted)">${pct}% (${c.total})</div>
@@ -2095,7 +2112,8 @@ function hbarList(dataset){
   return dataset.map(d=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
     <div style="width:130px;flex-shrink:0;font-size:12.5px;color:var(--muted);white-space:nowrap;
       overflow:hidden;text-overflow:ellipsis" title="${esc(d.label)}">${esc(d.label)}</div>
-    <div style="flex:1;background:var(--soft);border-radius:4px;overflow:hidden;height:14px">
+    <div role="progressbar" aria-label="${esc(d.label)}" aria-valuenow="${d.v}" aria-valuemin="0" aria-valuemax="${max}"
+      style="flex:1;background:var(--soft);border-radius:4px;overflow:hidden;height:14px">
       <div style="height:100%;width:${Math.max(2,Math.round(d.v/max*100))}%;background:var(--accent);border-radius:4px"></div>
     </div>
     <div style="width:22px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted)">${d.v}</div>
@@ -2198,7 +2216,7 @@ function vUsuarios(){
   let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
     <button class="chip" data-a="usuarios-sort-lastseen">Última conexión ${sortDir==="desc"?"↓ más reciente primero":"↑ más antigua primero"}</button>
     <button class="chip" data-a="refresh-usuarios">Actualizar</button></div>`;
-  if(state.usersDeleteMsg) h += `<div class="hint" style="color:var(--green);margin-bottom:8px">${esc(state.usersDeleteMsg)}</div>`;
+  if(state.usersDeleteMsg) h += `<div class="hint" style="color:var(--status-activo-fg);margin-bottom:8px">${esc(state.usersDeleteMsg)}</div>`;
   if(state.usersError) return h + `<div class="saveerr">${esc(state.usersError)}</div>`;
   if(!state.usersLoaded) return h + skeletonRows(5);
   const list = state.users||[];
@@ -2230,7 +2248,7 @@ function vUsuarios(){
   });
   h += sorted.map(u=>{
     const seen = isOnline(u)
-      ? `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--green);font-weight:600">
+      ? `<span style="display:inline-flex;align-items:center;gap:5px;color:var(--status-activo-fg);font-weight:600">
           <span class="sem" style="width:8px;height:8px;background:var(--green)"></span>En línea</span>`
       : `<span style="color:var(--faint)">${u.last_seen_at?"visto por última vez "+timeAgo(u.last_seen_at):"nunca conectado"}</span>`;
     const isAdmin = u.rol==="admin";
@@ -2238,11 +2256,11 @@ function vUsuarios(){
     let delUi = "";
     if(!isAdmin){
       if(!confirming){
-        delUi = `<button class="del" data-a="users-del-ask" data-id="${esc(u.user_id)}" title="Eliminar cuenta">×</button>`;
+        delUi = `<button class="del" data-a="users-del-ask" data-id="${esc(u.user_id)}" title="Eliminar cuenta" aria-label="Eliminar cuenta">×</button>`;
       }else{
         const matches = (state.usersConfirmDelInput||"")===u.email;
         delUi = `<div style="flex-basis:100%;margin-top:8px;padding-top:8px;border-top:1px solid var(--soft)">
-          <div style="font-size:13px;color:var(--red);margin-bottom:6px">Esto borra la cuenta, sus alumnos, respaldos y materiales — no se puede deshacer. Escribí <b>${esc(u.email)}</b> para confirmar:</div>
+          <div style="font-size:13px;color:var(--status-desaprobo-fg);margin-bottom:6px">Esto borra la cuenta, sus alumnos, respaldos y materiales — no se puede deshacer. Escribí <b>${esc(u.email)}</b> para confirmar:</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input type="text" data-live="users-del-email" value="${esc(state.usersConfirmDelInput||"")}" placeholder="${esc(u.email)}" style="flex:1;min-width:180px">
             <button class="danger" data-a="users-del-confirm" data-id="${esc(u.user_id)}" ${(!matches||state.usersDeleteStatus==="deleting")?"disabled":""}>Sí, eliminar</button>
@@ -2402,7 +2420,7 @@ function sumRange(dataset, from, toExclusive){
 // Variación del período actual contra el anterior, con flecha y color — arriba de cada gráfico.
 function trendBadge(curr, prev, periodLabel){
   if(prev===0 && curr===0) return `<div class="hint" style="margin-bottom:6px">Sin actividad en ninguno de los dos períodos.</div>`;
-  if(prev===0) return `<div class="hint" style="margin-bottom:6px"><span style="color:var(--green);font-weight:700">↑ nuevo</span> — sin datos del ${esc(periodLabel)} para comparar.</div>`;
+  if(prev===0) return `<div class="hint" style="margin-bottom:6px"><span style="color:var(--status-activo-fg);font-weight:700">↑ nuevo</span> — sin datos del ${esc(periodLabel)} para comparar.</div>`;
   const pct=((curr-prev)/prev)*100;
   const flat = Math.round(pct)===0;
   const up = pct>0;
@@ -2518,7 +2536,8 @@ function vRecursos(){
   const pct = Math.min(100, dbBytes/SUPABASE_FREE_LIMIT_BYTES*100);
   const barColor = pct>=90 ? "var(--red)" : pct>=70 ? "var(--amber)" : "var(--green)";
   h += `<div class="stitle">Uso de base de datos</div>
-  <div style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;margin-bottom:6px">
+  <div role="progressbar" aria-label="Uso de base de datos" aria-valuenow="${pct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"
+    style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;margin-bottom:6px">
     <div style="height:100%;width:${pct.toFixed(1)}%;background:${barColor};border-radius:99px"></div>
   </div>
   <div class="hint" style="margin-bottom:20px">${fmtBytes(dbBytes)} de ${fmtBytes(SUPABASE_FREE_LIMIT_BYTES)} (${pct.toFixed(1)}%) — plan gratuito de Supabase</div>`;
@@ -2661,9 +2680,9 @@ function render(){
   let m = "";
   if(IS_NATIVE && state.newVersionTag && !state.updateBannerDismissed){
     m += `<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;
-      background:var(--bluebg);border:1px solid var(--blueline);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px;color:var(--blue)">
-      <span>Hay una versión nueva disponible (${esc(state.newVersionTag)}). <a href="${DOWNLOADS_URL}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">Ir a descargas</a></span>
-      <button data-a="dismiss-update-banner" title="Cerrar aviso" style="background:none;border:none;color:var(--blue);font-size:16px;line-height:1;padding:0 4px">×</button>
+      background:var(--bluebg);border:1px solid var(--blueline);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px;color:var(--status-aprobo-fg)">
+      <span>Hay una versión nueva disponible (${esc(state.newVersionTag)}). <a href="${DOWNLOADS_URL}" target="_blank" rel="noopener" style="color:var(--status-aprobo-fg);font-weight:600">Ir a descargas</a></span>
+      <button data-a="dismiss-update-banner" title="Cerrar aviso" aria-label="Cerrar aviso" style="background:none;border:none;color:var(--status-aprobo-fg);font-size:16px;line-height:1;padding:0 4px">×</button>
     </div>`;
   }
   if(state.saveErr) m += `<div class="saveerr">No se pudo guardar el último cambio. Descargá una copia de respaldo por las dudas.</div>`;

@@ -132,10 +132,13 @@ const OBJETIVO_META = {
 // Estado de la seña de una clase puntual (ver s.clasesPuntuales[].seniaEstado en helpers.js).
 // "retenida"/"devuelta" son terminales (las pone applyCancelacion, no se tocan a mano); sólo
 // "pendiente"↔"cobrada" se alternan con un toque (ver toggle-senia-estado en events.js).
+// Reusan los mismos tokens -fg de TAREA_META (ya pensados para leerse como texto, con buen
+// contraste en ambos temas) en vez de los colores planos --amber/--green/--red, que sobre el
+// fondo por defecto de un chip no llegan a 4.5:1 (paso 75).
 const SENIA_ESTADO_META = {
-  pendiente:{label:"Pendiente",fg:"var(--amber)"},
-  cobrada:{label:"Cobrada",fg:"var(--green)"},
-  retenida:{label:"Retenida",fg:"var(--red)"},
+  pendiente:{label:"Pendiente",fg:"var(--tarea-intentada-fg)"},
+  cobrada:{label:"Cobrada",fg:"var(--tarea-hecha-fg)"},
+  retenida:{label:"Retenida",fg:"var(--tarea-no-fg)"},
   devuelta:{label:"Devuelta",fg:"var(--muted)"},
 };
 // Política de cancelación por defecto (state.catalog.cancelPolicy) — catálogos sincronizados

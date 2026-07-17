@@ -24,6 +24,7 @@
     --line:#E4E9F5; --soft:#EEF1F9; --red:#EF4444; --redbg:#FEE2E2;
     --blue:#3B82F6; --green:#22C55E; --amber:#F59E0B;
     --navy:#1E2B4D; --navy-2:#2F4272; --accent:#14B8A6; --accent-dark:#0E9488; --accent-soft:#CFF7F0;
+    --red-fg:#A23A2A;
     --subj-teal-fg:#0F766E; --subj-blue-fg:#1D4ED8; --subj-purple-fg:#6D28D9; --subj-amber-fg:#92400E;
     --subj-rose-fg:#BE123C; --subj-green-fg:#15803D; --subj-indigo-fg:#4338CA; --subj-slate-fg:#475569;
     --sans:'Inter',-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -35,11 +36,14 @@
       --line:#2B3348; --soft:#171D2C; --red:#FF6B6B; --redbg:#3A211D;
       --blue:#60A5FA; --green:#4ADE80; --amber:#FBBF24;
       --navy:#2B3A63; --navy-2:#3D5089; --accent:#2DD4C0; --accent-dark:#14B8A6; --accent-soft:#123C38;
+      --red-fg:#E8A093;
       --subj-teal-fg:#5EEAD4; --subj-blue-fg:#93C5FD; --subj-purple-fg:#C4B5FD; --subj-amber-fg:#FBBF24;
       --subj-rose-fg:#FDA4AF; --subj-green-fg:#86EFAC; --subj-indigo-fg:#A5B4FC; --subj-slate-fg:#CBD5E1;
     }
   }
   *{box-sizing:border-box}
+  a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
        font-size:15px;line-height:1.5;padding:24px 16px 48px}
   .shell{max-width:520px;margin:0 auto}
@@ -57,7 +61,7 @@
   .msg{text-align:center;padding:40px 16px}
   .msg .big{font-size:17px;font-weight:600;margin-bottom:8px}
   .msg .small{color:var(--muted);font-size:13.5px}
-  .err{color:var(--red);background:var(--redbg);border-radius:10px;padding:10px 14px;font-size:13.5px}
+  .err{color:var(--red-fg);background:var(--redbg);border-radius:10px;padding:10px 14px;font-size:13.5px}
   #biblio-search{width:100%;font:inherit;font-size:14px;padding:9px 12px;margin:4px 0 10px;
     border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink)}
   #biblio-search:focus-visible{outline:2px solid var(--accent);outline-offset:1px}

@@ -40,11 +40,14 @@ function fmtDiaLocal(ds){
 // resuelto por la app antes de publicar, ver publicarPortal() en sync.js) y los mismos tokens
 // --subj-*-fg duplicados en portal.html (mismo criterio que SUPA_URL/SUPA_ANON_KEY más arriba).
 const SUBJECT_COLOR_FALLBACK = "slate";
+// color: texto sobre el card por defecto — usa los tokens --subj-*-fg (ya pensados para
+// leerse bien en ambos temas) en vez de --blue/--amber/--green planos, que sobre --card no
+// llegan a 4.5:1 (paso 75).
 const TOPIC_BAR_META = {
   pendiente:{pct:6, label:"Pendiente", color:"var(--faint)"},
-  visto:{pct:35, label:"Visto", color:"var(--blue)"},
-  practica:{pct:65, label:"En práctica", color:"var(--amber)"},
-  parcial:{pct:100, label:"Nivel parcial", color:"var(--green)"},
+  visto:{pct:35, label:"Visto", color:"var(--subj-blue-fg)"},
+  practica:{pct:65, label:"En práctica", color:"var(--subj-amber-fg)"},
+  parcial:{pct:100, label:"Nivel parcial", color:"var(--subj-green-fg)"},
   noentra:{pct:100, label:"No entra", color:"var(--faint)"},
 };
 // Bloque personal de un alumno con llave individual (ver buildAlumnoBlock en sync.js) — sólo
@@ -77,7 +80,7 @@ function personalHtml(alumno){
       return `<div class="unitrow">
         <div class="unitname">${esc(it.unidad)}</div>
         <div class="unitbarwrap">
-          <div class="unitbar"><div class="unitfill" style="width:${m.pct}%;background:${m.color}"></div></div>
+          <div class="unitbar" role="progressbar" aria-label="${esc(it.unidad)}" aria-valuenow="${m.pct}" aria-valuemin="0" aria-valuemax="100"><div class="unitfill" style="width:${m.pct}%;background:${m.color}"></div></div>
           <div class="unitstate" style="color:${m.color}">${m.label}</div>
         </div>
       </div>`;
