@@ -151,6 +151,10 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="refresh-inactividad"){ state.inactividadLoaded=false; state.inactividadError=""; loadInactividad(); }
   else if(a==="refresh-usuarios"){ state.usersLoaded=false; state.usersError=""; loadUsuarios(); }
+  else if(a==="limpiar-huerfanos"){
+    if(state.orphanCleanStatus==="cleaning") return;
+    limpiarHuerfanos(); return;
+  }
   else if(a==="usuarios-sort-lastseen"){ state.usersSortDir = state.usersSortDir==="desc" ? "asc" : "desc"; }
   else if(a==="users-del-ask"){
     state.usersConfirmDelId=el.dataset.id; state.usersConfirmDelInput=""; state.usersDeleteError=""; state.usersDeleteMsg="";

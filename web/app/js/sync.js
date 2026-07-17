@@ -284,9 +284,50 @@ async function loadUsuarios(){
   }
   render();
 }
+// Listado crudo de una "carpeta" del bucket materiales (mismo endpoint que loadMateriales,
+// generalizado a cualquier prefijo). Entradas sin "id" son subcarpetas, no archivos.
+async function listStorageFolder(prefix){
+  const s=await ensureToken();
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+  const r=await fetch(SUPA_URL+"/storage/v1/object/list/"+MATERIALES_BUCKET,{method:"POST", headers:h,
+    body:JSON.stringify({prefix, limit:1000, sortBy:{column:"name",order:"asc"}})});
+  if(!r.ok) throw new Error("error "+r.status);
+  const list=await r.json();
+  return Array.isArray(list) ? list : [];
+}
+// Borrado en lote por Storage API (no DELETE directo sobre storage.objects, ver
+// 015_borrado_storage_api.sql en cuaderno-supabase) — mismo endpoint que usa
+// supabase-js .remove(), a pesar del nombre "prefixes" son rutas completas, no prefijos.
+async function removeStorageObjects(paths){
+  if(!paths.length) return;
+  const s=await ensureToken();
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+  const r=await fetch(SUPA_URL+"/storage/v1/object/"+MATERIALES_BUCKET,{method:"DELETE", headers:h,
+    body:JSON.stringify({prefixes:paths})});
+  if(!r.ok) throw new Error("error "+r.status);
+}
+// Rutas completas de todos los archivos dentro de materiales/{uid}/... — dos niveles
+// (materiales/{uid}/{subjectId}/{archivo}, ver materialPath), así que hay que listar la
+// carpeta del usuario para encontrar sus materias y después cada materia para sus archivos.
+async function listUserMaterialPaths(uid_){
+  const top = await listStorageFolder(uid_);
+  const paths=[];
+  for(const entry of top){
+    if(entry.id){ paths.push(`${uid_}/${entry.name}`); continue; }
+    const files = await listStorageFolder(`${uid_}/${entry.name}`);
+    for(const f of files){ if(f.id) paths.push(`${uid_}/${entry.name}/${f.name}`); }
+  }
+  return paths;
+}
 async function deleteUsuario(id){
   state.usersDeleteStatus="deleting"; state.usersDeleteError=""; render();
   try{
+    try{
+      await removeStorageObjects(await listUserMaterialPaths(id));
+    }catch(e){
+      // si falla el borrado de materiales no bloqueamos el borrado de la cuenta — los
+      // archivos quedan huérfanos y "Limpiar archivos huérfanos" los levanta después.
+    }
     const s=await ensureToken();
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
     const r=await fetch(SUPA_URL+"/rest/v1/rpc/admin_eliminar_usuario",{method:"POST", headers:h, body:JSON.stringify({objetivo:id})});
@@ -303,6 +344,34 @@ async function deleteUsuario(id){
     state.usersDeleteError = !navigator.onLine ? "Sin conexión a internet." : (e.message||"No se pudo eliminar la cuenta.");
     render();
   }
+}
+// Cierres por inactividad (revisar_inactivos, cuaderno-supabase 012/015) borran sólo las
+// tablas y dejan la carpeta del usuario huérfana en el bucket — este botón la limpia:
+// compara las carpetas de materiales contra las cuentas vivas en perfiles y borra el resto.
+async function limpiarHuerfanos(){
+  state.orphanCleanStatus="cleaning"; state.orphanCleanError=""; state.orphanCleanMsg=""; render();
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const ur=await fetch(SUPA_URL+"/rest/v1/perfiles?select=user_id",{headers:h});
+    if(!ur.ok) throw new Error("error "+ur.status);
+    const activos=new Set((await ur.json()).map(u=>u.user_id));
+    const top=await listStorageFolder("");
+    const huerfanas=top.filter(e=>!e.id && !activos.has(e.name));
+    let nCarpetas=0, nArchivos=0;
+    for(const carpeta of huerfanas){
+      const paths=await listUserMaterialPaths(carpeta.name);
+      if(!paths.length) continue;
+      await removeStorageObjects(paths);
+      nCarpetas++; nArchivos+=paths.length;
+    }
+    state.orphanCleanStatus="idle";
+    state.orphanCleanMsg = nCarpetas ? `Se borraron ${nArchivos} archivo(s) de ${nCarpetas} cuenta(s) ya eliminada(s).` : "No había archivos huérfanos.";
+  }catch(e){
+    state.orphanCleanStatus="idle";
+    state.orphanCleanError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron limpiar los archivos huérfanos.";
+  }
+  render();
 }
 async function loadInactividad(){
   try{

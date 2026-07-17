@@ -2571,8 +2571,13 @@ function vUsuarios(){
   const sortDir = state.usersSortDir||"desc";
   let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
     <button class="chip" data-a="usuarios-sort-lastseen">Última conexión ${sortDir==="desc"?"↓ más reciente primero":"↑ más antigua primero"}</button>
-    <button class="chip" data-a="refresh-usuarios">Actualizar</button></div>`;
+    <div style="display:flex;gap:8px">
+      <button class="chip" data-a="limpiar-huerfanos" ${state.orphanCleanStatus==="cleaning"?"disabled":""}>${state.orphanCleanStatus==="cleaning"?"Limpiando…":"Limpiar archivos huérfanos"}</button>
+      <button class="chip" data-a="refresh-usuarios">Actualizar</button>
+    </div></div>`;
   if(state.usersDeleteMsg) h += `<div class="hint" style="color:var(--status-activo-fg);margin-bottom:8px">${esc(state.usersDeleteMsg)}</div>`;
+  if(state.orphanCleanMsg) h += `<div class="hint" style="color:var(--status-activo-fg);margin-bottom:8px">${esc(state.orphanCleanMsg)}</div>`;
+  if(state.orphanCleanError) h += `<div class="saveerr" style="margin-bottom:8px">${esc(state.orphanCleanError)}</div>`;
   if(state.usersError) return h + `<div class="saveerr">${esc(state.usersError)}</div>`;
   if(!state.usersLoaded) return h + skeletonRows(5);
   const list = state.users||[];
