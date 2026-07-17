@@ -1072,11 +1072,11 @@ function vAgendaMes(){
   return h;
 }
 function vAgendaDayDetail(date){
-  const events = agendaRangeEvents(date,date).sort((a,b)=>a.time.localeCompare(b.time));
+  const events = markOverlaps(agendaRangeEvents(date,date)).sort((a,b)=>a.time.localeCompare(b.time));
   let h = `<div class="formcard">
     <div class="ftitle">${esc(fmtDate(date))}${date===today()?" · hoy":""}</div>`;
   h += events.length===0 ? `<div class="empty">Sin clases este día.</div>`
-    : events.map(e=>vAgendaEvent(e,date)).join("");
+    : vAgendaDayHours(events,date);
 
   if(!state.agendaQuickAddOpen){
     h += `<button class="chip" style="margin-top:10px" data-a="agenda-quick-open">Programar clase acá</button>`;
@@ -1091,6 +1091,25 @@ function vAgendaDayDetail(date){
         <div class="field" style="max-width:120px"><div class="flabel">Duración (min)</div><input type="number" id="aq-duration" value="60" min="15" step="15"></div>
         <button class="chip" data-a="agenda-quick-add" style="margin-bottom:2px">+ Programar</button>
       </div>`;
+  }
+  return h + `</div>`;
+}
+// Grilla vertical de bloques por hora para la vista de un día (paso 90): desde la primera hora
+// con clase (si es más temprano) hasta un rango razonable 8-22 (más tarde, si hace falta),
+// con scroll. Cada bloque muestra todas las clases que empiezan en esa hora lado a lado — nunca
+// superpuestas ni ocultas — reusando vAgendaEvent() tal cual (mismo click, mismo aviso de
+// superposición ya calculado por markOverlaps() antes de llamar acá).
+function vAgendaDayHours(events, date){
+  const startHour = Math.min(8, ...events.map(e=>Math.floor(e.startMin/60)));
+  const endHour = Math.max(22, ...events.map(e=>Math.ceil(e.endMin/60)));
+  let h = `<div class="agenda-hours">`;
+  for(let hr=startHour; hr<endHour; hr++){
+    const label = String(hr).padStart(2,"0")+":00";
+    const list = events.filter(e=>Math.floor(e.startMin/60)===hr);
+    h += `<div class="agenda-hour-row">
+      <div class="agenda-hour-label">${label}</div>
+      <div class="agenda-hour-slot">${list.map(e=>vAgendaEvent(e,date)).join("")}</div>
+    </div>`;
   }
   return h + `</div>`;
 }

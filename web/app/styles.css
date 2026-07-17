@@ -238,6 +238,20 @@
   .agenda-event.overlap{background:var(--redbg);border:1px solid var(--redline2)}
   .agenda-time{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
   .agenda-who{margin-top:2px}
+
+  /* ============ agenda de un día: grilla vertical de bloques por hora (paso 90) ============ */
+  .agenda-hours{max-height:65vh;overflow-y:auto;border:1px solid var(--line);border-radius:10px;
+    margin-top:10px}
+  .agenda-hour-row{display:flex;border-bottom:1px solid var(--line)}
+  .agenda-hour-row:last-child{border-bottom:none}
+  .agenda-hour-label{flex-shrink:0;width:52px;padding:8px 6px;font-family:var(--mono);font-size:10.5px;
+    color:var(--faint);border-right:1px solid var(--line);background:var(--bg)}
+  .agenda-hour-slot{flex:1;display:flex;flex-wrap:wrap;gap:8px;padding:8px;align-items:stretch;min-width:0}
+  .agenda-hour-slot .agenda-event{flex:1 1 150px;min-width:130px;margin-bottom:0}
+  @media (max-width:480px){
+    .agenda-hour-label{width:44px;font-size:9.5px}
+    .agenda-hour-slot .agenda-event{flex-basis:100%}
+  }
   .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;
                 font-size:10.5px;font-family:var(--mono);text-transform:uppercase;color:var(--faint);text-align:center}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px}
