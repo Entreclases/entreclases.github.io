@@ -277,8 +277,12 @@ function vBackupReminder(){
    Cada uno muestra su número grande arriba y un acceso directo abajo; sin datos, el estado
    vacío amable de emptyState() en vez de dejar la tarjeta en blanco. */
 function hoyCard(title, num, body, action){
+  // num puede ser un entero contable (paso 100, cuenta hasta su valor con countSpan()) o ya
+  // venir formateado como texto (fecha, "Al día", "63%", "—" — ver vFichaResumenGlance): sólo
+  // se envuelve en countSpan() cuando es realmente un número, si no se muestra tal cual.
+  const numHtml = (typeof num==="number" && isFinite(num)) ? countSpan(num) : esc(String(num));
   return `<div class="ds-card hoy-card">
-    <div class="hoy-card-head"><span class="ds-eyebrow">${esc(title)}</span><span class="hoy-num">${countSpan(num)}</span></div>
+    <div class="hoy-card-head"><span class="ds-eyebrow">${esc(title)}</span><span class="hoy-num">${numHtml}</span></div>
     <div class="hoy-card-body">${body}</div>
     ${action?`<button class="btn btn-ghost btn-block hoy-card-action" data-a="${action.a}">${esc(action.label)}</button>`:""}
   </div>`;
