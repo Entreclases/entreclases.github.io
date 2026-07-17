@@ -649,6 +649,9 @@ async function publicarPortal(){
 // No depende de que Cuenta esté abierta ni de state.portal: lee/escribe la fila directo, así
 // también funciona si el docente nunca entra a esa pantalla en el día. Sólo re-firma los ítems que
 // están a PORTAL_LINK_RENEW_AFTER_DAYS o más de su firma — el resto de la biblioteca no se toca.
+// Un mismo archivo puede aparecer tanto en publicado.biblioteca (llave general/individual) como
+// en publicado.grupos[materiaId].biblioteca (llave grupal, firmada aparte por republishGrupoBlock)
+// — se junta por path antes de firmar para no pedirle a Storage dos URLs del mismo archivo.
 async function maybeRenewPortalLibrary(uid_, s){
   if(localStorage.getItem(PORTAL_RENEW_CHECK_KEY) === today()) return;
   localStorage.setItem(PORTAL_RENEW_CHECK_KEY, today());
@@ -659,34 +662,45 @@ async function maybeRenewPortalLibrary(uid_, s){
     const row=(await r.json())[0];
     if(!row || !row.habilitado) return;
     const biblioteca=(row.publicado&&row.publicado.biblioteca)||[];
+    const grupos=(row.publicado&&row.publicado.grupos)||{};
     const staleCutoff=Date.now()-PORTAL_LINK_RENEW_AFTER_DAYS*86400000;
-    const stale=biblioteca.filter(it=>!it.firmadoAt || it.firmadoAt<staleCutoff);
-    if(!stale.length) return;
-    const renewed=await Promise.all(stale.map(async it=>{
-      try{
-        const url=await signMaterialUrl(s, it.path, PORTAL_LINK_TTL_DAYS*86400);
-        return {...it, url, firmadoAt:Date.now()};
-      }catch(e){ return it; } // best-effort: un archivo puntual borrado/renombrado no frena a los demás
+    const stale=new Map();
+    const markStale=(it)=>{ if((!it.firmadoAt || it.firmadoAt<staleCutoff) && !stale.has(it.path)) stale.set(it.path, it); };
+    biblioteca.forEach(markStale);
+    Object.values(grupos).forEach(g=>(g.biblioteca||[]).forEach(markStale));
+    if(!stale.size) return;
+    const renewed=await Promise.all([...stale.values()].map(async it=>{
+      try{ return [it.path, {url:await signMaterialUrl(s, it.path, PORTAL_LINK_TTL_DAYS*86400), firmadoAt:Date.now()}]; }
+      catch(e){ return [it.path, null]; } // best-effort: un archivo puntual borrado/renombrado no frena a los demás
     }));
-    const byPath=new Map(renewed.map(it=>[it.path,it]));
-    const merged=biblioteca.map(it=>byPath.get(it.path)||it);
-    const publicado={...row.publicado, biblioteca:merged};
+    const fresh=new Map(renewed.filter(([,v])=>v));
+    const mergeItem=(it)=>fresh.has(it.path) ? {...it, ...fresh.get(it.path)} : it;
+    const mergedBiblioteca=biblioteca.map(mergeItem);
+    const mergedGrupos={};
+    Object.entries(grupos).forEach(([mid,g])=>{ mergedGrupos[mid]={...g, biblioteca:(g.biblioteca||[]).map(mergeItem)}; });
+    const publicado={...row.publicado, biblioteca:mergedBiblioteca, grupos:mergedGrupos};
     await patchPortalRow(uid_, h, {publicado});
     if(state.portal){ state.portal.publicado=publicado; render(); }
   }catch(e){ /* silencioso: se reintenta al otro día */ }
 }
 // Al dejar de compartir un archivo o borrarlo, sacarlo del portal enseguida en vez de esperar a
 // que el docente toque "Publicar cambios" — no vuelve a firmar nada, sólo saca el ítem de
-// publicado.biblioteca. Lee/escribe la fila directo (no depende de que state.portal esté cargado,
-// ya que esto se dispara desde el editor de Materiales, no desde Cuenta).
+// publicado.biblioteca y (si la materia tiene llave grupal) de publicado.grupos[subjectId].biblioteca,
+// que republishGrupoBlock firma aparte. Lee/escribe la fila directo (no depende de que
+// state.portal esté cargado, ya que esto se dispara desde el editor de Materiales, no desde Cuenta).
 async function removeFromPortalBiblioteca(subjectId, fileName){
   try{
     const {s, uid_, h, row}=await fetchPortalRow("publicado");
     if(!row.publicado) return;
     const path=materialPath(uid_, subjectId, fileName);
     const biblioteca=row.publicado.biblioteca||[];
-    if(!biblioteca.some(it=>it.path===path)) return;
+    const grupoBloque=row.publicado.grupos&&row.publicado.grupos[subjectId];
+    const enGrupo=grupoBloque&&(grupoBloque.biblioteca||[]).some(it=>it.path===path);
+    if(!biblioteca.some(it=>it.path===path) && !enGrupo) return;
     const publicado={...row.publicado, biblioteca:biblioteca.filter(it=>it.path!==path)};
+    if(enGrupo){
+      publicado.grupos={...row.publicado.grupos, [subjectId]:{...grupoBloque, biblioteca:grupoBloque.biblioteca.filter(it=>it.path!==path)}};
+    }
     await patchPortalRow(uid_, h, {publicado});
     if(state.portal){ state.portal.publicado=publicado; render(); }
   }catch(e){ /* silencioso: se corrige solo en la próxima publicación manual */ }
@@ -842,23 +856,32 @@ async function actualizarAlumnosGrupo(materiaId, alumnoIds){
   }
   state.portalGrupoBusy=null; render();
 }
-// Re-arma y guarda sólo el bloque de una materia puntual, reusando los links ya firmados de
-// publicado.biblioteca (no vuelve a firmar nada, así que es liviano) — mismo criterio que
-// republishAlumnoBlock.
+// Re-arma y guarda sólo el bloque de una materia puntual. A diferencia de republishAlumnoBlock,
+// SÍ firma de nuevo los materiales compartidos de esta materia (materialesIndexFor) en vez de
+// reusar publicado.biblioteca: esta última sólo se arma al tocar "Publicar cambios" general, así
+// que si la llave grupal se crea o edita antes de tocarlo (o antes de compartir un material
+// nuevo), reusar la biblioteca vieja dejaría el grupo sin ver nada — firmando acá directo, la
+// llave grupal siempre refleja lo que hoy está marcado "Compartido" en Materias.
 async function republishGrupoBlock(materiaId){
   try{
-    const {uid_, h, row}=await fetchPortalRow("publicado,tokens_grupos");
+    const {s, uid_, h, row}=await fetchPortalRow("publicado,tokens_grupos");
     const tokensGrupos=row.tokens_grupos||{};
     const entry=Object.values(tokensGrupos).find(g=>g.materiaId===materiaId);
-    const biblioteca=(row.publicado&&row.publicado.biblioteca)||[];
-    const bibMateria=biblioteca.filter(it=>it.subjectId===materiaId);
+    const m=subjById(materiaId);
+    const compartidos=materialesIndexFor(materiaId).filter(f=>f.compartido);
+    const bibMateria=await Promise.all(compartidos.map(async f=>{
+      const path=materialPath(uid_, materiaId, f.name);
+      const url=await signMaterialUrl(s, path, PORTAL_LINK_TTL_DAYS*86400);
+      return {subjectId:materiaId, materia:m?m.name:"", color:subjectColorKey(materiaId), nombre:materialDisplayName(f.name),
+        path, url, bytes:f.bytes||0, at:f.at||null, firmadoAt:Date.now()};
+    }));
     const bloque=buildGrupoBlock(materiaId, entry?entry.alumnos:[], bibMateria);
     const grupos={...((row.publicado&&row.publicado.grupos)||{})};
     if(bloque) grupos[materiaId]=bloque; else delete grupos[materiaId];
     const publicado={...(row.publicado||{}), grupos};
     await patchPortalRow(uid_, h, {publicado});
     if(state.portal) state.portal.publicado=publicado;
-  }catch(e){ /* silencioso: se corrige con el próximo "Publicar cambios" */ }
+  }catch(e){ /* silencioso: se corrige con el próximo intento (editar alumnos, regenerar, o "Publicar cambios") */ }
 }
 
 /* ============ materiales por materia (Supabase Storage, bucket privado "materiales") ============
