@@ -78,6 +78,16 @@ const SEM_META = {
   amarillo:{color:"var(--sem-amarillo)",label:"En riesgo: llega ajustado, priorizar temas"},
   rojo:{color:"var(--sem-rojo)",label:"Complicado: difícilmente llegue así"},
 };
+// Color por materia (paso 73): paleta accesible fija de 8 colores con nombre — cada materia
+// guarda la key elegida en m.color; el token CSS de cada key (--subj-{key}-bg/-fg/-bd) ya
+// tiene el contraste resuelto para ambos temas (ver :root/.theme-dark en styles.css), así que
+// el color de una materia se ve igual en la lista, la agenda, las estadísticas, materiales y
+// el portal sin volver a calcular nada acá. Ver subjectColorKey() en helpers.js.
+const SUBJECT_COLOR_KEYS = ["teal","blue","purple","amber","rose","green","indigo","slate"];
+const SUBJECT_COLOR_LABELS = {
+  teal:"Verde azulado", blue:"Azul", purple:"Violeta", amber:"Ámbar",
+  rose:"Rosa", green:"Verde", indigo:"Índigo", slate:"Gris",
+};
 const CAREERS = ["Ingeniería","Licenciatura","Arquitectura","Ingresante"];
 function defaultCatalog(){
   return { careers:[...CAREERS],
@@ -93,10 +103,12 @@ function defaultCatalog(){
 const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};
 // Resultado del cierre de objetivo de clase (ver s.sessions[].objetivoResult en helpers.js).
 // pctDefault es el valor que toma el slider si el profesor no lo tocó antes de tocar el botón.
+// El ícono de cada uno (ICON_CHECK/ICON_HALF/ICON_X) vive en views.js — OBJETIVO_ICONS ahí — porque
+// config.js carga antes que los SVG inline del set unificado (ver paso 73 en CHANGELOG.md).
 const OBJETIVO_META = {
-  si:{label:"Sí",emoji:"✅",fg:"var(--tarea-hecha-fg)",bg:"var(--greenbg)",pctDefault:100},
-  medias:{label:"A medias",emoji:"🤏",fg:"var(--tarea-intentada-fg)",bg:"var(--amberbg)",pctDefault:50},
-  no:{label:"No",emoji:"❌",fg:"var(--tarea-no-fg)",bg:"var(--redbg)",pctDefault:0},
+  si:{label:"Sí",fg:"var(--tarea-hecha-fg)",bg:"var(--greenbg)",pctDefault:100},
+  medias:{label:"A medias",fg:"var(--tarea-intentada-fg)",bg:"var(--amberbg)",pctDefault:50},
+  no:{label:"No",fg:"var(--tarea-no-fg)",bg:"var(--redbg)",pctDefault:0},
 };
 // Estado de la seña de una clase puntual (ver s.clasesPuntuales[].seniaEstado en helpers.js).
 // "retenida"/"devuelta" son terminales (las pone applyCancelacion, no se tocan a mano); sólo

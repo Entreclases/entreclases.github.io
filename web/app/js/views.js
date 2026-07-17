@@ -29,6 +29,18 @@ const ICON_CHART=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_ACCOUNT=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c0-4 3.5-7 7.5-7s7.5 3 7.5 7"/></svg>`;
 const ICON_SHIELD=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>`;
 const ICON_SEARCH=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>`;
+/* ============ iconografía unificada (paso 73): mismo set de línea (viewBox 24, stroke-width 2,
+   stroke-linecap/linejoin round) para todo lo que antes era un emoji suelto — WhatsApp, objetivo
+   de clase, racha, superposición de horario y los tres resultados de objetivo (sí/a medias/no).
+   Documentado acá para reusar en vez de tipear un emoji nuevo si hace falta un ícono más. */
+const ICON_CHAT=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.9 8.9 0 0 1-3.1-.5L3 21l1.6-4.2A8.3 8.3 0 0 1 3.5 11.5 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg>`;
+const ICON_TARGET=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>`;
+const ICON_FLAME=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4.5 0 7-2.7 7-6.5C19 11 15.5 9 15 5c-1.8 2-2.5 3.7-2.5 5.5C10 9 9.5 6 10 3c-3 2-5 6-5 9.5C5 17.5 7.5 22 12 22z"/></svg>`;
+const ICON_WARNING=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v4"/><path d="M12 17.5v.1"/></svg>`;
+const ICON_HALF=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>`;
+const ICON_X=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+const ICON_WAVE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V6a1.8 1.8 0 0 1 3.6 0v5"/><path d="M11.6 11V4.6a1.8 1.8 0 0 1 3.6 0V11"/><path d="M15.2 11V6.4a1.8 1.8 0 0 1 3.6 0V15c0 4-2.5 7-6.8 7-3 0-4.6-1-6-2.7L3 15.4c-.6-.9-.4-2 .5-2.6.8-.5 1.8-.3 2.4.4L8 15.5"/></svg>`;
+const OBJETIVO_ICONS = {si:ICON_CHECK.replace('stroke="white"','stroke="currentColor"'), medias:ICON_HALF, no:ICON_X};
 const THEME_NAV_ICONS = {
   system:`<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>`,
   light:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`,
@@ -188,6 +200,7 @@ function vHoyClasesHoy(){
         return `<div class="hoy-row">
           <div class="hoy-row-main">
             <span class="hoy-row-time">${esc(e.time)}</span>
+            ${e.subjectId?subjectDot(e.subjectId):""}
             <span class="hoy-row-name">${esc(e.studentName)}</span>
             ${e.subject?`<span class="hint">· ${esc(e.subject)}</span>`:""}
           </div>
@@ -244,7 +257,7 @@ function vHoyProximo(){
     }
     if(manana.length){
       body += `<div class="hoy-subhead">Mañana</div>` + manana.map(e=>
-        `<div class="hoy-row"><span class="hoy-row-time">${esc(e.time)}</span><span class="hoy-row-name">${esc(e.studentName)}</span></div>`
+        `<div class="hoy-row"><span class="hoy-row-time">${esc(e.time)}</span>${e.subjectId?subjectDot(e.subjectId):""}<span class="hoy-row-name">${esc(e.studentName)}</span></div>`
       ).join("");
     }
   }
@@ -280,7 +293,7 @@ function vTablero(){
     : alerts.map(a=>`<div class="alert-row">
         <button class="alert" data-a="open" data-id="${a.s.id}">
           <span class="dot"></span><b>${esc(a.s.name)}</b><span class="t">${esc(a.text)}</span></button>
-        ${hasPhone(a.s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(a.s,waMsgForAlert(a.s,a.wa))}">💬</a>`:""}
+        ${hasPhone(a.s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(a.s,waMsgForAlert(a.s,a.wa))}">${ICON_CHAT}</a>`:""}
       </div>`).join("");
 
   h += `<div class="stitle">Próximos exámenes</div>`;
@@ -342,7 +355,7 @@ function vCobrosBanner(){
           </div>
           <div style="text-align:right;flex-shrink:0">
             <div style="font-weight:600;font-family:var(--mono)">${fmtMoney(subtotal)}</div>
-            ${hasPhone(s)?`<a class="wa-quick" style="margin-top:4px" title="WhatsApp: recordatorio de pago" target="_blank" rel="noopener" href="${waLink(s,waMsgCobro(s))}">💬</a>`:""}
+            ${hasPhone(s)?`<a class="wa-quick" style="margin-top:4px" title="WhatsApp: recordatorio de pago" target="_blank" rel="noopener" href="${waLink(s,waMsgCobro(s))}">${ICON_CHAT}</a>`:""}
           </div>
         </div>`;
       }).join("") + `</div>`;
@@ -420,7 +433,7 @@ function vLista(){
         <div class="sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")} · temas ${seen}/${rel}</div></div>
         <div class="right">${right}</div>
       </button>
-      ${hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">💬</a>`:""}
+      ${hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">${ICON_CHAT}</a>`:""}
     </div>`;
   }).join("");
   return h;
@@ -491,8 +504,8 @@ function vDetalle(){
         <span class="tareatag">${c.duration!=null&&c.duration!==""?Math.round(c.duration)+" min":"60 min (asumido)"}</span>
         ${c.tarea&&c.tarea!=="sd"?`<span class="tareatag" style="color:${TAREA_META[c.tarea].fg}">tarea: ${TAREA_META[c.tarea].label}</span>`:""}
         ${c.note?`<div class="note">${esc(c.note)}</div>`:""}
-        ${c.objetivo?`<div class="note goaltag">🎯 ${esc(c.objetivo)}${c.objetivoResult
-          ? ` <span style="color:${OBJETIVO_META[c.objetivoResult.estado].fg}">· ${OBJETIVO_META[c.objetivoResult.estado].emoji} ${OBJETIVO_META[c.objetivoResult.estado].label}${c.objetivoResult.pct!=null?` (${c.objetivoResult.pct}%)`:""}</span>`
+        ${c.objetivo?`<div class="note goaltag"><span class="icon-inline">${ICON_TARGET}</span> ${esc(c.objetivo)}${c.objetivoResult
+          ? ` <span style="color:${OBJETIVO_META[c.objetivoResult.estado].fg}">· <span class="icon-inline">${OBJETIVO_ICONS[c.objetivoResult.estado]}</span> ${OBJETIVO_META[c.objetivoResult.estado].label}${c.objetivoResult.pct!=null?` (${c.objetivoResult.pct}%)`:""}</span>`
           : ` <span class="hint">· sin evaluar todavía</span>`}</div>` : ""}</div>
         ${cobraPorClase?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
         <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar">×</button></div>`).join("");
@@ -520,7 +533,7 @@ function vDetalle(){
     const opt=(v,cur,l)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(l)}</option>`;
     const streak = goalStreak(s);
     if(streak>0) h += `<div class="formcard" style="padding:10px 16px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:20px">🔥</span>
+      <span class="icon-inline" style="width:20px;height:20px;color:var(--amber)">${ICON_FLAME}</span>
       <span style="font-size:13.5px"><b>${streak}</b> objetivo${streak===1?"":"s"} de clase cumplido${streak===1?"":"s"} seguido${streak===1?"":"s"}</span>
     </div>`;
     h += `<div class="formcard" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -606,7 +619,7 @@ function vGoalClosure(s){
     const msg = cel.estado==="si" ? "¡Buenísimo! Así se construye una racha." :
                 cel.estado==="medias" ? "Un paso más y lo tiene — anotado." : "A seguir insistiendo con eso.";
     return `<div class="goalcard goalcard-cel" style="border-color:${m.fg};background:${m.bg}">
-      <div class="goalcard-emoji">${m.emoji}</div>
+      <div class="goalcard-emoji" style="color:${m.fg}">${OBJETIVO_ICONS[cel.estado]}</div>
       <div class="goalcard-msg" style="color:${m.fg}">${msg}</div>
     </div>`;
   }
@@ -615,9 +628,9 @@ function vGoalClosure(s){
     <div class="goalcard-q">¿Se cumplió «${esc(c.objetivo)}»?</div>
     <div class="hint" style="margin-bottom:8px">Clase del ${esc(fmtDate(c.date))}</div>
     <div class="goalcard-btns">
-      <button class="goalbtn si" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="si">✅ Sí</button>
-      <button class="goalbtn medias" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="medias">🤏 A medias</button>
-      <button class="goalbtn no" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="no">❌ No</button>
+      <button class="goalbtn si" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="si"><span class="goalbtn-icon">${OBJETIVO_ICONS.si}</span> Sí</button>
+      <button class="goalbtn medias" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="medias"><span class="goalbtn-icon">${OBJETIVO_ICONS.medias}</span> A medias</button>
+      <button class="goalbtn no" data-a="goal-resultado" data-sid="${s.id}" data-id="${c.id}" data-r="no"><span class="goalbtn-icon">${OBJETIVO_ICONS.no}</span> No</button>
     </div>
     <div class="goalcard-slider">
       <span class="hint">Afiná el % si querés (opcional)</span>
@@ -872,11 +885,12 @@ function vAgendaDayDetail(date){
 function vAgendaEvent(e, date){
   const past = date<today();
   const already = past && studentHasSessionOnDate(e.studentId, e.date);
-  return `<div class="agenda-event ${e.overlap?"overlap":""}">
+  const borderColor = e.subjectId ? `var(--subj-${subjectColorKey(e.subjectId)}-fg)` : "transparent";
+  return `<div class="agenda-event ${e.overlap?"overlap":""}" style="border-left:3px solid ${borderColor}">
     <div class="agenda-time">${esc(e.time)} <span class="hint">${e.duration}min</span></div>
-    <div class="agenda-who"><b>${esc(e.studentName)}</b>${e.subject?` <span class="hint">· ${esc(e.subject)}</span>`:""}</div>
+    <div class="agenda-who">${e.subjectId?subjectDot(e.subjectId):""} <b>${esc(e.studentName)}</b>${e.subject?` <span class="hint">· ${esc(e.subject)}</span>`:""}</div>
     ${e.seniaEstado?`<span class="chip" style="margin-top:4px;color:${SENIA_ESTADO_META[e.seniaEstado].fg};border-color:${SENIA_ESTADO_META[e.seniaEstado].fg}">Seña ${SENIA_ESTADO_META[e.seniaEstado].label.toLowerCase()}</span>`:""}
-    ${e.overlap?`<div class="hint" style="color:var(--red)">⚠ se superpone con otra clase</div>`:""}
+    ${e.overlap?`<div class="hint" style="color:var(--red);display:flex;align-items:center;gap:4px"><span class="icon-inline" style="width:12px;height:12px">${ICON_WARNING}</span> se superpone con otra clase</div>`:""}
     ${past && already ? `<div class="hint" style="color:var(--green)">Ya registrada</div>` : ""}
     ${past && !already ? `<button class="chip" style="margin-top:6px" data-a="agenda-log" data-id="${e.studentId}" data-date="${e.date}">Registrar esta clase</button>` : ""}
   </div>`;
@@ -1660,10 +1674,16 @@ function vCatalog(){
   let h = pageHead("Materias","Materias, carreras y materiales");
   const em = state.editSubjectId ? subjById(state.editSubjectId) : null;
   if(em){
-    h += `<div class="formcard"><div class="ftitle">Editar materia</div>
+    h += `<div class="formcard"><div class="ftitle" style="display:flex;align-items:center;gap:8px">${subjectDot(em)}Editar materia</div>
     ${em.id==="materia-ejemplo"?`<div class="hint" style="margin-bottom:12px">Esta materia viene de ejemplo para mostrar el formato de unidades — renombrala o borrala cuando quieras.</div>`:""}
     <div class="field"><div class="flabel">Nombre de la materia</div>
       <input data-cf="subj-name" value="${esc(em.name)}"></div>
+    <div class="flabel" style="margin-top:12px">Color (para identificarla en toda la app)</div>
+    <div class="subj-swatches">${SUBJECT_COLOR_KEYS.map(k=>{
+      const sel = subjectColorKey(em)===k;
+      return `<button class="subj-swatch ${sel?"sel":""}" data-a="cat-set-subject-color" data-color="${k}"
+        style="background:var(--subj-${k}-fg)" title="${esc(SUBJECT_COLOR_LABELS[k])}">${sel?ICON_CHECK:""}</button>`;
+    }).join("")}</div>
     <div class="flabel" style="margin-top:12px">Unidades / temas (se muestran en este orden)</div>
     ${em.units.map((u,i)=>`<div class="log" style="padding:7px 12px"><div class="body">${esc(u)}</div>
       <button class="del" data-a="cat-del-unit" data-i="${i}" title="Quitar unidad">×</button></div>`).join("") || `<div class="empty">Sin unidades todavía. Agregá la primera acá abajo.</div>`}
@@ -1702,7 +1722,7 @@ function vCatalog(){
   ${c.subjects.map(m=>{
     const packNames=packsContaining(m.id).map(p=>p.name);
     return `<div class="row" style="cursor:pointer" data-a="cat-edit-subject" data-id="${m.id}">
-    <div class="main"><b>${esc(m.name)}</b> ${packNames.map(n=>`<span class="pill" style="color:var(--blue);background:var(--bluebg)">${esc(n)}</span>`).join(" ")}
+    <div class="main"><b style="display:inline-flex;align-items:center;gap:7px">${subjectDot(m)}${esc(m.name)}</b> ${packNames.map(n=>`<span class="pill" style="color:var(--blue);background:var(--bluebg)">${esc(n)}</span>`).join(" ")}
       <div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
     <button class="del" data-a="cat-del-subject" data-id="${m.id}" title="Eliminar materia">×</button></div>`;
   }).join("") || `<div class="empty">Sin materias cargadas.</div>`}
@@ -1737,7 +1757,7 @@ function vCatalog(){
 
 /* ============ materiales de una materia (dentro de su editor) ============ */
 function vMateriales(subjectId){
-  let h = `<div class="formcard"><div class="ftitle">Materiales</div>`;
+  let h = `<div class="formcard"><div class="ftitle" style="display:flex;align-items:center;gap:8px">${subjectDot(subjectId)}Materiales</div>`;
   if(!navigator.onLine || state.materialesError==="offline"){
     h += `<div class="hint">Necesitás conexión a internet para ver y subir materiales.</div></div>`;
     return h;
@@ -1917,9 +1937,9 @@ function vObjetivosGeneral(){
   </div>`;
 
   const bySubject = state.catalog.subjects
-    .map(m=>({label:m.name, c:goalCounts(students.filter(s=>s.subjectId===m.id))}))
+    .map(m=>({label:m.name, subjectId:m.id, c:goalCounts(students.filter(s=>s.subjectId===m.id))}))
     .filter(x=>x.c.total>0)
-    .map(x=>({label:x.label, c:{aprobo:x.c.si, total:x.c.total}}));
+    .map(x=>({label:x.label, subjectId:x.subjectId, c:{aprobo:x.c.si, total:x.c.total}}));
   const sinMateria = goalCounts(students.filter(s=>!s.subjectId));
   if(sinMateria.total>0) bySubject.push({label:"Materia s/d", c:{aprobo:sinMateria.si, total:sinMateria.total}});
   if(bySubject.length>1) h += tasaAprobacionBars(bySubject);
@@ -1940,7 +1960,7 @@ function vTasaAprobacionGeneral(){
   </div>`;
 
   const bySubject = state.catalog.subjects
-    .map(m=>({label:m.name, c:examResultCounts(students.filter(s=>s.subjectId===m.id))}))
+    .map(m=>({label:m.name, subjectId:m.id, c:examResultCounts(students.filter(s=>s.subjectId===m.id))}))
     .filter(x=>x.c.total>0);
   const sinMateria = examResultCounts(students.filter(s=>!s.subjectId));
   if(sinMateria.total>0) bySubject.push({label:"Materia s/d", c:sinMateria});
@@ -1948,13 +1968,15 @@ function vTasaAprobacionGeneral(){
   return h;
 }
 function tasaAprobacionBars(entries){
-  return entries.map(({label,c})=>{
+  return entries.map(({label,subjectId,c})=>{
     const pct=Math.round(c.aprobo/c.total*100);
+    const color = subjectId ? `var(--subj-${subjectColorKey(subjectId)}-fg)` : "var(--gray2)";
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
       <div style="width:130px;flex-shrink:0;font-size:12.5px;color:var(--muted);white-space:nowrap;
-        overflow:hidden;text-overflow:ellipsis" title="${esc(label)}">${esc(label)}</div>
+        overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px" title="${esc(label)}">
+        ${subjectId?subjectDot(subjectId):""}${esc(label)}</div>
       <div style="flex:1;background:var(--soft);border-radius:4px;overflow:hidden;height:14px">
-        <div style="height:100%;width:${pct}%;background:var(--green);border-radius:4px"></div>
+        <div class="subj-bar" style="width:${pct}%;background:${color}"></div>
       </div>
       <div style="width:70px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted)">${pct}% (${c.total})</div>
     </div>`;

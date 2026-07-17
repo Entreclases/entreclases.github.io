@@ -35,6 +35,11 @@ function fmtDiaLocal(ds){
 }
 // Colores/etiquetas de cada estado de unidad, duplicados acá (no cargamos config.js: portal.js
 // es standalone) — mismo criterio que SUPA_URL/SUPA_ANON_KEY más arriba.
+// Color por materia (ver SUBJECT_COLOR_KEYS/subjectColorKey en config.js/helpers.js) — portal.js
+// no carga esos archivos (es standalone), así que sólo necesita el color final (m.color, ya
+// resuelto por la app antes de publicar, ver publicarPortal() en sync.js) y los mismos tokens
+// --subj-*-fg duplicados en portal.html (mismo criterio que SUPA_URL/SUPA_ANON_KEY más arriba).
+const SUBJECT_COLOR_FALLBACK = "slate";
 const TOPIC_BAR_META = {
   pendiente:{pct:6, label:"Pendiente", color:"var(--faint)"},
   visto:{pct:35, label:"Visto", color:"var(--blue)"},
@@ -45,8 +50,11 @@ const TOPIC_BAR_META = {
 // Bloque personal de un alumno con llave individual (ver buildAlumnoBlock en sync.js) — sólo
 // trae los campos que el docente tildó explícitamente en la ficha; nunca notas, pagos, señas ni
 // comentarios privados (eso ni siquiera sale de la app, ver el comentario en esa función).
+// Ícono de saludo, mismo set de línea que la app (ICON_WAVE en views.js) — duplicado acá
+// porque portal.js es standalone y no carga ese archivo (ver el comentario de SUPA_URL arriba).
+const ICON_WAVE=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V6a1.8 1.8 0 0 1 3.6 0v5"/><path d="M11.6 11V4.6a1.8 1.8 0 0 1 3.6 0V11"/><path d="M15.2 11V6.4a1.8 1.8 0 0 1 3.6 0V15c0 4-2.5 7-6.8 7-3 0-4.6-1-6-2.7L3 15.4c-.6-.9-.4-2 .5-2.6.8-.5 1.8-.3 2.4.4L8 15.5"/></svg>`;
 function personalHtml(alumno){
-  let h = `<div class="card personal"><div class="hello">Hola, ${esc(alumno.nombre||"")} 👋</div>`;
+  let h = `<div class="card personal"><div class="hello">Hola, ${esc(alumno.nombre||"")} <span class="icon-inline">${ICON_WAVE}</span></div>`;
   if("proximaClase" in alumno){
     const pc = alumno.proximaClase;
     h += `<div class="prow"><div class="plabel">Próxima clase</div>
@@ -91,13 +99,13 @@ function bibliotecaHtml(items, filtro){
   const bySubject = new Map();
   filtered.forEach(it=>{
     const key = it.materia || "Sin materia";
-    if(!bySubject.has(key)) bySubject.set(key, []);
-    bySubject.get(key).push(it);
+    if(!bySubject.has(key)) bySubject.set(key, {color:it.color||SUBJECT_COLOR_FALLBACK, files:[]});
+    bySubject.get(key).files.push(it);
   });
-  return [...bySubject.entries()].map(([materia, files])=>`
+  return [...bySubject.entries()].map(([materia, group])=>`
     <div class="subject">
-      <div class="subjectname">${esc(materia)}</div>
-      ${files.map(it=>`<div class="file">
+      <div class="subjectname"><span class="subj-dot" style="background:var(--subj-${group.color}-fg)"></span>${esc(materia)}</div>
+      ${group.files.map(it=>`<div class="file">
         <div class="filemain">${esc(it.nombre)}<div class="filemeta">${fmtBytes(it.bytes)}${it.at?" · "+fmtDate(it.at):""}</div></div>
         <a class="dl" href="${esc(it.url)}" target="_blank" rel="noopener">Descargar</a>
       </div>`).join("")}

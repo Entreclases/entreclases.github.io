@@ -51,6 +51,14 @@
     --status-dejo-fg:#8B90A0; --status-dejo-bg:#F0F0EE;
     --sem-sd:var(--gray); --sem-verde:var(--green); --sem-amarillo:var(--amber); --sem-rojo:var(--red);
     --tarea-hecha-fg:#1F6B44; --tarea-intentada-fg:#8A6410; --tarea-no-fg:#A23A2A;
+    --subj-teal-bg:#CCFBF1; --subj-teal-fg:#0F766E; --subj-teal-bd:#5EEAD4;
+    --subj-blue-bg:#DBEAFE; --subj-blue-fg:#1D4ED8; --subj-blue-bd:#93C5FD;
+    --subj-purple-bg:#EDE9FE; --subj-purple-fg:#6D28D9; --subj-purple-bd:#C4B5FD;
+    --subj-amber-bg:#FEF3C7; --subj-amber-fg:#92400E; --subj-amber-bd:#FCD34D;
+    --subj-rose-bg:#FFE4E6; --subj-rose-fg:#BE123C; --subj-rose-bd:#FDA4AF;
+    --subj-green-bg:#DCFCE7; --subj-green-fg:#15803D; --subj-green-bd:#86EFAC;
+    --subj-indigo-bg:#E0E7FF; --subj-indigo-fg:#4338CA; --subj-indigo-bd:#A5B4FC;
+    --subj-slate-bg:#E2E8F0; --subj-slate-fg:#475569; --subj-slate-bd:#94A3B8;
     --sans:'Inter',-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
     --display:'Poppins',var(--sans);
     --mono:ui-monospace,"Cascadia Mono",Consolas,"Roboto Mono",monospace;
@@ -83,6 +91,14 @@
       --status-dejo-fg:#8B90A0; --status-dejo-bg:#242836;
       --sem-sd:var(--gray); --sem-verde:var(--green); --sem-amarillo:var(--amber); --sem-rojo:var(--red);
       --tarea-hecha-fg:#8FC4A6; --tarea-intentada-fg:#E3C878; --tarea-no-fg:#E8A093;
+      --subj-teal-bg:#134E4A; --subj-teal-fg:#5EEAD4; --subj-teal-bd:#0F766E;
+      --subj-blue-bg:#1E3A5F; --subj-blue-fg:#93C5FD; --subj-blue-bd:#3B82F6;
+      --subj-purple-bg:#2E1F5E; --subj-purple-fg:#C4B5FD; --subj-purple-bd:#7C3AED;
+      --subj-amber-bg:#422F0B; --subj-amber-fg:#FBBF24; --subj-amber-bd:#92400E;
+      --subj-rose-bg:#4C1424; --subj-rose-fg:#FDA4AF; --subj-rose-bd:#BE123C;
+      --subj-green-bg:#14321F; --subj-green-fg:#86EFAC; --subj-green-bd:#15803D;
+      --subj-indigo-bg:#262452; --subj-indigo-fg:#A5B4FC; --subj-indigo-bd:#4338CA;
+      --subj-slate-bg:#2B3348; --subj-slate-fg:#CBD5E1; --subj-slate-bd:#475569;
       --shadow-sm:0 1px 2px rgba(0,0,0,.3); --shadow-md:0 8px 20px -6px rgba(0,0,0,.45);
       --shadow-lg:0 20px 40px -20px rgba(0,0,0,.6); --shadow-accent:0 8px 20px -6px rgba(45,212,192,.4);
     }
@@ -109,6 +125,14 @@
     --status-dejo-fg:#8B90A0; --status-dejo-bg:#242836;
     --sem-sd:var(--gray); --sem-verde:var(--green); --sem-amarillo:var(--amber); --sem-rojo:var(--red);
     --tarea-hecha-fg:#8FC4A6; --tarea-intentada-fg:#E3C878; --tarea-no-fg:#E8A093;
+    --subj-teal-bg:#134E4A; --subj-teal-fg:#5EEAD4; --subj-teal-bd:#0F766E;
+    --subj-blue-bg:#1E3A5F; --subj-blue-fg:#93C5FD; --subj-blue-bd:#3B82F6;
+    --subj-purple-bg:#2E1F5E; --subj-purple-fg:#C4B5FD; --subj-purple-bd:#7C3AED;
+    --subj-amber-bg:#422F0B; --subj-amber-fg:#FBBF24; --subj-amber-bd:#92400E;
+    --subj-rose-bg:#4C1424; --subj-rose-fg:#FDA4AF; --subj-rose-bd:#BE123C;
+    --subj-green-bg:#14321F; --subj-green-fg:#86EFAC; --subj-green-bd:#15803D;
+    --subj-indigo-bg:#262452; --subj-indigo-fg:#A5B4FC; --subj-indigo-bd:#4338CA;
+    --subj-slate-bg:#2B3348; --subj-slate-fg:#CBD5E1; --subj-slate-bd:#475569;
     --shadow-sm:0 1px 2px rgba(0,0,0,.3); --shadow-md:0 8px 20px -6px rgba(0,0,0,.45);
     --shadow-lg:0 20px 40px -20px rgba(0,0,0,.6); --shadow-accent:0 8px 20px -6px rgba(45,212,192,.4);
   }
@@ -195,6 +219,7 @@
   .wa-quick{flex-shrink:0;width:32px;height:32px;border-radius:99px;border:1px solid var(--greenline,var(--line));
             background:var(--greenbg);color:var(--green);display:flex;align-items:center;justify-content:center;
             font-size:15px;line-height:1;text-decoration:none}
+  .wa-quick svg{width:16px;height:16px}
   .examresult{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
               border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13.5px}
   .agenda-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
@@ -284,7 +309,7 @@
   .goalcard-slider{display:flex;flex-direction:column;gap:4px}
   .goalcard-slider input[type=range]{width:100%;accent-color:var(--accent)}
   .goalcard-cel{display:flex;align-items:center;gap:12px;text-align:left}
-  .goalcard-emoji{font-size:34px;animation:goalPop .5s cubic-bezier(.34,1.56,.64,1)}
+  .goalcard-emoji{width:34px;height:34px;flex-shrink:0;animation:goalPop .5s cubic-bezier(.34,1.56,.64,1)}
   .goalcard-msg{font-weight:700;font-size:14.5px}
   @media (prefers-reduced-motion:reduce){.goalcard,.goalcard-emoji{animation:none}}
   .aula-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--faint);margin-bottom:14px;align-items:center}
@@ -479,6 +504,28 @@
   .search-row-text{min-width:0;display:flex;flex-direction:column;gap:1px}
   .search-row-label{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .search-row-sub{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* ============ color por materia (paso 73): dot/chip que usan la misma key en toda la app
+     (lista de materias, agenda, estadísticas, materiales, portal) — ver subjectColorKey() en
+     helpers.js y SUBJECT_COLOR_KEYS en config.js. El picker son 8 swatches con foco/selección
+     visibles, mismo tamaño de toque (28px) que el resto de los controles chicos. ============ */
+  .subj-dot{width:9px;height:9px;border-radius:99px;display:inline-block;flex-shrink:0}
+  .subj-chip{font-size:10.5px;font-family:var(--mono);font-weight:600;border-radius:99px;
+    padding:3px 9px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .subj-swatches{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+  .subj-swatch{width:28px;height:28px;border-radius:99px;border:2px solid transparent;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .subj-swatch.sel{border-color:var(--ink)}
+  .subj-swatch svg{width:14px;height:14px;color:#fff}
+  .subj-bar{height:100%;border-radius:4px}
+
+  /* ============ ícono inline genérico: mismo trazo que el resto del set (ver ICON_* en
+     views.js), para reemplazar los emojis sueltos que quedaban en botones/notas ============ */
+  .icon-inline{display:inline-flex;vertical-align:-3px;width:16px;height:16px;flex-shrink:0}
+  .icon-inline svg{width:100%;height:100%;display:block}
+  .goalbtn-icon{display:inline-flex;width:16px;height:16px;vertical-align:-3px;margin-right:2px}
+  .goalbtn-icon svg{width:100%;height:100%;display:block}
+  .goalcard-emoji svg{width:100%;height:100%;display:block}
 
   /* ============ toasts: feedback breve y no intrusivo tras una acción ============ */
   .toast-wrap{position:fixed;left:0;right:0;bottom:72px;z-index:70;display:flex;flex-direction:column;

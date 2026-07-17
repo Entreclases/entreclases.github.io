@@ -186,17 +186,21 @@ document.addEventListener("click", (e)=>{
   else if(a==="cat-del-career"){ state.catalog.careers.splice(+el.dataset.i,1); touchCatalog(); return; }
   else if(a==="cat-add-subject"){
     const v=(document.getElementById("new-subject").value||"").trim(); if(!v) return;
-    const m={id:uid(), name:v, units:[]};
+    const m={id:uid(), name:v, units:[], color:nextSubjectColor()};
     state.catalog.subjects.push(m); state.editSubjectId=m.id;
     loadMateriales(m.id);
     touchCatalog(); return;
   }
   else if(a==="cat-add-from-template"){
     const t=SUBJECT_TEMPLATES.find(x=>x.id===el.dataset.id); if(!t) return;
-    const m={id:uid(), name:t.name, units:[...t.units]};
+    const m={id:uid(), name:t.name, units:[...t.units], color:nextSubjectColor()};
     state.catalog.subjects.push(m); state.editSubjectId=m.id;
     loadMateriales(m.id);
     touchCatalog(); return;
+  }
+  else if(a==="cat-set-subject-color"){
+    const m=subjById(state.editSubjectId); if(!m) return;
+    m.color=el.dataset.color; touchCatalog(); return;
   }
   else if(a==="cat-edit-subject"){
     state.editSubjectId=el.dataset.id; state.editPackId=null;

@@ -488,7 +488,7 @@ async function publicarPortal(){
     const biblioteca=await Promise.all(compartidos.map(async f=>{
       const path=materialPath(uid_, f.subjectId, f.name);
       const url=await signMaterialUrl(s, path, PORTAL_LINK_TTL_DAYS*86400);
-      return {subjectId:f.subjectId, materia:f.subject, nombre:materialDisplayName(f.name),
+      return {subjectId:f.subjectId, materia:f.subject, color:subjectColorKey(f.subjectId), nombre:materialDisplayName(f.name),
         path, url, bytes:f.bytes||0, at:f.at||null, firmadoAt:Date.now()};
     }));
     const alumnoIds=[...new Set(Object.values(state.portal.tokensAlumnos||{}))];

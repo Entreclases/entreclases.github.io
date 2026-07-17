@@ -91,6 +91,28 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               searchOpen:false, searchQuery:"", searchSel:0 };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
+// Color por materia (paso 73): key estable de SUBJECT_COLOR_KEYS. Si la materia ya tiene
+// m.color usa esa; si no (catálogos viejos, o llamado con sólo el id) cae en un hash simple
+// del id para que la asignación sea siempre la misma sin tener que migrar nada a mano —
+// mismo patrón que cancelPolicyFor()/recordatoriosFor() en config.js.
+function subjectColorKey(subjectOrId){
+  const m = (subjectOrId && typeof subjectOrId==="object") ? subjectOrId : subjById(subjectOrId);
+  if(m && m.color && SUBJECT_COLOR_KEYS.includes(m.color)) return m.color;
+  const id = (m ? m.id : subjectOrId) || "";
+  let h=0; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))|0;
+  return SUBJECT_COLOR_KEYS[Math.abs(h)%SUBJECT_COLOR_KEYS.length];
+}
+// Color por defecto para una materia nueva: el key menos usado entre las materias existentes
+// (empatando, el primero de la paleta) — así materias creadas seguidas no repiten color.
+function nextSubjectColor(){
+  const counts = Object.fromEntries(SUBJECT_COLOR_KEYS.map(k=>[k,0]));
+  state.catalog.subjects.forEach(m=>{ const k=subjectColorKey(m); counts[k]=(counts[k]||0)+1; });
+  return SUBJECT_COLOR_KEYS.reduce((best,k)=>counts[k]<counts[best]?k:best, SUBJECT_COLOR_KEYS[0]);
+}
+function subjectDot(subjectOrId){
+  const k = subjectColorKey(subjectOrId);
+  return `<span class="subj-dot" style="background:var(--subj-${k}-fg)"></span>`;
+}
 function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object.keys(s.topics||{}); }
 function careerOptions(cur){ const l=[...state.catalog.careers]; if(cur && !l.includes(cur)) l.push(cur); return l; }
 function touchCatalog(){ state.catalog.updatedAt=Date.now(); save(); render(); }
@@ -447,7 +469,7 @@ function agendaRangeEvents(fromDate, toDate){
       for(let d=fromDate; d<=toDate; d=addDays(d,1)){
         const dow=weekdayIdx(d);
         (s.horarios||[]).filter(h=>h.day===dow).forEach(h=>{
-          events.push({studentId:s.id, studentName:s.name, subject:s.subject,
+          events.push({studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId,
             date:d, time:h.time, duration:Number(h.duration)||60, kind:"horario", sourceId:h.id});
         });
       }
@@ -455,7 +477,7 @@ function agendaRangeEvents(fromDate, toDate){
     (s.clasesPuntuales||[]).forEach(p=>{
       if(p.cancelada) return;
       if(p.date>=fromDate && p.date<=toDate) events.push({
-        studentId:s.id, studentName:s.name, subject:s.subject,
+        studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId,
         date:p.date, time:p.time, duration:Number(p.duration)||60,
         kind:"puntual", sourceId:p.id, seniaEstado:p.seniaEstado });
     });
