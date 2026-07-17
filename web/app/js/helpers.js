@@ -64,7 +64,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               listSearch:"", listSubject:"todas", listCareer:"todas", listSem:"todos",
               simTimer:null, simTimerLastMin:90, simPrefillNote:"",
               statsSubjectId:null,
-              showNew:false, newStudentError:"", confirmDel:false, fichaError:"", saveErr:false,
+              showNew:false, newStudentError:"", confirmDel:false, catConfirmDelId:null, trashPurgeConfirmKey:null, fichaError:"", saveErr:false,
               syncStatus:"idle", syncMsg:"", lastSync:null,
               authMode:"login", authEmail:"", recovery:null,
               pendingConfirmEmail:null, confirmStatus:"idle", confirmError:"",
@@ -118,16 +118,19 @@ function unitsFor(s){ const m=subjById(s.subjectId); return m ? m.units : Object
 function careerOptions(cur){ const l=[...state.catalog.careers]; if(cur && !l.includes(cur)) l.push(cur); return l; }
 function touchCatalog(){ state.catalog.updatedAt=Date.now(); save(); render(); }
 // Feedback breve y no intrusivo tras una acción (ver .toast-wrap en styles.css) — se apila en
-// state.toasts y se autodescarta solo pasado TOAST_MS, sin bloquear ni pedir click.
-const TOAST_MS = 2600;
-function toast(text, tone){
+// state.toasts y se autodescarta solo pasado TOAST_MS (TOAST_UNDO_MS si tiene botón "Deshacer",
+// para dar más tiempo a reaccionar), sin bloquear ni pedir click. Patrón único de borrado (paso
+// 76): toda acción que borra algo llama a toast() con un tercer argumento "undo" — una función
+// sin argumentos que revierte el borrado — y el toast muestra el botón; ver data-a="toast-undo".
+const TOAST_MS = 2600, TOAST_UNDO_MS = 6000;
+function toast(text, tone, undo){
   const id = uid();
-  state.toasts = [...state.toasts, {id, text, tone: tone||"ok"}];
+  state.toasts = [...state.toasts, {id, text, tone: tone||"ok", undo: undo||null}];
   render();
   setTimeout(()=>{
     state.toasts = state.toasts.filter(t=>t.id!==id);
     render();
-  }, TOAST_MS);
+  }, undo ? TOAST_UNDO_MS : TOAST_MS);
 }
 // packs: agrupan materias existentes para dar de alta un alumno en todas de una (ver events.js
 // "create"). Catálogos guardados antes de este campo no tienen packs — se completa acá.
@@ -144,9 +147,16 @@ function load(){
         state.catalog = p.catalog; }
   }catch(e){}
   if(!Array.isArray(state.catalog.packs)) state.catalog.packs=[];
-  // limpiar marcas de borrado con más de 90 días (ya viajaron a todos los dispositivos)
-  state.students = state.students.filter(s => !(s.deleted && (Date.now()-(s.updatedAt||0)) > 90*86400000));
+  if(!Array.isArray(state.catalog.trash)) state.catalog.trash=[];
+  // papelera (paso 76): alumnos y materias borrados quedan restaurables 7 días y se purgan solos
+  // pasado ese plazo — students usa el mismo flag "deleted" que antes (ahora con ventana de 7
+  // días en vez de 90), catalog.trash guarda materias enteras sacadas de catalog.subjects.
+  state.students = state.students.filter(s => !(s.deleted && (Date.now()-(s.deletedAt||s.updatedAt||0)) > TRASH_DAYS*86400000));
+  state.catalog.trash = state.catalog.trash.filter(t => (Date.now()-(t.deletedAt||0)) <= TRASH_DAYS*86400000);
 }
+const TRASH_DAYS = 7;
+// días restantes antes de que la papelera purgue algo sola, a partir de un ts en ms (deletedAt)
+function trashDaysLeft(deletedAt){ return Math.max(0, TRASH_DAYS - Math.floor((Date.now()-(deletedAt||0))/86400000)); }
 function setDirty(v){ try{ v ? localStorage.setItem(DIRTY_KEY,"1") : localStorage.removeItem(DIRTY_KEY); }catch(e){} }
 function isDirty(){ return localStorage.getItem(DIRTY_KEY)==="1"; }
 function save(){

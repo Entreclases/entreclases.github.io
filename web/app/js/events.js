@@ -81,7 +81,7 @@ document.addEventListener("click", (e)=>{
     state.backupsLoaded=false; state.backupsError=""; loadBackups();
     state.portalLoaded=false; state.portalError=""; state.portalCopyMsg=""; loadPortal();
   }
-  else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; state.editPackId=null; }
+  else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; state.editPackId=null; state.catConfirmDelId=null; }
   else if(a==="nav-pagos"){ state.view="pagos"; state.selId=null; if(!state.pagosMonth) state.pagosMonth=currentMonthKey(); }
   else if(a==="nav-agenda"){ state.view="agenda"; state.selId=null; }
   else if(a==="agenda-view-semana"){ state.agendaViewMode="semana"; }
@@ -209,7 +209,12 @@ document.addEventListener("click", (e)=>{
     state.editSubjectId=el.dataset.id; state.editPackId=null;
     loadMateriales(el.dataset.id); return;
   }
-  else if(a==="cat-del-subject"){ deleteSubjectAndMaybeMaterials(el.dataset.id); return; }
+  else if(a==="cat-ask-del-subject"){ state.catConfirmDelId={type:"subject", id:el.dataset.id}; }
+  else if(a==="cat-cancel-del"){ state.catConfirmDelId=null; }
+  else if(a==="cat-confirm-del-subject"){
+    state.catConfirmDelId=null;
+    deleteSubjectAndMaybeMaterials(el.dataset.id); return;
+  }
   else if(a==="cat-close-edit"){ state.editSubjectId=null; }
   else if(a==="cat-add-unit"){
     const v=(document.getElementById("new-unit").value||"").trim(); if(!v) return;
@@ -222,9 +227,17 @@ document.addEventListener("click", (e)=>{
     m.units.splice(+el.dataset.i,1); touchCatalog(); return;
   }
   else if(a==="cat-edit-pack"){ state.editPackId=el.dataset.id; state.editSubjectId=null; }
-  else if(a==="cat-del-pack"){
+  else if(a==="cat-ask-del-pack"){ state.catConfirmDelId={type:"pack", id:el.dataset.id}; }
+  else if(a==="cat-confirm-del-pack"){
+    state.catConfirmDelId=null;
+    const removed=(state.catalog.packs||[]).find(p=>p.id===el.dataset.id); if(!removed) return;
     state.catalog.packs=(state.catalog.packs||[]).filter(p=>p.id!==el.dataset.id);
-    touchCatalog(); return;
+    touchCatalog();
+    toast("Pack eliminado", "ok", ()=>{
+      state.catalog.packs=[...(state.catalog.packs||[]), removed];
+      touchCatalog();
+      toast("Pack restaurado");
+    }); return;
   }
   else if(a==="cat-close-pack-edit"){ state.editPackId=null; }
   else if(a==="pack-toggle-subject"){
@@ -520,8 +533,13 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="del-session" && s){
+    const removed=s.sessions.find(x=>x.id===el.dataset.id);
     update(s.id,{sessions:s.sessions.filter(x=>x.id!==el.dataset.id)});
-    toast("Clase eliminada"); return;
+    toast("Clase eliminada", "ok", ()=>{
+      const st=state.students.find(x=>x.id===s.id); if(!st || !removed) return;
+      update(s.id,{sessions:[...st.sessions, removed]});
+      toast("Clase restaurada");
+    }); return;
   }
   else if(a==="add-horario" && s){
     const day=parseInt(document.getElementById("h-day").value,10);
@@ -531,8 +549,13 @@ document.addEventListener("click", (e)=>{
     toast("Horario agregado"); return;
   }
   else if(a==="del-horario" && s){
+    const removed=(s.horarios||[]).find(x=>x.id===el.dataset.id);
     update(s.id,{horarios:(s.horarios||[]).filter(x=>x.id!==el.dataset.id)});
-    toast("Horario eliminado"); return;
+    toast("Horario eliminado", "ok", ()=>{
+      const st=state.students.find(x=>x.id===s.id); if(!st || !removed) return;
+      update(s.id,{horarios:[...(st.horarios||[]), removed]});
+      toast("Horario restaurado");
+    }); return;
   }
   else if(a==="add-puntual" && s){
     const date=document.getElementById("p-date").value; if(!date) return;
@@ -544,8 +567,13 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="del-puntual" && s){
+    const removed=(s.clasesPuntuales||[]).find(x=>x.id===el.dataset.id);
     update(s.id,{clasesPuntuales:(s.clasesPuntuales||[]).filter(x=>x.id!==el.dataset.id)});
-    toast("Clase puntual eliminada"); return;
+    toast("Clase puntual eliminada", "ok", ()=>{
+      const st=state.students.find(x=>x.id===s.id); if(!st || !removed) return;
+      update(s.id,{clasesPuntuales:[...(st.clasesPuntuales||[]), removed]});
+      toast("Clase puntual restaurada");
+    }); return;
   }
   else if(a==="toggle-senia" && s){
     update(s.id,{seniaActiva:el.dataset.f==="si", seniaTipo:s.seniaTipo||"monto"}); return;
@@ -609,8 +637,13 @@ document.addEventListener("click", (e)=>{
     toast("Pago registrado"); return;
   }
   else if(a==="del-pago" && s){
+    const removed=(s.pagos||[]).find(x=>x.id===el.dataset.id);
     update(s.id,{pagos:(s.pagos||[]).filter(x=>x.id!==el.dataset.id)});
-    toast("Pago eliminado"); return;
+    toast("Pago eliminado", "ok", ()=>{
+      const st=state.students.find(x=>x.id===s.id); if(!st || !removed) return;
+      update(s.id,{pagos:[...(st.pagos||[]), removed]});
+      toast("Pago restaurado");
+    }); return;
   }
   else if(a==="pagos-tab"){ state.pagosTab=el.dataset.t; }
   else if(a==="add-costo-fijo"){
@@ -623,8 +656,15 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="del-costo-fijo"){
     const costos=costosFor();
+    const removed=costos.fijos.find(c=>c.id===el.dataset.id);
     state.catalog.costos={...costos, fijos:costos.fijos.filter(c=>c.id!==el.dataset.id)};
-    touchCatalog(); return;
+    touchCatalog();
+    toast("Costo fijo eliminado", "ok", ()=>{
+      const cur=costosFor();
+      state.catalog.costos={...cur, fijos:[...cur.fijos, removed]};
+      touchCatalog();
+      toast("Costo restaurado");
+    }); return;
   }
   else if(a==="add-costo-variable"){
     const name=document.getElementById("costo-var-name").value.trim(); if(!name) return;
@@ -636,8 +676,15 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="del-costo-variable"){
     const costos=costosFor();
+    const removed=costos.variables.find(c=>c.id===el.dataset.id);
     state.catalog.costos={...costos, variables:costos.variables.filter(c=>c.id!==el.dataset.id)};
-    touchCatalog(); return;
+    touchCatalog();
+    toast("Costo variable eliminado", "ok", ()=>{
+      const cur=costosFor();
+      state.catalog.costos={...cur, variables:[...cur.variables, removed]};
+      touchCatalog();
+      toast("Costo restaurado");
+    }); return;
   }
   else if(a==="save-sim" && s){
     const date=document.getElementById("s-date").value; if(!date) return;
@@ -648,8 +695,13 @@ document.addEventListener("click", (e)=>{
     toast("Simulacro registrado"); return;
   }
   else if(a==="del-sim" && s){
+    const removed=s.simulacros.find(x=>x.id===el.dataset.id);
     update(s.id,{simulacros:s.simulacros.filter(x=>x.id!==el.dataset.id)});
-    toast("Simulacro eliminado"); return;
+    toast("Simulacro eliminado", "ok", ()=>{
+      const st=state.students.find(x=>x.id===s.id); if(!st || !removed) return;
+      update(s.id,{simulacros:[...st.simulacros, removed]});
+      toast("Simulacro restaurado");
+    }); return;
   }
   else if(a==="sim-timer-start"){
     const min=Math.max(1, parseInt(document.getElementById("sim-timer-min").value,10)||90);
@@ -670,8 +722,12 @@ document.addEventListener("click", (e)=>{
   else if(a==="confirm-del" && s){
     state.view="lista"; state.confirmDel=false;
     const id=s.id; state.selId=null;
-    update(id,{deleted:true});
-    toast(s.sample?"Ejemplo eliminado":"Estudiante eliminado"); return;
+    update(id,{deleted:true, deletedAt:Date.now()});
+    toast(s.sample?"Ejemplo eliminado":"Estudiante eliminado — va a la papelera por 7 días", "ok", ()=>{
+      const st=state.students.find(x=>x.id===id); if(!st) return;
+      update(id,{deleted:false, deletedAt:null});
+      toast("Estudiante restaurado");
+    }); return;
   }
   else if(a==="toggle-help"){ state.helpOpen = state.helpOpen===el.dataset.id ? null : el.dataset.id; }
   else if(a==="toggle-faq"){
@@ -682,6 +738,30 @@ document.addEventListener("click", (e)=>{
   else if(a==="search-modal-noop"){ return; }
   else if(a==="search-select"){
     openSearchResult({type:el.dataset.type, id:el.dataset.id});
+  }
+  else if(a==="trash-restore-student"){
+    const id=el.dataset.id;
+    update(id,{deleted:false, deletedAt:null});
+    toast("Estudiante restaurado"); return;
+  }
+  else if(a==="trash-restore-subject"){ restoreSubjectFromTrash(el.dataset.id); return; }
+  else if(a==="trash-purge-ask"){ state.trashPurgeConfirmKey=el.dataset.key; }
+  else if(a==="trash-purge-cancel"){ state.trashPurgeConfirmKey=null; }
+  else if(a==="trash-purge-confirm"){
+    state.trashPurgeConfirmKey=null;
+    const [kind,id]=el.dataset.key.split(":");
+    if(kind==="student"){
+      state.students=state.students.filter(x=>x.id!==id); save(); render();
+    } else if(kind==="subject"){
+      purgeSubjectFromTrash(id);
+    }
+    toast("Eliminado definitivamente"); return;
+  }
+  else if(a==="toast-undo"){
+    const t=state.toasts.find(x=>x.id===el.dataset.id);
+    state.toasts=state.toasts.filter(x=>x.id!==el.dataset.id);
+    if(t && t.undo) t.undo();
+    return;
   }
   else if(a==="export"){
     const blob=new Blob([JSON.stringify({students:state.students},null,2)],{type:"application/json"});

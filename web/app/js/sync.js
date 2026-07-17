@@ -78,6 +78,7 @@ async function syncNow(force){
        (rd.catalog.updatedAt||0) > (state.catalog.updatedAt||0))
       catalog=rd.catalog;
     if(!Array.isArray(catalog.packs)) catalog.packs=[];
+    if(!Array.isArray(catalog.trash)) catalog.trash=[];
 
     let remoteUpdatedAt=row?row.updated_at:null;
     const needsWrite = dirty || !row || !sameStudents(merged,remote) ||
@@ -216,7 +217,7 @@ async function restoreBackup(id){
     // gana la próxima sincronización en vez de que el estado remoto (más reciente) lo pise.
     const now=Date.now();
     state.students=(b.data.students||[]).map(x=>({...x, updatedAt:now}));
-    state.catalog={packs:[], ...(b.data.catalog||defaultCatalog()), updatedAt:now};
+    state.catalog={packs:[], trash:[], ...(b.data.catalog||defaultCatalog()), updatedAt:now};
     state.confirmRestoreId=null; state.restoreStatus="idle";
     save(); syncNow(); render();
     loadBackups();
@@ -798,27 +799,52 @@ async function listMaterialsForSubject(subjectId){
     return {uid_, s, files:(Array.isArray(list)?list:[]).filter(x=>x.id)};
   }catch(e){ return {uid_:null, s:null, files:[]}; }
 }
-// Al borrar una materia del catálogo: si tiene materiales guardados, avisa y ofrece borrarlos
-// también (dos confirm() nativos, igual que el resto de la app). Offline no intenta comprobar
-// nada — borra la materia como siempre, sin tocar materiales (no hay forma de saber si tiene).
+// Al borrar una materia del catálogo (paso 76): en vez de sacarla del todo, se manda a la
+// papelera (catalog.trash) con fecha de borrado — se puede restaurar completa (unidades, color,
+// packs a los que pertenecía) durante 7 días, después se purga sola (ver trashDaysLeft() en
+// helpers.js). Los materiales en Storage son aparte: si tiene guardados, avisa y ofrece
+// borrarlos también (dos confirm() nativos, igual que antes) — eso sí es irreversible y no
+// forma parte de la papelera. Offline no intenta comprobar nada de materiales.
 async function deleteSubjectAndMaybeMaterials(subjectId){
+  const subj=subjById(subjectId); if(!subj) return;
   // Materiales compartidos de esta materia: se sacan de la biblioteca del portal al borrar la
   // materia entera, se elija o no borrarlos también de Storage (ya dejaron de existir para el
   // catálogo, así que no tiene sentido que sigan visibles ahí).
   const compartidos=materialesIndexFor(subjectId).filter(f=>f.compartido);
-  const removeFromCatalog=()=>{
+  const packIds=packsContaining(subjectId).map(p=>p.id);
+  const moveToTrash=()=>{
     state.catalog.subjects=state.catalog.subjects.filter(m=>m.id!==subjectId);
     state.catalog.packs=(state.catalog.packs||[]).map(p=>({...p, subjectIds:p.subjectIds.filter(id=>id!==subjectId)}));
+    state.catalog.trash=[...(state.catalog.trash||[]), {type:"subject", subject:subj, packIds, deletedAt:Date.now()}];
     touchCatalog();
     compartidos.forEach(f=>removeFromPortalBiblioteca(subjectId, f.name));
+    toast(`Materia eliminada — va a la papelera por 7 días`, "ok", ()=>restoreSubjectFromTrash(subjectId));
   };
-  if(!navigator.onLine){ removeFromCatalog(); return; }
+  if(!navigator.onLine){ moveToTrash(); return; }
   const {uid_, s, files} = await listMaterialsForSubject(subjectId);
-  if(files.length===0){ removeFromCatalog(); return; }
+  if(files.length===0){ moveToTrash(); return; }
   const n=files.length;
   if(!confirm(`Esta materia tiene ${n} material${n===1?"":"es"} guardado${n===1?"":"s"}. ¿Eliminar la materia igualmente?`)) return;
-  removeFromCatalog();
+  moveToTrash();
   if(uid_ && confirm(`¿Borrar también ${n===1?"ese material":"esos "+n+" materiales"} del almacenamiento? Si elegís que no, quedan guardados pero ya no vas a poder verlos ni borrarlos desde la app.`)){
     await deleteAllMaterialsForSubject(uid_, s, subjectId, files);
   }
+}
+// Restaura una materia de la papelera: la vuelve a catalog.subjects y, si los packs que la
+// tenían siguen existiendo, se la vuelve a agregar (los que ya no existen se ignoran).
+function restoreSubjectFromTrash(subjectId){
+  const entry=(state.catalog.trash||[]).find(t=>t.type==="subject" && t.subject.id===subjectId); if(!entry) return;
+  state.catalog.trash=state.catalog.trash.filter(t=>t!==entry);
+  state.catalog.subjects=[...state.catalog.subjects, entry.subject];
+  state.catalog.packs=(state.catalog.packs||[]).map(p=>
+    entry.packIds.includes(p.id) && !p.subjectIds.includes(subjectId)
+      ? {...p, subjectIds:[...p.subjectIds, subjectId]} : p);
+  touchCatalog();
+  toast("Materia restaurada");
+}
+// Elimina definitivamente una materia de la papelera (botón "Eliminar definitivo" en Cuenta) —
+// ya no se puede deshacer.
+function purgeSubjectFromTrash(subjectId){
+  state.catalog.trash=(state.catalog.trash||[]).filter(t=>!(t.type==="subject" && t.subject.id===subjectId));
+  touchCatalog();
 }

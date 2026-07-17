@@ -113,6 +113,7 @@ function defaultCatalog(){
     subjects:[{ id:"materia-ejemplo", name:"Materia de ejemplo (tocala para verla)",
       units:["Unidad 1: introducción","Unidad 2: desarrollo","Unidad 3: aplicaciones","Unidad 4: repaso final"] }],
     packs:[],
+    trash:[],
     cancelPolicy: defaultCancelPolicy(),
     recordatorios: defaultRecordatorios(),
     costos: defaultCostos(),

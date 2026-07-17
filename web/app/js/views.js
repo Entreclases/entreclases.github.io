@@ -132,7 +132,8 @@ function skeletonRows(n){
 function toastWrap(){
   if(!state.toasts.length) return "";
   return `<div class="toast-wrap no-print">${state.toasts.map(t=>
-    `<div class="toast ${t.tone==="error"?"toast-error":""}"><span class="dot"></span>${esc(t.text)}</div>`
+    `<div class="toast ${t.tone==="error"?"toast-error":""}"><span class="dot"></span>${esc(t.text)}
+    ${t.undo?`<button class="toast-undo" data-a="toast-undo" data-id="${t.id}">Deshacer</button>`:""}</div>`
   ).join("")}</div>`;
 }
 
@@ -1615,6 +1616,7 @@ function vCuenta(){
     <div class="hint" style="margin-bottom:10px">Se guarda una copia completa una vez por día, en la primera sincronización. Se conservan las últimas ${MAX_BACKUPS}. Esto no reemplaza la copia manual (.json) del tablero — conviven.</div>
     ${vBackupsList()}
   </div>
+  ${vPapeleraCard()}
   ${vCentroAyuda()}
   <div class="formcard"><div class="ftitle">Reportar un problema</div>
     <div class="field"><textarea id="report-msg" placeholder="Contanos qué pasó — cuanto más detalle, mejor.">${esc(state.reportMsg||"")}</textarea></div>
@@ -1703,6 +1705,40 @@ function vPortalCard(){
   return h + `</div>`;
 }
 
+// Papelera (paso 76): alumnos y materias borrados en los últimos 7 días, con Restaurar
+// completo o Eliminar definitivo. Pasados los 7 días se purgan solos (ver trashDaysLeft() en
+// helpers.js) sin necesidad de tocar nada acá. Los materiales de Storage no entran acá: se
+// borran aparte y son irreversibles (ver nota en sync.js).
+function vTrashRow(kind, id, label, sub, deletedAt){
+  const key=`${kind}:${id}`;
+  const confirming = state.trashPurgeConfirmKey===key;
+  const left = trashDaysLeft(deletedAt);
+  if(confirming) return `<div class="log" style="align-items:center;flex-wrap:wrap">
+    <div class="body"><b>${esc(label)}</b></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:12.5px;color:var(--status-desaprobo-fg)">Se borra para siempre, no se puede deshacer. ¿Confirmás?</span>
+      <button class="danger" data-a="trash-purge-confirm" data-key="${key}">Sí, borrar</button>
+      <button class="chip" data-a="trash-purge-cancel">Cancelar</button>
+    </div></div>`;
+  return `<div class="log" style="align-items:center;flex-wrap:wrap">
+    <div class="body"><b>${esc(label)}</b><div class="note">${esc(sub)} · se purga sola en ${left} día${left===1?"":"s"}</div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="chip" data-a="trash-restore-${kind}" data-id="${id}">Restaurar</button>
+      <button class="chip" data-a="trash-purge-ask" data-key="${key}">Eliminar definitivo</button>
+    </div></div>`;
+}
+function vPapeleraCard(){
+  const students=state.students.filter(s=>s.deleted);
+  const subjects=(state.catalog.trash||[]).filter(t=>t.type==="subject");
+  const total=students.length+subjects.length;
+  let h = `<div class="formcard"><div class="ftitle">Papelera</div>
+    <div class="hint" style="margin-bottom:10px">Alumnos y materias que borraste quedan acá 7 días por si te arrepentís — después se borran solos. Los materiales de una materia (archivos en Storage) no entran acá.</div>`;
+  if(total===0){ h += `<div class="empty">Vacía por ahora.</div></div>`; return h; }
+  h += students.map(s=>vTrashRow("student", s.id, s.sample?"Ejemplo eliminado":(s.name||"Sin nombre"), "Alumno", s.deletedAt||s.updatedAt)).join("");
+  h += subjects.map(t=>vTrashRow("subject", t.subject.id, t.subject.name, "Materia", t.deletedAt)).join("");
+  h += `</div>`;
+  return h;
+}
 function vBackupsList(){
   if(state.backupsError) return `<div class="saveerr">${esc(state.backupsError)}</div>`;
   if(!state.backupsLoaded) return skeletonRows(3);
@@ -1779,10 +1815,15 @@ function vCatalog(){
   h += `<div class="formcard"><div class="ftitle">Materias y sus unidades</div>
   ${c.subjects.map(m=>{
     const packNames=packsContaining(m.id).map(p=>p.name);
+    const confirming = state.catConfirmDelId && state.catConfirmDelId.type==="subject" && state.catConfirmDelId.id===m.id;
+    if(confirming) return `<div class="row"><div class="main" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:13px;color:var(--status-desaprobo-fg)">¿Eliminar «${esc(m.name)}»? Va a la papelera por 7 días.</span>
+      <button class="danger" data-a="cat-confirm-del-subject" data-id="${m.id}">Sí, eliminar</button>
+      <button class="chip" data-a="cat-cancel-del">Cancelar</button></div></div>`;
     return `<div class="row" style="cursor:pointer" data-a="cat-edit-subject" data-id="${m.id}">
     <div class="main"><b style="display:inline-flex;align-items:center;gap:7px">${subjectDot(m)}${esc(m.name)}</b> ${packNames.map(n=>`<span class="pill" style="color:var(--status-aprobo-fg);background:var(--bluebg)">${esc(n)}</span>`).join(" ")}
       <div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
-    <button class="del" data-a="cat-del-subject" data-id="${m.id}" title="Eliminar materia" aria-label="Eliminar materia">×</button></div>`;
+    <button class="del" data-a="cat-ask-del-subject" data-id="${m.id}" title="Eliminar materia" aria-label="Eliminar materia">×</button></div>`;
   }).join("") || `<div class="empty">Sin materias cargadas.</div>`}
   <div class="flabel" style="margin-top:12px">Empezar desde una plantilla</div>
   <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">
@@ -1797,9 +1838,14 @@ function vCatalog(){
   <div class="hint" style="margin-bottom:10px">Un pack agrupa varias materias para dar de alta al alumno en todas de una — ej. «Ingreso a Medicina».</div>
   ${(c.packs||[]).map(p=>{
     const names=p.subjectIds.map(id=>{const m=subjById(id); return m?m.name:null;}).filter(Boolean);
+    const confirming = state.catConfirmDelId && state.catConfirmDelId.type==="pack" && state.catConfirmDelId.id===p.id;
+    if(confirming) return `<div class="row"><div class="main" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:13px;color:var(--status-desaprobo-fg)">¿Eliminar el pack «${esc(p.name)}»?</span>
+      <button class="danger" data-a="cat-confirm-del-pack" data-id="${p.id}">Sí, eliminar</button>
+      <button class="chip" data-a="cat-cancel-del">Cancelar</button></div></div>`;
     return `<div class="row" style="cursor:pointer" data-a="cat-edit-pack" data-id="${p.id}">
     <div class="main"><b>${esc(p.name)}</b><div class="sub">${names.length} materia${names.length===1?"":"s"}${names.length?": "+esc(names.join(", ")):""}</div></div>
-    <button class="del" data-a="cat-del-pack" data-id="${p.id}" title="Eliminar pack" aria-label="Eliminar pack">×</button></div>`;
+    <button class="del" data-a="cat-ask-del-pack" data-id="${p.id}" title="Eliminar pack" aria-label="Eliminar pack">×</button></div>`;
   }).join("") || `<div class="empty">Sin packs todavía.</div>`}
   <div class="field" style="margin-top:10px"><div class="flabel">Nombre del pack nuevo</div>
     <input id="new-pack-name" data-cf="new-pack-name" placeholder="Ej: Ingreso a Medicina" value="${esc(state.newPackName||"")}"></div>
