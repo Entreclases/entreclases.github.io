@@ -2172,6 +2172,75 @@ function vEstadisticas(){
   h += vTuActividad();
   h += vTasaAprobacionGeneral();
   h += vObjetivosGeneral();
+  h += vRetencion();
+  h += vSaludDelMes();
+  return h;
+}
+
+// Retención (paso 79): duración promedio de un alumno (de su primera a su última clase
+// registrada) y altas/bajas por mes — mismo estilo de gráfico que el resto (barRow/signedBarChart,
+// paso 57: CSS/SVG puro, valor siempre visible). "Alta" = por s.startDate; "baja" = alumnos en
+// estado "dejo", aproximando la fecha de baja con updatedAt (no hay un campo de fecha de baja
+// dedicado) — la más cercana disponible sin agregar un campo nuevo al modelo.
+function vRetencion(){
+  let h = `<div class="stitle" style="margin-top:30px">Retención</div>`;
+  const students = alive();
+
+  const durations = students.map(s=>{
+    const dates=(s.sessions||[]).map(c=>c.date).filter(Boolean).sort();
+    if(dates.length<2) return null;
+    return (new Date(dates[dates.length-1]+"T12:00:00")-new Date(dates[0]+"T12:00:00"))/86400000/30.44;
+  }).filter(v=>v!==null);
+  h += `<div class="stitle">Duración promedio de un alumno</div>`;
+  h += durations.length===0
+    ? `<div class="empty">Hace falta más de una clase registrada por alumno para calcular esto.</div>`
+    : `<div class="stats" style="margin-bottom:16px"><div class="stat"><b>${(durations.reduce((a,b)=>a+b,0)/durations.length).toFixed(1)}</b><span>meses en promedio, de la 1ª a la última clase (${durations.length} alumno${durations.length===1?"":"s"} con 2+ clases)</span></div></div>`;
+
+  h += `<div class="stitle">Altas y bajas por mes (últimos 6)</div>`;
+  const keys = recentMonthKeys(6).reverse();
+  const mkOfTs = ts => ts ? new Date(ts).toISOString().slice(0,7) : "";
+  const altas = keys.map(mk=>students.filter(s=>monthKeyOf(s.startDate)===mk).length);
+  const bajas = keys.map(mk=>students.filter(s=>s.status==="dejo" && mkOfTs(s.updatedAt)===mk).length);
+  const totalAltas = altas.reduce((a,b)=>a+b,0), totalBajas = bajas.reduce((a,b)=>a+b,0);
+  if(totalAltas===0 && totalBajas===0){
+    h += `<div class="empty">Sin altas ni bajas en los últimos 6 meses.</div>`;
+  }else{
+    h += `<div class="stats" style="margin-bottom:8px">
+      <div class="stat"><b>${totalAltas}</b><span>altas</span></div>
+      <div class="stat"><b>${totalBajas}</b><span>bajas</span></div>
+    </div>`;
+    h += `<div class="hint" style="margin-bottom:6px">Neto por mes (altas − bajas) — verde: crece, rojo: baja</div>`;
+    const axisLabels = keys.map(monthLabelShort);
+    const dataset = keys.map((mk,i)=>({label:monthLabel(mk), v:altas[i]-bajas[i]}));
+    h += signedBarChart(dataset, axisLabels, v=>(v>0?"+":"")+v);
+  }
+  return h;
+}
+
+// Salud del mes (paso 79): activos vs. "enfriándose" vs. inactivos, según hace cuánto no tienen
+// una clase registrada — con un chip de alerta por cada alumno que se está enfriando o inactivo,
+// para poder escribirle directo desde acá (data-a="open" abre su ficha).
+const SALUD_ENFRIANDO_SEMANAS = 3, SALUD_INACTIVO_SEMANAS = 6;
+function vSaludDelMes(){
+  let h = `<div class="stitle" style="margin-top:30px">Salud del mes</div>`;
+  const activos = alive().filter(s=>s.status==="activo");
+  if(activos.length===0) return h + `<div class="empty">Sin alumnos activos todavía.</div>`;
+  const semanasSin = s=>{ const last=lastSessionDate(s); return last===null ? Infinity : daysSince(last)/7; };
+  const recientes = activos.filter(s=>semanasSin(s)<=SALUD_ENFRIANDO_SEMANAS);
+  const enfriando = activos.filter(s=>{ const w=semanasSin(s); return w>SALUD_ENFRIANDO_SEMANAS && w<=SALUD_INACTIVO_SEMANAS; });
+  const inactivos = activos.filter(s=>semanasSin(s)>SALUD_INACTIVO_SEMANAS);
+  h += `<div class="stats" style="margin-bottom:12px">
+    <div class="stat"><b>${recientes.length}</b><span>con clase en las últimas ${SALUD_ENFRIANDO_SEMANAS} semanas</span></div>
+    <div class="stat"><b>${enfriando.length}</b><span>enfriándose (${SALUD_ENFRIANDO_SEMANAS}–${SALUD_INACTIVO_SEMANAS} semanas)</span></div>
+    <div class="stat"><b>${inactivos.length}</b><span>inactivos (${SALUD_INACTIVO_SEMANAS}+ semanas o nunca)</span></div>
+  </div>`;
+  const alertList=[...enfriando, ...inactivos];
+  h += alertList.length===0 ? `<div class="hint">Ningún alumno activo se está enfriando — todos con clase reciente.</div>`
+    : `<div style="display:flex;flex-wrap:wrap;gap:6px">` + alertList.map(s=>{
+        const w=semanasSin(s);
+        const label = w===Infinity ? "nunca tuvo clase" : `hace ${Math.floor(w)} semana${Math.floor(w)===1?"":"s"}`;
+        return `<button class="chip" style="color:var(--status-desaprobo-fg);border-color:var(--status-desaprobo-fg)" data-a="open" data-id="${s.id}">${esc(s.name)} · ${label}</button>`;
+      }).join("") + `</div>`;
   return h;
 }
 
