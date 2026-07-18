@@ -138,6 +138,17 @@ const STATUS_META = {
   desaprobo:{label:"A recuperar",fg:"var(--status-desaprobo-fg)",bg:"var(--status-desaprobo-bg)"},
   dejo:{label:"Dejó",fg:"var(--status-dejo-fg)",bg:"var(--status-dejo-bg)"},
 };
+// Interesados (paso 119, state.catalog.interesados): mini lista de espera, independiente de
+// state.students — nunca se cruzan hasta que "Convertir en alumno" crea un alumno de verdad
+// (ver convertirInteresado() en helpers.js) y saca al interesado de esta lista. Estado con
+// ciclo fijo (se avanza tocando el chip, mismo criterio que TOPIC_CYCLE/SEM_CYCLE).
+const INTERESADO_ESTADO_CYCLE = ["consulto","en_charla","arranca","no_arranca"];
+const INTERESADO_ESTADO_META = {
+  consulto:{label:"Consultó",fg:"var(--muted)"},
+  en_charla:{label:"En charla",fg:"var(--status-pausado-fg)"},
+  arranca:{label:"Arranca",fg:"var(--status-activo-fg)"},
+  no_arranca:{label:"No arranca",fg:"var(--status-dejo-fg)"},
+};
 const SEM_CYCLE = ["sd","verde","amarillo","rojo"];
 const SEM_META = {
   sd:{color:"var(--sem-sd)",label:"Sin evaluar"},

@@ -737,6 +737,40 @@ document.addEventListener("click", (e)=>{
     update(s.id,{status:"activo", pausaHasta:""});
     toast("Alumno reanudado"); return;
   }
+  else if(a==="estudiantes-tab-alumnos"){ state.estudiantesTab="alumnos"; }
+  else if(a==="estudiantes-tab-interesados"){ state.estudiantesTab="interesados"; }
+  else if(a==="add-interesado"){
+    const nombre=document.getElementById("int-nombre").value.trim(); if(!nombre) return;
+    const contacto=document.getElementById("int-contacto").value.trim();
+    const materia=document.getElementById("int-materia").value.trim();
+    const nota=document.getElementById("int-nota").value.trim();
+    state.catalog.interesados=[...interesadosFor(), {id:uid(), nombre, contacto, materia, nota, estado:"consulto", createdAt:Date.now()}];
+    touchCatalog(); toast("Interesado agregado"); return;
+  }
+  else if(a==="cycle-interesado-estado"){
+    const id=el.dataset.id;
+    state.catalog.interesados=interesadosFor().map(it=>{
+      if(it.id!==id) return it;
+      const i=INTERESADO_ESTADO_CYCLE.indexOf(it.estado);
+      return {...it, estado:INTERESADO_ESTADO_CYCLE[(i+1)%INTERESADO_ESTADO_CYCLE.length]};
+    });
+    touchCatalog(); return;
+  }
+  else if(a==="convertir-interesado"){
+    const st=convertirInteresado(el.dataset.id); if(!st) return;
+    state.view="detalle"; state.selId=st.id; state.tab="resumen";
+    toast("Alumno creado a partir del interesado"); return;
+  }
+  else if(a==="del-interesado"){
+    const id=el.dataset.id;
+    const removed=interesadosFor().find(x=>x.id===id);
+    state.catalog.interesados=interesadosFor().filter(x=>x.id!==id);
+    touchCatalog();
+    toast("Interesado eliminado", "ok", ()=>{
+      state.catalog.interesados=[...interesadosFor(), removed]; touchCatalog();
+    });
+    return;
+  }
   else if(a==="tag-add" && s){
     const input=document.getElementById("tag-input");
     const v=(input&&input.value||"").trim(); if(!v) return;

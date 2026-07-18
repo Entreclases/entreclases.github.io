@@ -520,6 +520,12 @@ function vLista(){
     });
 
   let h = pageHead("Estudiantes","Tus alumnos",`<button class="btn btn-primary" data-a="new">+ Nuevo estudiante</button>`);
+  const estTab = state.estudiantesTab||"alumnos";
+  h += `<div class="tabs" style="margin-bottom:14px">
+    ${tabbtn("estudiantes-tab-alumnos",estTab==="alumnos","Alumnos")}
+    ${tabbtn("estudiantes-tab-interesados",estTab==="interesados",`Interesados${interesadosFor().length?` (${interesadosFor().length})`:""}`)}
+  </div>`;
+  if(estTab==="interesados") return h + vInteresados();
   h += `<div class="field" style="margin-bottom:10px">
     <input id="lista-search" data-live="lista-search" type="text" placeholder="Buscar por nombre…" value="${esc(state.listSearch||"")}"></div>`;
 
@@ -604,6 +610,46 @@ function vAlumnoRow(s){
     </button>
     ${hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">${ICON_CHAT}</a>`:""}
   </div>`;
+}
+
+/* ============ Interesados: mini lista de espera (paso 119) ============
+   Aparte de state.students a propósito — alguien que sólo preguntó todavía no es un alumno
+   (sin ficha, sin historial, sin sincronizar con el portal). "Convertir en alumno" (ver
+   convertirInteresado en helpers.js) crea la ficha de verdad y lo saca de esta lista. */
+function vInteresados(){
+  const list = [...interesadosFor()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  let h = `<div class="formcard"><div class="ftitle">Nuevo interesado</div>
+    <div class="hint" style="margin-bottom:8px">Para no perder una consulta que llega por WhatsApp — anotalo acá y convertilo en alumno con un click cuando arranca.</div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Nombre</div><input id="int-nombre" data-enter="add-interesado"></div>
+      <div class="field"><div class="flabel">Contacto (WhatsApp)</div><input id="int-contacto" placeholder="Ej: 11 2345-6789" data-enter="add-interesado"></div>
+      <div class="field"><div class="flabel">Materia de interés</div><input id="int-materia" data-enter="add-interesado"></div>
+    </div>
+    <div class="field"><div class="flabel">Nota (opcional)</div><input id="int-nota" placeholder="Ej: vio el anuncio en Instagram, quiere empezar en marzo" data-enter="add-interesado"></div>
+    <button class="chip" style="margin-top:8px" data-a="add-interesado">+ Agregar interesado</button>
+  </div>`;
+
+  if(list.length===0){
+    return h + emptyState(ICON_USERS, "Sin interesados por ahora", "Cuando alguien pregunte por WhatsApp o en persona, anotalo acá arriba para no perderlo.");
+  }
+
+  h += list.map(it=>{
+    const em = INTERESADO_ESTADO_META[it.estado]||INTERESADO_ESTADO_META.consulto;
+    const waHref = it.contacto ? `https://wa.me/${normalizeArPhone(it.contacto)}` : "";
+    return `<div class="row" style="flex-wrap:wrap">
+      <div class="main">
+        <div class="name">${esc(it.nombre)} <button class="chip" style="color:${em.fg};border-color:${em.fg}" data-a="cycle-interesado-estado" data-id="${it.id}">${esc(em.label)}</button></div>
+        <div class="sub">${it.materia?esc(it.materia):"materia s/d"}${it.contacto?` · ${esc(it.contacto)}`:""}</div>
+        ${it.nota?`<div class="hint" style="margin-top:2px">${esc(it.nota)}</div>`:""}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${waHref?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waHref}">${ICON_CHAT}</a>`:""}
+        <button class="chip" data-a="convertir-interesado" data-id="${it.id}">Convertir en alumno</button>
+        <button class="del" data-a="del-interesado" data-id="${it.id}" title="Borrar" aria-label="Borrar">×</button>
+      </div>
+    </div>`;
+  }).join("");
+  return h;
 }
 
 // Etiquetas libres (paso 103): chips con quitar + input con autocompletado (datalist) de las

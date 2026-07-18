@@ -599,6 +599,22 @@ function buildPagosCsv(monthKeys){
 function recordatoriosFor(){ return state.catalog.recordatorios || defaultRecordatorios(); }
 function costosFor(){ return state.catalog.costos || defaultCostos(); }
 function docenteFor(){ return state.catalog.docente || defaultDocente(); }
+/* ============ interesados (paso 119): mini lista de espera, aparte de state.students ============ */
+function interesadosFor(){ return state.catalog.interesados||[]; }
+// Crea un alumno de verdad a partir de un interesado y lo saca de la lista — un solo
+// save()/render() para las dos cosas (mismo criterio que applyTarifaAjuste: evita un mutation
+// a medio camino si algo falla entre medio). El alumno arranca con lo que ya se sabía de él
+// (nombre, contacto, materia de interés como texto libre, nota) — el resto se completa después
+// en su ficha, como con cualquier alta manual.
+function convertirInteresado(id){
+  const it = interesadosFor().find(x=>x.id===id); if(!it) return null;
+  const st = emptyStudent();
+  st.name = it.nombre; st.phone = it.contacto||""; st.subject = it.materia||""; st.notes = it.nota||"";
+  state.students = [...state.students, st];
+  state.catalog.interesados = interesadosFor().filter(x=>x.id!==id);
+  touchCatalog();
+  return st;
+}
 /* ============ plantillas de mensajes (paso 117) ============
    mensajesFor() mezcla defaults (config.js) con lo guardado; legacyRecordatorio sostiene la
    plantilla de recordatorio de clase del paso 111 (state.catalog.waRecordatorioClase, guardada
