@@ -1,4 +1,4 @@
-# Cuaderno de seguimiento — Guía de uso
+# Entreclases — Guía de uso
 
 ## Qué es
 

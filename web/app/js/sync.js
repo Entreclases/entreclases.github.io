@@ -379,11 +379,14 @@ async function listUserMaterialPaths(uid_){
 async function deleteUsuario(id){
   state.usersDeleteStatus="deleting"; state.usersDeleteError=""; render();
   try{
+    // QA/regresión: si falla el borrado de materiales no bloqueamos el borrado de la cuenta —
+    // los archivos quedan huérfanos y "Limpiar archivos huérfanos" los levanta después — pero
+    // antes quedaba en absoluto silencio; ahora el admin se entera al toque en el mensaje final.
+    let storageWarning=false;
     try{
       await removeStorageObjects(await listUserMaterialPaths(id));
     }catch(e){
-      // si falla el borrado de materiales no bloqueamos el borrado de la cuenta — los
-      // archivos quedan huérfanos y "Limpiar archivos huérfanos" los levanta después.
+      storageWarning=true;
     }
     const s=await ensureToken();
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
@@ -393,7 +396,10 @@ async function deleteUsuario(id){
       throw new Error(j.message||j.msg||("error "+r.status));
     }
     state.usersConfirmDelId=null; state.usersConfirmDelInput=""; state.usersDeleteStatus="idle";
-    state.usersDeleteMsg="Cuenta eliminada.";
+    state.usersDeleteWarning=storageWarning;
+    state.usersDeleteMsg = storageWarning
+      ? "Cuenta eliminada. Algunos materiales no se pudieron borrar de Storage — corré \"Limpiar archivos huérfanos\" para terminar."
+      : "Cuenta eliminada.";
     state.usersLoaded=false;
     await loadUsuarios();
   }catch(e){
@@ -667,7 +673,7 @@ function buildAlumnoBlock(s){
     block.proximaClase = n ? {date:n.date, time:n.time, duration:n.duration, link:n.link||""} : null;
   }
   if(share.tareas){
-    const last=[...(s.sessions||[])].sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const last=[...(s.sessions||[])].filter(c=>!isAusente(c)).sort((a,b)=>b.date.localeCompare(a.date))[0];
     block.tarea = last ? {date:last.date, nota:last.note||""} : null;
   }
   if(share.avance){

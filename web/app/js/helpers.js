@@ -355,10 +355,11 @@ function studentAlerts(s){
     out.push({text:`Examen en ${d} día${d===1?"":"s"} y todavía no hizo ningún simulacro`, wa:"examen"});
   if(d!==null && d>=0 && d<10 && !hasScheduledBeforeExam(s))
     out.push({text:`Rinde en ${d} día${d===1?"":"s"} y no tiene ninguna clase agendada hasta el examen — ¿reforzamos?`, wa:"clase"});
-  const last2=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);
+  const dadas = s.sessions.filter(c=>!isAusente(c));
+  const last2=[...dadas].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);
   if(last2.length===2 && last2.every(x=>x.tarea==="no"))
     out.push({text:"Dos clases seguidas sin tarea hecha — momento de la charla", wa:"tarea"});
-  const lastDate = s.sessions.length ? [...s.sessions].sort((a,b)=>b.date.localeCompare(a.date))[0].date : s.startDate;
+  const lastDate = dadas.length ? [...dadas].sort((a,b)=>b.date.localeCompare(a.date))[0].date : s.startDate;
   const gap = lastDate ? -daysTo(lastDate) : null;
   if(gap!==null && gap>=10) out.push({text:`Sin clases hace ${gap} días — ¿sigue o pasarlo a pausado?`, wa:"clase"});
   const ausenciasMes = asistenciaStats(s, currentMonthKey()+"-01", today()).ausencias;
@@ -606,14 +607,21 @@ function interesadosFor(){ return state.catalog.interesados||[]; }
 // a medio camino si algo falla entre medio). El alumno arranca con lo que ya se sabía de él
 // (nombre, contacto, materia de interés como texto libre, nota) — el resto se completa después
 // en su ficha, como con cualquier alta manual.
+// QA/regresión: antes no pasaba por findDuplicateStudent como cualquier otra alta manual —
+// podía crear una ficha duplicada en silencio si el interesado ya era alumno (ej. de otra
+// materia, anotado de nuevo por error). st.subjectId queda vacío (la materia de interés es
+// texto libre, no un id del catálogo), así que el chequeo de duplicado es contra esa misma
+// falta de materia — mismo criterio que un alta manual "sin materia por ahora".
 function convertirInteresado(id){
-  const it = interesadosFor().find(x=>x.id===id); if(!it) return null;
+  const it = interesadosFor().find(x=>x.id===id); if(!it) return {error:null, student:null};
+  const dup = findDuplicateStudent(it.nombre, "", null);
+  if(dup) return {error:`Ya tenés a ${dup.name} sin materia asignada — revisá si es la misma persona antes de convertirlo.`, student:null};
   const st = emptyStudent();
   st.name = it.nombre; st.phone = it.contacto||""; st.subject = it.materia||""; st.notes = it.nota||"";
   state.students = [...state.students, st];
   state.catalog.interesados = interesadosFor().filter(x=>x.id!==id);
   touchCatalog();
-  return st;
+  return {error:null, student:st};
 }
 /* ============ plantillas de mensajes (paso 117) ============
    mensajesFor() mezcla defaults (config.js) con lo guardado; legacyRecordatorio sostiene la
@@ -705,7 +713,7 @@ function cobrosAtrasadosSummary(diasAtraso){
   alive().filter(s=>s.status==="activo").forEach(s=>{
     if(hasPagos(s) && s.modalidad==="clase"){
       (s.sessions||[]).forEach(c=>{
-        if(!c.cobrada && daysSince(c.date)>=dias)
+        if(!isAusente(c) && !c.cobrada && daysSince(c.date)>=dias)
           items.push({studentId:s.id, kind:"clase", monto:Number(s.tarifa)||0, date:c.date, sessionId:c.id});
       });
     }

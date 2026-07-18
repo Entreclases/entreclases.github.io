@@ -757,8 +757,10 @@ document.addEventListener("click", (e)=>{
     touchCatalog(); return;
   }
   else if(a==="convertir-interesado"){
-    const st=convertirInteresado(el.dataset.id); if(!st) return;
-    state.view="detalle"; state.selId=st.id; state.tab="resumen";
+    const {error, student}=convertirInteresado(el.dataset.id);
+    if(error){ toast(error, "error"); return; }
+    if(!student) return;
+    state.view="detalle"; state.selId=student.id; state.tab="resumen";
     toast("Alumno creado a partir del interesado"); return;
   }
   else if(a==="del-interesado"){

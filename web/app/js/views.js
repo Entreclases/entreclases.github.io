@@ -499,7 +499,7 @@ function listFiltersActive(){
 }
 // Última clase dictada (para ordenar/mostrar "por actividad") — null si nunca tuvo una.
 function lastSessionDate(s){
-  return (s.sessions||[]).reduce((max,c)=>(!max||c.date>max)?c.date:max, null);
+  return (s.sessions||[]).reduce((max,c)=>(!isAusente(c) && (!max||c.date>max))?c.date:max, null);
 }
 function vLista(){
   const order=["activo","pausado","desaprobo","aprobo","dejo","todos"];
@@ -1426,7 +1426,7 @@ function waMsgProximaClase(s){
   return mensajeTexto("proximaClase", {alumno:studentFirstName(s), materia:s.subject||"la materia"});
 }
 function waMsgTareaHoy(s){
-  const last=[...(s.sessions||[])].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const last=[...(s.sessions||[])].filter(c=>!isAusente(c)).sort((a,b)=>b.date.localeCompare(a.date))[0];
   if(!last) return `Hola ${studentFirstName(s)}! ¿Cómo veníamos con la tarea?`;
   const tarea = last.note || last.topic || "lo que vimos en la última clase";
   return mensajeTexto("tarea", {alumno:studentFirstName(s), fecha:fmtDate(last.date), tarea});
@@ -1766,7 +1766,7 @@ function vCostosConfig(){
 function informeFilteredData(s){
   const periodKey = state.informePeriod||"3m";
   const fromDate = informePeriodFrom(periodKey);
-  const sessions = [...(s.sessions||[])].filter(c=>!fromDate||c.date>=fromDate).sort((a,b)=>a.date.localeCompare(b.date));
+  const sessions = [...(s.sessions||[])].filter(c=>!isAusente(c) && (!fromDate||c.date>=fromDate)).sort((a,b)=>a.date.localeCompare(b.date));
   const simulacros = [...(s.simulacros||[])].filter(c=>!fromDate||c.date>=fromDate).sort((a,b)=>a.date.localeCompare(b.date));
   return { periodKey, fromDate, sessions, simulacros };
 }
@@ -3333,7 +3333,7 @@ function vUsuarios(){
       <button class="chip" data-a="limpiar-huerfanos" ${state.orphanCleanStatus==="cleaning"?"disabled":""}>${state.orphanCleanStatus==="cleaning"?"Limpiando…":"Limpiar archivos huérfanos"}</button>
       <button class="chip" data-a="refresh-usuarios">Actualizar</button>
     </div></div>`;
-  if(state.usersDeleteMsg) h += `<div class="hint" style="color:var(--status-activo-fg);margin-bottom:8px">${esc(state.usersDeleteMsg)}</div>`;
+  if(state.usersDeleteMsg) h += `<div class="hint" style="color:var(--status-${state.usersDeleteWarning?"desaprobo":"activo"}-fg);margin-bottom:8px">${esc(state.usersDeleteMsg)}</div>`;
   if(state.orphanCleanMsg) h += `<div class="hint" style="color:var(--status-activo-fg);margin-bottom:8px">${esc(state.orphanCleanMsg)}</div>`;
   if(state.orphanCleanError) h += `<div class="saveerr" style="margin-bottom:8px">${esc(state.orphanCleanError)}</div>`;
   if(state.usersError) return h + `<div class="saveerr">${esc(state.usersError)}</div>`;
