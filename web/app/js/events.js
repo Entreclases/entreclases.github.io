@@ -722,6 +722,18 @@ document.addEventListener("click", (e)=>{
     const next=SEM_CYCLE[(SEM_CYCLE.indexOf(s.semaforo||"sd")+1)%SEM_CYCLE.length];
     update(s.id,{semaforo:next}); return;
   }
+  else if(a==="pausar-alumno-ask" && s){ state.pausaAskId=s.id; render(); return; }
+  else if(a==="pausar-alumno-cancel"){ state.pausaAskId=null; render(); return; }
+  else if(a==="pausar-alumno-confirm" && s){
+    const hastaEl=document.getElementById("pausa-hasta");
+    state.pausaAskId=null;
+    update(s.id,{status:"pausado", pausaHasta:(hastaEl&&hastaEl.value)||""});
+    toast("Alumno en pausa"); return;
+  }
+  else if(a==="reanudar-alumno" && s){
+    update(s.id,{status:"activo", pausaHasta:""});
+    toast("Alumno reanudado"); return;
+  }
   else if(a==="tag-add" && s){
     const input=document.getElementById("tag-input");
     const v=(input&&input.value||"").trim(); if(!v) return;
@@ -1261,6 +1273,12 @@ function handleFormChange(e){
     const dup=findDuplicateStudent(el.value,s.subjectId,s.id);
     if(dup){ state.fichaError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
     state.fichaError="";
+  }
+  // Cambiar el estado a mano desde este select (en vez de Pausar/Reanudar, paso 114) también
+  // limpia pausaHasta si ya no queda en "pausado" — para que no quede una fecha de vuelta
+  // colgada de una pausa vieja si más tarde se lo pasa a otro estado sin pasar por "Reanudar".
+  if(el.dataset.f==="status" && el.value!=="pausado"){
+    update(s.id,{status:el.value, pausaHasta:""}); return;
   }
   update(s.id,{[el.dataset.f]:el.value});
 }

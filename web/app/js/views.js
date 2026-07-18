@@ -543,30 +543,46 @@ function vLista(){
         `<button class="btn btn-primary" data-a="new">+ Agregá tu primer alumno</button>`)
     : `<div class="empty">Nadie coincide con estos filtros.</div>`);
 
-  h += shown.map(s=>{
-    const d=daysTo(s.examDate);
-    const na=studentAlerts(s).length;
-    const units=unitsFor(s);
-    const seen=units.filter(t=>["visto","practica","parcial"].includes((s.topics||{})[t])).length;
-    const rel=units.filter(t=>(s.topics||{})[t]!=="noentra").length||1;
-    const deuda=pendienteTotalFor(s);
-    const lastAct=lastSessionDate(s);
-    const right = (d!==null&&d>=0&&s.status==="activo")
-      ? `<span style="color:${d<=7?"var(--red)":"var(--ink)"};font-weight:600">examen en ${d}d</span>`
-      : `<span style="color:var(--faint)">${s.examDate?fmtDate(s.examDate):"sin fecha"}</span>`;
-    return `<div class="row">
-      <button class="row-click" data-a="open" data-id="${s.id}">
-        <div class="main"><div class="name">${esc(s.name)} ${semDot(s.semaforo,13,false)} ${pill(s.status)} ${examplePill(s)}
-          ${na?`<span class="mini-alert">${na} alerta${na>1?"s":""}</span>`:""}
-          ${deuda>0?`<span class="pill" style="color:var(--status-desaprobo-fg);background:var(--redbg)">debe ${fmtMoney(deuda)}</span>`:""}</div>
-        <div class="sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")} · temas ${seen}/${rel}${(state.listSort||"examen")==="actividad"?` · última clase ${lastAct?esc(fmtDate(lastAct)):"nunca"}`:""}</div>
-        ${studentTags(s).length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${studentTags(s).map(t=>tagChip(t)).join("")}</div>`:""}</div>
-        <div class="right">${right}</div>
-      </button>
-      ${hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">${ICON_CHAT}</a>`:""}
-    </div>`;
-  }).join("");
+  // En la vista "Todos" los alumnos en pausa (paso 114) se separan del resto en su propia
+  // sección al final — mezclados en la misma lista se perdían entre exámenes/deudas de los
+  // activos; en cualquier otro filtro (incluido "Pausado" mismo) se listan tal cual, sin split.
+  if(state.filter==="todos"){
+    const pausados = shown.filter(s=>s.status==="pausado");
+    const resto = shown.filter(s=>s.status!=="pausado");
+    h += resto.map(vAlumnoRow).join("");
+    if(pausados.length){
+      h += `<div class="stitle" style="margin-top:20px">En pausa</div>`;
+      h += pausados.map(vAlumnoRow).join("");
+    }
+    return h;
+  }
+  h += shown.map(vAlumnoRow).join("");
   return h;
+}
+function vAlumnoRow(s){
+  const d=daysTo(s.examDate);
+  const na=studentAlerts(s).length;
+  const units=unitsFor(s);
+  const seen=units.filter(t=>["visto","practica","parcial"].includes((s.topics||{})[t])).length;
+  const rel=units.filter(t=>(s.topics||{})[t]!=="noentra").length||1;
+  const deuda=pendienteTotalFor(s);
+  const lastAct=lastSessionDate(s);
+  const right = (d!==null&&d>=0&&s.status==="activo")
+    ? `<span style="color:${d<=7?"var(--red)":"var(--ink)"};font-weight:600">examen en ${d}d</span>`
+    : s.status==="pausado" && s.pausaHasta
+      ? `<span style="color:var(--faint)">vuelve el ${fmtDate(s.pausaHasta)}</span>`
+      : `<span style="color:var(--faint)">${s.examDate?fmtDate(s.examDate):"sin fecha"}</span>`;
+  return `<div class="row">
+    <button class="row-click" data-a="open" data-id="${s.id}">
+      <div class="main"><div class="name">${esc(s.name)} ${semDot(s.semaforo,13,false)} ${pill(s.status)} ${examplePill(s)}
+        ${na?`<span class="mini-alert">${na} alerta${na>1?"s":""}</span>`:""}
+        ${deuda>0?`<span class="pill" style="color:var(--status-desaprobo-fg);background:var(--redbg)">debe ${fmtMoney(deuda)}</span>`:""}</div>
+      <div class="sub">${esc(s.career)} · ${esc(s.subject||"materia s/d")} · temas ${seen}/${rel}${(state.listSort||"examen")==="actividad"?` · última clase ${lastAct?esc(fmtDate(lastAct)):"nunca"}`:""}</div>
+      ${studentTags(s).length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${studentTags(s).map(t=>tagChip(t)).join("")}</div>`:""}</div>
+      <div class="right">${right}</div>
+    </button>
+    ${hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">${ICON_CHAT}</a>`:""}
+  </div>`;
 }
 
 // Etiquetas libres (paso 103): chips con quitar + input con autocompletado (datalist) de las
@@ -584,6 +600,28 @@ function vFichaTagsRow(s){
     <datalist id="tag-datalist">${existingLabels.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>
   </div>`;
 }
+// Modo vacaciones (paso 114): "Pausar" pasa s.status a "pausado" (con fecha de vuelta opcional
+// en s.pausaHasta) — un alumno pausado ya queda afuera de la agenda, "para cobrar" y "salud del
+// negocio" porque esas vistas sólo miran status==="activo" (ver agendaRangeEvents/
+// cobrosAtrasadosSummary/vSaludDelMes); acá sólo se agrega la acción guiada y la lista aparte de
+// Estudiantes. "Reanudar" lo devuelve intacto: nada de su historial se toca en ningún momento.
+function vFichaPausa(s){
+  if(s.status==="pausado"){
+    return `<div class="hint" style="margin:8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span>En pausa${s.pausaHasta?` — vuelve el ${fmtDate(s.pausaHasta)}`:""}</span>
+      <button class="chip" data-a="reanudar-alumno">Reanudar</button>
+    </div>`;
+  }
+  if(s.status!=="activo") return "";
+  if(state.pausaAskId===s.id){
+    return `<div style="margin:8px 0;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="max-width:180px;margin:0"><div class="flabel">Vuelve el (opcional)</div><input type="date" id="pausa-hasta"></div>
+      <button class="chip" data-a="pausar-alumno-confirm">Confirmar pausa</button>
+      <button class="chip" data-a="pausar-alumno-cancel">Cancelar</button>
+    </div>`;
+  }
+  return `<div style="margin:8px 0"><button class="chip" data-a="pausar-alumno-ask">Pausar</button></div>`;
+}
 function vDetalle(){
   const s = sel(); if(!s) return "";
   const d = daysTo(s.examDate);
@@ -598,6 +636,7 @@ function vDetalle(){
     </div>
     ${(s.examDate&&d!==null&&d>=0)?`<span class="count big ${d<=7?"urgent":""}">examen: ${d===0?"HOY":d+" día"+(d===1?"":"s")}</span>`:""}
   </div>`;
+  h += vFichaPausa(s);
   h += vFichaTagsRow(s);
   h += alerts.map(a=>`<div class="alert" style="cursor:default"><span class="dot"></span><span class="t">${esc(a.text)}</span></div>`).join("");
   h += vGoalClosure(s);
