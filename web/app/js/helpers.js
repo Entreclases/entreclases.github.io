@@ -613,20 +613,23 @@ function portalShareFor(s){ return s.portalShare || {proximaClase:false, tareas:
 // Próxima clase de un alumno puntual (no importa el estado del alumno, a diferencia de
 // agendaRangeEvents que sólo mira activos): la más próxima entre sus clases puntuales futuras
 // no canceladas y la próxima ocurrencia de cada horario habitual dentro de los próximos 7 días.
+// Link de videollamada (paso 116) de un evento puntual/horario: el propio si lo cargó, si no el
+// del alumno (default por alumno, ficha → Clases). Nunca ambos combinados.
+function linkVideollamadaFor(s, ownLink){ return ownLink || s.videollamadaLink || ""; }
 function nextClaseForStudent(s){
   const from=today();
   let best=null;
   (s.clasesPuntuales||[]).forEach(p=>{
     if(p.cancelada || p.date<from) return;
     const key=p.date+" "+p.time;
-    if(!best || key<best.key) best={key, date:p.date, time:p.time, duration:Number(p.duration)||60};
+    if(!best || key<best.key) best={key, date:p.date, time:p.time, duration:Number(p.duration)||60, link:linkVideollamadaFor(s,p.link)};
   });
   (s.horarios||[]).forEach(hr=>{
     for(let i=0;i<7;i++){
       const d=addDays(from,i);
       if(weekdayIdx(d)===hr.day){
         const key=d+" "+hr.time;
-        if(!best || key<best.key) best={key, date:d, time:hr.time, duration:Number(hr.duration)||60};
+        if(!best || key<best.key) best={key, date:d, time:hr.time, duration:Number(hr.duration)||60, link:linkVideollamadaFor(s,hr.link)};
         break;
       }
     }
@@ -747,7 +750,8 @@ function agendaRangeEvents(fromDate, toDate){
         const dow=weekdayIdx(d);
         (s.horarios||[]).filter(h=>h.day===dow).forEach(h=>{
           events.push({studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId,
-            date:d, time:h.time, duration:Number(h.duration)||60, kind:"horario", sourceId:h.id});
+            date:d, time:h.time, duration:Number(h.duration)||60, kind:"horario", sourceId:h.id,
+            link:linkVideollamadaFor(s,h.link)});
         });
       }
     }
@@ -756,7 +760,8 @@ function agendaRangeEvents(fromDate, toDate){
       if(p.date>=fromDate && p.date<=toDate) events.push({
         studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId,
         date:p.date, time:p.time, duration:Number(p.duration)||60,
-        kind:"puntual", sourceId:p.id, seniaEstado:p.seniaEstado });
+        kind:"puntual", sourceId:p.id, seniaEstado:p.seniaEstado,
+        link:linkVideollamadaFor(s,p.link) });
     });
   });
   return events;
@@ -817,9 +822,9 @@ function nextPendingPuntual(s, afterDate){
 // crea una clase puntual para studentId (usado tanto desde la ficha como desde "Programar clase
 // acá" en la agenda mensual) — snapshotea la seña si el alumno la tiene activa y devuelve un
 // aviso (o null) si la clase anterior de ese alumno todavía tiene la seña sin cobrar.
-function addPuntualClase(studentId, date, time, duration){
+function addPuntualClase(studentId, date, time, duration, link){
   const s = state.students.find(x=>x.id===studentId); if(!s) return {warning:null};
-  const nueva = {id:uid(), date, time, duration};
+  const nueva = {id:uid(), date, time, duration, link:link||""};
   let warning = null;
   if(hasSenia(s)){
     nueva.seniaEstado="pendiente"; nueva.seniaMonto=seniaMontoFor(s);

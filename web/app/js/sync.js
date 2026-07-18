@@ -664,7 +664,7 @@ function buildAlumnoBlock(s){
   // saca del JSON de vuelta antes de responder (ver la función), así que nunca llega al navegador.
   if(share.proximaClase){
     const n=nextClaseForStudent(s);
-    block.proximaClase = n ? {date:n.date, time:n.time, duration:n.duration} : null;
+    block.proximaClase = n ? {date:n.date, time:n.time, duration:n.duration, link:n.link||""} : null;
   }
   if(share.tareas){
     const last=[...(s.sessions||[])].sort((a,b)=>b.date.localeCompare(a.date))[0];

@@ -810,7 +810,8 @@ document.addEventListener("click", (e)=>{
     const day=parseInt(document.getElementById("h-day").value,10);
     const time=document.getElementById("h-time").value; if(!time) return;
     const duration=parseInt(document.getElementById("h-duration").value,10)||60;
-    update(s.id,{horarios:[...(s.horarios||[]), {id:uid(), day, time, duration}]});
+    const link=document.getElementById("h-link").value.trim();
+    update(s.id,{horarios:[...(s.horarios||[]), {id:uid(), day, time, duration, link}]});
     toast("Horario agregado"); return;
   }
   else if(a==="del-horario" && s){
@@ -826,7 +827,8 @@ document.addEventListener("click", (e)=>{
     const date=document.getElementById("p-date").value; if(!date) return;
     const time=document.getElementById("p-time").value; if(!time) return;
     const duration=parseInt(document.getElementById("p-duration").value,10)||60;
-    const {warning}=addPuntualClase(s.id, date, time, duration);
+    const link=document.getElementById("p-link").value.trim();
+    const {warning}=addPuntualClase(s.id, date, time, duration, link);
     if(warning) alert(warning);
     else toast("Clase puntual agregada");
     return;

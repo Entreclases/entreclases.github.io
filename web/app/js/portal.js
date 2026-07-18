@@ -61,7 +61,8 @@ function personalHtml(alumno){
   if("proximaClase" in alumno){
     const pc = alumno.proximaClase;
     h += `<div class="prow"><div class="plabel">Próxima clase</div>
-      ${pc ? `<div class="pvalue">${fmtDiaLocal(pc.date)} a las ${esc(pc.time)} (${Number(pc.duration)||60} min)</div>`
+      ${pc ? `<div class="pvalue">${fmtDiaLocal(pc.date)} a las ${esc(pc.time)} (${Number(pc.duration)||60} min)
+          ${pc.link ? `<div style="margin-top:6px"><a class="dl" target="_blank" rel="noopener" href="${esc(pc.link)}">Entrar a la clase</a></div>` : ""}</div>`
            : `<div class="pempty">Sin clases agendadas por ahora.</div>`}
     </div>`;
   }

@@ -321,6 +321,7 @@ function vHoyClasesHoy(){
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             ${done ? `<span class="badge badge-green">Registrada</span>`
               : `<button class="chip" data-a="agenda-log" data-id="${e.studentId}" data-date="${today()}">Registrar</button>`}
+            ${e.link?`<a class="chip" target="_blank" rel="noopener" href="${esc(e.link)}">Entrar a la clase</a>`:""}
             ${vWaRecordarClaseBtn(e,"hoy")}
           </div>
         </div>`;
@@ -374,7 +375,8 @@ function vHoyProximo(){
     }
     if(manana.length){
       body += `<div class="hoy-subhead">Mañana</div>` + manana.map(e=>
-        `<div class="hoy-row"><div class="hoy-row-main"><span class="hoy-row-time">${esc(e.time)}</span>${e.subjectId?subjectDot(e.subjectId):""}<span class="hoy-row-name">${esc(e.studentName)}</span></div>${vWaRecordarClaseBtn(e,"mañana")}</div>`
+        `<div class="hoy-row"><div class="hoy-row-main"><span class="hoy-row-time">${esc(e.time)}</span>${e.subjectId?subjectDot(e.subjectId):""}<span class="hoy-row-name">${esc(e.studentName)}</span></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${e.link?`<a class="chip" target="_blank" rel="noopener" href="${esc(e.link)}">Entrar a la clase</a>`:""}${vWaRecordarClaseBtn(e,"mañana")}</div></div>`
       ).join("");
     }
   }
@@ -834,6 +836,7 @@ function vFichaClases(s){
       ${cobraPorClase?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
       <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`;
       }).join("");
+  h += vVideollamadaDefaultCard(s);
   h += vHorariosCard(s);
   h += vPuntualesCard(s);
   h += vSimTimer();
@@ -1038,18 +1041,29 @@ function vPortalAlumnoCard(s){
 }
 
 /* ============ agenda: horarios habituales + clases puntuales, dentro de la ficha ============ */
+// Link de videollamada (paso 116): por defecto del alumno (data-f="videollamadaLink", debajo)
+// o propio de un horario/clase puntual — el propio pisa al del alumno (linkVideollamadaFor en
+// helpers.js). Se muestra como botón "Entrar a la clase" en la agenda y el tablero Hoy, y al
+// alumno en su portal individual (sólo su próxima clase, ver buildAlumnoBlock en sync.js).
+function vVideollamadaDefaultCard(s){
+  return `<div class="formcard"><div class="ftitle">Link de videollamada (por defecto)</div>
+    <div class="hint" style="margin-bottom:8px">Para clases virtuales — Meet, Zoom, lo que uses. Se puede pisar en un horario o clase puntual si alguna vez usás otro link.</div>
+    <input data-f="videollamadaLink" placeholder="https://meet.google.com/…" value="${esc(s.videollamadaLink||"")}"></div>`;
+}
 function vHorariosCard(s){
   const list=[...(s.horarios||[])].sort((a,b)=>a.day-b.day||a.time.localeCompare(b.time));
   let h = `<div class="formcard"><div class="ftitle">Horarios habituales</div>`;
   h += list.length===0 ? `<div class="empty">Sin horarios cargados.</div>`
     : list.map(hr=>`<div class="log" style="align-items:center">
       <div class="body">${esc(DIAS_SEMANA[hr.day])} ${esc(hr.time)} · ${hr.duration||60} min</div>
+      ${hr.link?`<a class="chip" target="_blank" rel="noopener" href="${esc(hr.link)}">Link propio</a>`:""}
       <button class="del" data-a="del-horario" data-id="${hr.id}" title="Borrar" aria-label="Borrar">×</button></div>`).join("");
   h += `<div class="frow" style="margin-top:8px;align-items:flex-end">
     <div class="field"><div class="flabel">Día</div><select id="h-day" data-enter="add-horario">
       ${DIAS_SEMANA.map((d,i)=>`<option value="${i}">${esc(d)}</option>`).join("")}</select></div>
     <div class="field"><div class="flabel">Hora</div><input type="time" id="h-time" value="18:00" data-enter="add-horario"></div>
     <div class="field" style="max-width:120px"><div class="flabel">Duración (min)</div><input type="number" id="h-duration" value="60" min="15" step="15" data-enter="add-horario"></div>
+    <div class="field"><div class="flabel">Link (opcional, si es distinto del de arriba)</div><input id="h-link" placeholder="https://…" data-enter="add-horario"></div>
     <button class="chip" data-a="add-horario" style="margin-bottom:2px">+ Agregar horario</button></div>
   </div>`;
   return h;
@@ -1064,6 +1078,7 @@ function vPuntualesCard(s){
     <div class="field"><div class="flabel">Fecha</div><input type="date" id="p-date" value="${today()}" data-enter="add-puntual"></div>
     <div class="field"><div class="flabel">Hora</div><input type="time" id="p-time" value="18:00" data-enter="add-puntual"></div>
     <div class="field" style="max-width:120px"><div class="flabel">Duración (min)</div><input type="number" id="p-duration" value="60" min="15" step="15" data-enter="add-puntual"></div>
+    <div class="field"><div class="flabel">Link (opcional, si es distinto del de arriba)</div><input id="p-link" placeholder="https://…" data-enter="add-puntual"></div>
     <button class="chip" data-a="add-puntual" style="margin-bottom:2px">+ Agregar clase puntual</button></div>
   </div>`;
   return h;
@@ -1079,6 +1094,7 @@ function vPuntualRow(s,p){
     <div class="body">${esc(DIAS_SEMANA[weekdayIdx(p.date)])} ${esc(fmtDate(p.date))} ${esc(p.time)} · ${p.duration||60} min
       ${p.cancelada?`<div class="note" style="color:var(--status-desaprobo-fg)">Cancelada ${esc(fmtDateTime(p.canceladaAt))}${senia?" · seña "+SENIA_ESTADO_META[senia].label.toLowerCase():""}</div>`:""}
     </div>`;
+  if(p.link) h += `<a class="chip" target="_blank" rel="noopener" href="${esc(p.link)}">Link propio</a>`;
   if(senia && !p.cancelada){
     h += canToggle
       ? `<button class="chip" style="color:${SENIA_ESTADO_META[senia].fg};border-color:${SENIA_ESTADO_META[senia].fg}" data-a="toggle-senia-estado" data-id="${p.id}">${SENIA_ESTADO_META[senia].label}</button>`
@@ -1270,6 +1286,7 @@ function vAgendaEvent(e, date){
     ${e.overlap?`<div class="hint" style="color:var(--status-desaprobo-fg);display:flex;align-items:center;gap:4px"><span class="icon-inline" style="width:12px;height:12px">${ICON_WARNING}</span> se superpone con otra clase</div>`:""}
     ${past && already ? `<div class="hint" style="color:var(--status-activo-fg)">Ya registrada</div>` : ""}
     ${past && !already ? `<button class="chip" style="margin-top:6px" data-a="agenda-log" data-id="${e.studentId}" data-date="${e.date}">Registrar esta clase</button>` : ""}
+    ${!past && e.link ? `<a class="chip" style="margin-top:6px" target="_blank" rel="noopener" href="${esc(e.link)}">Entrar a la clase</a>` : ""}
     ${waBtn ? `<div style="margin-top:6px">${waBtn}</div>` : ""}
   </div>`;
 }
