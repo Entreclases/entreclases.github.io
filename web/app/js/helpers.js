@@ -4,6 +4,15 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6
 const today = () => new Date().toISOString().slice(0,10);
 const esc = (s) => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
+// applicationServerKey de PushManager.subscribe() quiere un Uint8Array, no el string base64url
+// que da VAPID_PUBLIC_KEY (config.js) — conversión estándar (paso 108).
+function urlBase64ToUint8Array(base64String){
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+
 // Selector estable para volver a encontrar un elemento después de un render() completo (que
 // reconstruye todo el innerHTML de #app) — por id si tiene, si no por el primer atributo data-*
 // que lo identifique dentro de la vista actual. Usado para no perder el foco de teclado (ver el

@@ -848,6 +848,7 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="toggle-resumen-semanal"){ setResumenSemanal(el.dataset.f==="si"); return; }
+  else if(a==="toggle-notif-clases"){ setNotifClasesDia(el.dataset.f==="si"); return; }
   else if(a==="toggle-recordatorios"){
     state.catalog.recordatorios = {...recordatoriosFor(), activo: el.dataset.f==="si"};
     touchCatalog(); return;

@@ -1,5 +1,5 @@
 /* Entreclases — funcionamiento sin conexión */
-const CACHE = "cuaderno-v99";
+const CACHE = "cuaderno-v100";
 const FILES = ["./", "./index.html", "./styles.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",
   "./fonts/inter-latin.woff2", "./fonts/poppins-600.woff2", "./fonts/poppins-700.woff2", "./fonts/poppins-800.woff2",
   "./js/qrcode.js", "./js/config.js", "./js/helpers.js", "./js/auth.js", "./js/sync.js", "./js/views.js", "./js/events.js"];
@@ -23,6 +23,30 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("message", (e) => {
   if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
+// Recordatorio de las clases del día (paso 108): payload simple {title, body} armado por la
+// Edge Function enviar-push (cuaderno-supabase) — sin datos sensibles adentro, así que no hace
+// falta descifrar nada especial más allá de lo que ya resuelve el navegador (cifrado del
+// transporte, RFC 8291). Si el push llega sin body parseable, se muestra un texto genérico.
+self.addEventListener("push", (e) => {
+  let data = { title: "Entreclases", body: "Tenés novedades." };
+  try{ if(e.data) data = { ...data, ...e.data.json() }; }catch(err){}
+  e.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: "./icon-192.png",
+    badge: "./icon-192.png",
+  }));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for(const c of list) if("focus" in c) return c.focus();
+      return self.clients.openWindow("./");
+    })
+  );
 });
 
 self.addEventListener("fetch", (e) => {

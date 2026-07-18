@@ -1974,6 +1974,28 @@ function vRecordatoriosCard(){
   }
   return h + `</div>`;
 }
+// Recordatorio push de las clases del día (paso 108): a diferencia de vRecordatoriosCard() de
+// arriba (avisos de cobro, sólo suenan con la app abierta), esto sí llega con la app cerrada —
+// suscribe el service worker a PushManager y guarda la suscripción en push_subscriptions
+// (setNotifClasesDia() en sync.js); el envío real corre del lado del servidor (cron matutino +
+// Edge Function enviar-push, ver 018_push_clases.sql en cuaderno-supabase), en modo simulacro
+// hasta activarlo a mano ahí. No disponible en Tauri/Capacitor (no registran service worker,
+// ver IS_NATIVE en config.js) ni en navegadores sin soporte de Push API.
+function vNotifClasesCard(){
+  const ses=getSes();
+  const supported = !IS_NATIVE && typeof Notification!=="undefined" && "serviceWorker" in navigator && "PushManager" in window;
+  const denied = supported && Notification.permission==="denied";
+  let h = `<div class="formcard"><div class="ftitle">Recordatorio de las clases del día</div>
+    <div class="hint" style="margin-bottom:10px">Una notificación a la mañana con cuántas clases tenés hoy y a qué hora es la primera — llega aunque tengas la app cerrada.</div>`;
+  h += supported
+    ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="chip ${!(ses&&ses.notifClasesDia)?"on":""}" data-a="toggle-notif-clases" data-f="no">Apagado</button>
+        <button class="chip ${(ses&&ses.notifClasesDia)?"on":""}" data-a="toggle-notif-clases" data-f="si">Recordarme las clases del día</button>
+      </div>`
+    : `<span class="hint">No disponible en este dispositivo${IS_NATIVE?" — usá la versión web instalada desde el navegador para esto":""}.</span>`;
+  if(denied) h += `<div class="hint" style="color:var(--status-desaprobo-fg);margin-top:6px">Este navegador tiene los avisos bloqueados para el sitio — activalos desde su configuración y volvé a tocar el botón.</div>`;
+  return h + `</div>`;
+}
 // Escala para el cierre de objetivo de clase (paso 91): Simple (Sí/A medias/No, default) o
 // Porcentaje (un solo número 0-100). El resultado siempre se guarda igual (estado+pct, ver
 // escalaObjetivoFor en helpers.js), así que cambiar de escala no rompe el historial ni las
@@ -2002,6 +2024,7 @@ function vCuenta(){
     </div>
   </div>
   ${vRecordatoriosCard()}
+  ${vNotifClasesCard()}
   ${vEscalaObjetivoCard()}
   <div class="formcard"><div class="ftitle" style="display:flex;align-items:center;gap:7px">Política de cancelación${helpTip("cancelPolicy")}</div>
     <div class="hint" style="margin-bottom:10px">Se aplica al cancelar una clase puntual con seña ya cobrada (ver la ficha de cada alumno). El texto queda guardado para reutilizarlo donde haga falta.</div>

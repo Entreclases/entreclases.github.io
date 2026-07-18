@@ -106,6 +106,11 @@ const MATERIALES_BUCKET = "materiales";
 const MATERIAL_MAX_BYTES = 10*1024*1024;
 const MATERIAL_MAX_COUNT = 100;
 const MATERIAL_MAX_TOTAL_BYTES = 50*1024*1024; // por usuario, sumando materiales de todas sus materias
+// Recordatorio push de las clases del día (paso 108): clave pública VAPID, apta para exponerse
+// en el cliente por diseño (no es secreta) — el par se generó una sola vez con
+// `npx web-push generate-vapid-keys`; la privada vive sólo como secreto de la Edge Function
+// enviar-push (cuaderno-supabase), nunca en este repo. Ver setNotifClasesDia() en sync.js.
+const VAPID_PUBLIC_KEY = "BGj8qOBjAkuPuXXqILsyhFC8sfSc1eJHCZi9-WcVbHlaM98LGPdPBnKdOZ0shIWjnLzvIvrpo1NlMBrz8ZDxsEE";
 const APP_VERSION = "2.1.2";
 // Modo demo (paso 82): ?demo=1 carga un cuaderno ficticio en memoria (ver buildDemoData() en
 // helpers.js), sin cuenta, sin sync y sin tocar localStorage ni el backend — ver el guard de

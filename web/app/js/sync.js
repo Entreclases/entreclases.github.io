@@ -171,6 +171,63 @@ async function setResumenSemanal(v){
   }
 }
 
+/* ============ push de recordatorio de las clases del día (paso 108) ============
+   Opt-in en perfiles.notif_clases_dia (mismo patrón optimista que setResumenSemanal), más la
+   suscripción real del navegador (PushManager) guardada en push_subscriptions — una fila por
+   dispositivo, no por cuenta, porque cada dispositivo suscripto recibe el push por separado.
+   El envío en sí (firmado VAPID, cron matutino) vive del lado del backend — ver
+   018_push_clases.sql y supabase/functions/enviar-push en cuaderno-supabase. */
+async function saveSubscription(sub){
+  const s=await ensureToken();
+  const uid_=jwtSub(s.access);
+  const json=sub.toJSON();
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"resolution=merge-duplicates,return=minimal"};
+  const r=await fetch(SUPA_URL+"/rest/v1/push_subscriptions?on_conflict=endpoint", {method:"POST", headers:h,
+    body:JSON.stringify([{user_id:uid_, endpoint:json.endpoint, p256dh:json.keys.p256dh, auth:json.keys.auth}])});
+  if(!r.ok) throw new Error("error "+r.status);
+}
+async function deletePushSubscriptionRow(endpoint){
+  const s=await ensureToken();
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+  await fetch(SUPA_URL+"/rest/v1/push_subscriptions?endpoint=eq."+encodeURIComponent(endpoint), {method:"DELETE", headers:h});
+}
+async function setNotifClasesDia(v){
+  const ses=getSes(); if(!ses) return;
+  if(v){
+    try{
+      if(typeof Notification==="undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)){
+        toast("Este dispositivo no soporta notificaciones push.", "error"); return;
+      }
+      let perm=Notification.permission;
+      if(perm==="default") perm=await Notification.requestPermission();
+      if(perm!=="granted"){ toast("Necesitás permitir las notificaciones para activar esto.", "error"); return; }
+      const reg=await navigator.serviceWorker.ready;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+      await saveSubscription(sub);
+    }catch(e){ toast("No se pudo activar la notificación — probá de nuevo.", "error"); return; }
+  }else{
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.getSubscription();
+      if(sub){ await deletePushSubscriptionRow(sub.endpoint); await sub.unsubscribe(); }
+    }catch(e){ /* silencioso: si falla el borrado local/remoto, apagar el opt-in ya corta el envío del lado del servidor */ }
+  }
+  setSes({...ses, notifClasesDia:v}); render();
+  try{
+    const s=await ensureToken();
+    const uid_=jwtSub(s.access);
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
+    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?user_id=eq."+encodeURIComponent(uid_), {method:"PATCH", headers:h,
+      body:JSON.stringify({notif_clases_dia:v})});
+    if(!r.ok) throw new Error("error "+r.status);
+  }catch(e){
+    const cur=getSes(); if(cur) setSes({...cur, notifClasesDia:!v});
+    toast("No se pudo guardar — probá de nuevo.", "error");
+    render();
+  }
+}
+
 /* ============ respaldos automáticos con historial ============ */
 // Un snapshot completo por día (primera sync exitosa del día), silencioso; se guardan hasta
 // MAX_BACKUPS y se recortan los más viejos. Vive aparte de la exportación manual (.json).

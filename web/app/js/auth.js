@@ -48,14 +48,15 @@ async function loadRole(){
     const s=getSes(); if(!s) return;
     const uid_=jwtSub(s.access);
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
-    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=rol,resumen_semanal&user_id=eq."+encodeURIComponent(uid_), {headers:h});
+    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=rol,resumen_semanal,notif_clases_dia&user_id=eq."+encodeURIComponent(uid_), {headers:h});
     if(!r.ok) return;
     const rows=await r.json();
     const rol=rows[0]&&rows[0].rol;
     const resumenSemanal=!!(rows[0]&&rows[0].resumen_semanal);
+    const notifClasesDia=!!(rows[0]&&rows[0].notif_clases_dia);
     if(rol){
       const cur=getSes();
-      if(cur && cur.email===s.email){ setSes({...cur, role:rol, resumenSemanal}); render(); }
+      if(cur && cur.email===s.email){ setSes({...cur, role:rol, resumenSemanal, notifClasesDia}); render(); }
     }
   }catch(e){ /* silencioso: offline o falla puntual — sigue con lo ya cacheado */ }
 }
