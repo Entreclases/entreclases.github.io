@@ -689,6 +689,9 @@ document.addEventListener("click", (e)=>{
   else if(a==="open-recibo" && s){ state.reciboId=el.dataset.id; state.view="recibo"; }
   else if(a==="close-recibo"){ state.view="detalle"; state.tab="pagos"; }
   else if(a==="recibo-print"){ window.print(); return; }
+  else if(a==="open-agenda-imprimir"){ state.view="agenda-imprimir"; }
+  else if(a==="close-agenda-imprimir"){ state.view="agenda"; }
+  else if(a==="agenda-imprimir-print"){ window.print(); return; }
   else if(a==="recibo-copy" && s){
     const r=reciboFor(s,state.reciboId); if(!r) return;
     copyToClipboard(buildReciboText(s,r))

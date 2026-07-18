@@ -1170,7 +1170,10 @@ function vAgendaSemana(){
       <button class="chip" data-a="agenda-next">Semana siguiente →</button>
       ${offset!==0?`<button class="chip" data-a="agenda-today">Esta semana</button>`:""}
     </div>
-    ${vExportIcsButton()}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="chip" data-a="open-agenda-imprimir">Imprimir semana</button>
+      ${vExportIcsButton()}
+    </div>
   </div>`;
 
   const events = markOverlaps(agendaWeekEvents(weekStart));
@@ -1289,6 +1292,50 @@ function vAgendaEvent(e, date){
     ${!past && e.link ? `<a class="chip" style="margin-top:6px" target="_blank" rel="noopener" href="${esc(e.link)}">Entrar a la clase</a>` : ""}
     ${waBtn ? `<div style="margin-top:6px">${waBtn}</div>` : ""}
   </div>`;
+}
+
+/* ============ agenda semanal imprimible (paso 118) ============
+   Mismo patrón de "documento" que informe/contrato/recibo (.informe-bar sin imprimir + .informe-doc
+   con la identidad de Entreclases, ver vRecibo() más arriba) — la semana que ya se esté viendo en
+   Agenda (state.agendaWeekOffset), agrupada por día, pensada para pegar en la heladera o el aula. */
+function vAgendaImprimir(){
+  const offset = state.agendaWeekOffset||0;
+  const weekStart = addDays(mondayOfWeek(today()), offset*7);
+  const weekEnd = addDays(weekStart,6);
+  const events = agendaWeekEvents(weekStart);
+  const byDay = Array.from({length:7},()=>[]);
+  events.forEach(e=>{
+    const idx = Math.round((new Date(e.date+"T12:00:00")-new Date(weekStart+"T12:00:00"))/86400000);
+    if(idx>=0 && idx<7) byDay[idx].push(e);
+  });
+  byDay.forEach(list=>list.sort((a,b)=>a.time.localeCompare(b.time)));
+
+  let h = `<div class="informe-bar no-print">
+    <button class="back" style="margin:0" data-a="close-agenda-imprimir">← Volver a la agenda</button>
+    <div class="informe-actions">
+      <button class="primary" style="margin-left:0" data-a="agenda-imprimir-print">Imprimir</button>
+    </div>
+  </div>`;
+
+  h += `<div class="informe-doc">
+    <div class="informe-eyebrow">Agenda semanal</div>
+    <h1 class="informe-name">${esc(fmtDate(weekStart))} – ${esc(fmtDate(weekEnd))}</h1>
+    <div class="informe-sub">Entreclases</div>`;
+
+  h += DIAS_SEMANA.map((label,i)=>{
+    const date = addDays(weekStart,i);
+    const list = byDay[i];
+    return `<div class="informe-section">
+      <div class="informe-stitle">${esc(label)} · ${esc(fmtDate(date))}</div>
+      ${list.length===0
+        ? `<div class="informe-row"><div class="informe-rowbody" style="color:var(--faint)">Sin clases</div></div>`
+        : list.map(e=>`<div class="informe-row"><div class="informe-rowbody"><b>${esc(e.time)}</b> — ${esc(e.studentName)}${e.subject?` (${esc(e.subject)})`:""}</div></div>`).join("")}
+    </div>`;
+  }).join("");
+
+  h += `<div class="informe-footer">Generado con Entreclases — ${esc(fmtDate(today()))}</div>
+  </div>`;
+  return h;
 }
 
 /* ============ exportar agenda (.ics), el período que se esté viendo (paso 110) ============
@@ -3708,6 +3755,10 @@ function render(){
   if(state.view==="recibo"){
     if(!sel() || !reciboFor(sel(), state.reciboId)){ state.view="tablero"; }
     else{ document.body.classList.remove("has-nav"); _prevViewKey=null; document.getElementById("app").innerHTML = `<div class="view-fade">${vRecibo()}</div>`+toastWrap(); return; }
+  }
+  if(state.view==="agenda-imprimir"){
+    document.body.classList.remove("has-nav"); _prevViewKey=null;
+    document.getElementById("app").innerHTML = `<div class="view-fade">${vAgendaImprimir()}</div>`+toastWrap(); return;
   }
   document.body.classList.add("has-nav");
   const ses = getSes();
