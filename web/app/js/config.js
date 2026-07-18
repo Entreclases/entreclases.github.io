@@ -111,7 +111,7 @@ const MATERIAL_MAX_TOTAL_BYTES = 50*1024*1024; // por usuario, sumando materiale
 // `npx web-push generate-vapid-keys`; la privada vive sólo como secreto de la Edge Function
 // enviar-push (cuaderno-supabase), nunca en este repo. Ver setNotifClasesDia() en sync.js.
 const VAPID_PUBLIC_KEY = "BGj8qOBjAkuPuXXqILsyhFC8sfSc1eJHCZi9-WcVbHlaM98LGPdPBnKdOZ0shIWjnLzvIvrpo1NlMBrz8ZDxsEE";
-const APP_VERSION = "2.1.3";
+const APP_VERSION = "2.1.4";
 // Modo demo (paso 82): ?demo=1 carga un cuaderno ficticio en memoria (ver buildDemoData() en
 // helpers.js), sin cuenta, sin sync y sin tocar localStorage ni el backend — ver el guard de
 // save() en helpers.js y el de ensureToken() en auth.js, y el gate de render() en views.js.
