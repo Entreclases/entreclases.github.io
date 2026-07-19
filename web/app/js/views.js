@@ -3606,7 +3606,18 @@ function aulaOrder(list){
     return da-db;
   });
 }
-function deskHtml(s){
+// Bancos ocupados: color de semáforo detrás + foto/iniciales (paso 137) + nombre corto abajo,
+// con tooltip completo (avance, examen, si ya rindió). Bancos vacíos: silueta sutil, sin acción.
+// idx sólo se usa para el retraso de la animación en cascada (paso 138), ver vAula.
+function deskHtml(s, idx){
+  const delay = Math.min(idx*24, 480);
+  if(!s){
+    return `<div class="desk desk-empty" style="animation-delay:${delay}ms" aria-hidden="true">
+      <div class="desk-top"></div>
+      <div class="desk-body empty"><div class="desk-silhouette"></div></div>
+      <div class="desk-name">&nbsp;</div>
+    </div>`;
+  }
   const sem = s.semaforo||"sd";
   const color = SEM_META[sem].color;
   const pct = topicProgressPct(s);
@@ -3616,18 +3627,29 @@ function deskHtml(s){
   const done = hasCurrentExamResult(s);
   const firstName = (s.name||"").trim().split(/\s+/)[0] || "—";
   const title = `${s.name||"—"} — ${SEM_META[sem].label} — avance: ${pctVal}%${done?" — ya rindió":""}`;
-  return `<button class="desk" data-a="open" data-id="${esc(s.id)}" title="${esc(title)}">
+  return `<button class="desk" data-a="open" data-id="${esc(s.id)}" title="${esc(title)}" style="animation-delay:${delay}ms">
     <div class="desk-top"><div class="desk-progress grow-h" style="width:${pctVal}%"></div></div>
     <div class="desk-body" style="background:${color}">
+      ${avatarHtml(s.id, s.name, s.foto, 30, "border-radius:50%;border:2px solid var(--card)")}
       ${showBadge?`<span class="desk-badge">${d===0?"hoy":d+"d"}</span>`:""}
       ${done?`<span class="desk-done" title="Ya rindió este examen">✓</span>`:""}
     </div>
     <div class="desk-name">${esc(firstName)}</div>
   </button>`;
 }
+// Filas de "el aula" (paso 138): siempre 30 bancos como piso — 4 filas completas de 7 (2|3|2, dos
+// pasillos) + una quinta fila de un solo grupo de 2. Si hay más de 30 alumnos en la materia, se
+// agregan filas completas nuevas (también 2|3|2) de a una, debajo, hasta que entren todos —
+// nunca se recorta la lista ni se manda a "ver en la Lista" como antes.
+const AULA_BASE_ROWS = [[2,3,2],[2,3,2],[2,3,2],[2,3,2],[2]]; // 28+2 = 30
+function aulaRowGroups(studentCount){
+  const rows=[...AULA_BASE_ROWS];
+  let placed=30;
+  while(placed<studentCount){ rows.push([2,3,2]); placed+=7; }
+  return rows;
+}
 function vAula(grupo){
   let h = `<div class="stitle" style="margin-top:26px">El aula</div>`;
-  if(grupo.length===0) return h + `<div class="empty">Sin alumnos activos para mostrar acá.</div>`;
 
   h += `<div class="aula-legend">
     <span><span class="sw" style="background:${SEM_META.verde.color}"></span>${SEM_META.verde.label}</span>
@@ -3640,19 +3662,15 @@ function vAula(grupo){
   </div>`;
 
   const ordered = aulaOrder(grupo);
-  const shown = ordered.slice(0,30);
-  const resto = ordered.length - shown.length;
-
-  const rows=[]; for(let i=0;i<shown.length;i+=6) rows.push(shown.slice(i,i+6));
-  h += `<div class="aula-wrap"><div class="classroom">` + rows.map(row=>{
-    const left=row.slice(0,3), right=row.slice(3,6);
-    return `<div class="aula-row">
-      <div class="aula-side">${left.map(deskHtml).join("")}</div>
-      ${right.length?`<div class="aula-side">${right.map(deskHtml).join("")}</div>`:""}
-    </div>`;
-  }).join("") + `</div></div>`;
-
-  if(resto>0) h += `<button class="chip" data-a="nav-lista" style="margin-top:12px">y ${resto} más — ver en la Lista</button>`;
+  const rowGroups = aulaRowGroups(ordered.length);
+  let idx=0;
+  h += `<div class="aula-wrap"><div class="classroom">` + rowGroups.map(groups=>
+    `<div class="aula-row">` + groups.map(count=>{
+      let side="";
+      for(let i=0;i<count;i++){ side += deskHtml(ordered[idx], idx); idx++; }
+      return `<div class="aula-side">${side}</div>`;
+    }).join("") + `</div>`
+  ).join("") + `</div></div>`;
 
   return h;
 }

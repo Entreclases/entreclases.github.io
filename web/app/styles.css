@@ -398,7 +398,8 @@
         display:flex;flex-direction:column;align-items:center;font-family:inherit}
   .desk-top{width:100%;height:4px;background:var(--soft);border-radius:2px;overflow:hidden;margin-bottom:3px}
   .desk-progress{height:100%;background:var(--accent)}
-  .desk-body{position:relative;width:100%;height:38px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--shadow-ring2)}
+  .desk-body{position:relative;width:100%;height:38px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--shadow-ring2);
+             display:flex;align-items:center;justify-content:center}
   .desk-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:var(--on-accent);font-size:9px;
               font-family:var(--mono);border-radius:99px;padding:1px 4px;min-width:14px;text-align:center;line-height:1.3}
   .desk-done{position:absolute;top:-6px;left:-6px;background:var(--green);color:var(--on-green);font-size:9px;
@@ -407,14 +408,29 @@
                      border-radius:99px;background:var(--green);color:var(--on-green);font-size:9px;font-weight:700;margin-right:4px;vertical-align:middle}
   .desk-name{font-size:10px;color:var(--muted);margin-top:4px;max-width:56px;white-space:nowrap;
              overflow:hidden;text-overflow:ellipsis}
+  /* Banco vacío (paso 138): mismo esqueleto que uno ocupado (mantiene la grilla prolija), sin
+     color de semáforo ni acción — sólo una silueta sutil punteada. */
+  .desk-empty{cursor:default}
+  .desk-body.empty{background:none;box-shadow:none;border:1.5px dashed var(--line)}
+  .desk-silhouette{width:20px;height:20px;border-radius:50%;border:1.5px dashed var(--line)}
   @media (max-width:480px){
     .desk{width:40px}
     .desk-body{height:30px}
     .desk-name{max-width:40px;font-size:9px}
     .aula-row{gap:18px}
     .aula-side{gap:6px}
+    .desk-silhouette{width:16px;height:16px}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  /* Entrada en cascada de los bancos (paso 138): cada uno trae su propio animation-delay ya
+     calculado en deskHtml() (views.js), así que esta regla sólo define la animación en sí — entra
+     en cualquier re-render, no sólo al recién navegar a Estadísticas (a diferencia del
+     "view-enter" genérico de más abajo, que sólo dispara con vista nueva y sólo escalona los
+     primeros 7 elementos). Selector de 3 clases a propósito, para ganarle en especificidad a
+     `.view-enter .desk` (2 clases) sin depender del orden en la hoja.*/
+  @keyframes deskPop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+  .aula-wrap .classroom .desk{animation:deskPop .32s ease-out both}
+  @media (prefers-reduced-motion:reduce){.aula-wrap .classroom .desk{animation:none}}
 
   /* ============ informe de progreso ============ */
   .informe-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px}
