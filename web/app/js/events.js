@@ -174,6 +174,21 @@ document.addEventListener("click", (e)=>{
   if(state.fabOpen && !e.target.closest(".fab-wrap")){ state.fabOpen=false; render(); }
   const el = e.target.closest("[data-a]"); if(!el) return;
   const a = el.dataset.a, s = sel();
+  // Paso 136: si hay cambios sin guardar en la ficha (Resumen/Pagos), cortar cualquier navegación
+  // que la abandone de verdad — a otro alumno, a otra vista, cerrar sesión — con una confirmación
+  // (mismo `confirm()` nativo que ya usa "Cerrar sesión" un poco más abajo). Cambiar de pestaña
+  // dentro de la misma ficha no cuenta como "salir": el borrador sigue vivo hasta guardarlo o
+  // descartarlo a mano (ver ficha-draft-save/-discard). Ver también el guard gemelo en el
+  // popstate de más abajo, para cuando se sale con el botón "atrás" del navegador.
+  if(state.fichaDraft && fichaDraftFieldCount()>0){
+    const targetId = (a==="open"||a==="fab-pick-student") ? el.dataset.id : null;
+    const leavingFicha = a==="back" || a==="load-sample" || a==="auth-logout" || (a && a.startsWith("nav-"))
+      || ((a==="open"||a==="fab-pick-student") && targetId!==state.fichaDraft.id);
+    if(leavingFicha){
+      if(!confirm("Tenés cambios sin guardar en la ficha. ¿Salir sin guardar?")) return;
+      state.fichaDraft=null; state.fichaError="";
+    }
+  }
   if(a==="nav-tablero"){ state.view="tablero"; state.selId=null; }
   else if(a==="nav-lista"){ state.view="lista"; state.selId=null; }
   else if(a==="nav-cuenta"){
@@ -727,6 +742,19 @@ document.addEventListener("click", (e)=>{
     state.registrarClaseTipo=null;
   }
   else if(a==="back"){ state.view="lista"; state.selId=null; state.simTimer=null; state.simPrefillNote=""; state.editSessionTopicId=null; }
+  else if(a==="ficha-draft-save"){
+    if(!state.fichaDraft) return;
+    const id=state.fichaDraft.id, patch=state.fichaDraft.patch;
+    state.fichaDraft=null;
+    update(id, patch);
+    toast("Cambios guardados");
+    return;
+  }
+  else if(a==="ficha-draft-discard"){
+    state.fichaDraft=null; state.fichaError="";
+    toast("Cambios descartados");
+    return;
+  }
   else if(a==="new"){ state.showNew=true; state.newStudentError=""; state.newStudentAdvancedOpen=false; state.newStudentSeniaActiva=false; }
   else if(a==="load-sample"){
     const st=sampleStudent();
@@ -1645,33 +1673,12 @@ function handleFormChange(e){
   }
   const el=e.target.closest("[data-f]"); if(!el) return;
   const s=sel(); if(!s) return;
-  if(el.dataset.f==="subjectId"){
-    const dup=findDuplicateStudent(s.name,el.value,s.id);
-    if(dup){ state.fichaError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
-    const m=subjById(el.value);
-    state.fichaError="";
-    const patch={subjectId:el.value, subject:m?m.name:s.subject};
-    // Sugerencia de carrera (paso 129): si la materia elegida está vinculada a alguna carrera y
-    // la ficha todavía no tiene una carrera propia cargada, se autocompleta con la primera —
-    // el usuario la puede cambiar antes de guardar, nunca pisa una carrera ya elegida.
-    if(!(s.career||"").trim() && m && m.careerIds && m.careerIds.length){
-      const c=careerById(m.careerIds[0]);
-      if(c) patch.career=c.nombre;
-    }
-    update(s.id,patch);
-    return;
-  }
-  if(el.dataset.f==="name"){
-    const dup=findDuplicateStudent(el.value,s.subjectId,s.id);
-    if(dup){ state.fichaError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
-    state.fichaError="";
-  }
-  // Cambiar el estado a mano desde este select (en vez de Pausar/Reanudar, paso 114) también
-  // limpia pausaHasta si ya no queda en "pausado" — para que no quede una fecha de vuelta
-  // colgada de una pausa vieja si más tarde se lo pasa a otro estado sin pasar por "Reanudar".
-  if(el.dataset.f==="status" && el.value!=="pausado"){
-    update(s.id,{status:el.value, pausaHasta:""}); return;
-  }
+  // Campos de "datos" de la ficha (Resumen/Pagos, paso 136): en vez de guardar al toque, quedan
+  // en un borrador (state.fichaDraft) hasta confirmarlos con "Guardar cambios" — ver
+  // applyFichaDraftField/draftFor en helpers.js y la barra fija en vDetalle (views.js). El resto
+  // de los data-f de la app (videollamadaLink, informe/contrato, etc.) sigue con el autosave de
+  // siempre, más abajo.
+  if(FICHA_DRAFT_FIELDS.has(el.dataset.f)){ applyFichaDraftField(s, el.dataset.f, el.value); return; }
   update(s.id,{[el.dataset.f]:el.value});
 }
 
@@ -1827,6 +1834,16 @@ function syncHistory(){
 window.addEventListener("popstate", (e)=>{
   if(state.recovery || (!getSes() && !IS_DEMO)) return;
   const snap = (e.state && e.state.v) ? e.state : {v:"tablero", id:null, rid:null, m:null, mx:null};
+  // Paso 136: mismo guard que en el click handler, para el botón "atrás" del navegador — el
+  // history ya se movió (no se puede "cancelar" un popstate), así que si el profesor no confirma
+  // salir se vuelve a apilar el estado actual para neutralizarlo.
+  if(state.fichaDraft && fichaDraftFieldCount()>0 && snap.id!==state.fichaDraft.id){
+    if(!confirm("Tenés cambios sin guardar en la ficha. ¿Salir sin guardar?")){
+      history.pushState(_navSnapshot, "", urlForNavSnapshot(_navSnapshot));
+      return;
+    }
+    state.fichaDraft=null; state.fichaError="";
+  }
   _restoringNav = true;
   applyNavSnapshot(snap);
   _navSnapshot = snap;

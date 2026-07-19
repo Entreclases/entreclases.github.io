@@ -736,7 +736,24 @@ function vDetalle(){
   if(state.tab==="objetivos") h += vFichaObjetivos(s);
   if(state.tab==="materiales") h += vFichaMateriales(s);
   if(state.tab==="portal") h += vPortalAlumnoCard(s);
+  if(state.fichaDraft && state.fichaDraft.id===s.id) h += vFichaDraftBar();
   return h;
+}
+// Barra fija de "cambios sin guardar" (paso 136): sólo por los campos de datos de Resumen/Pagos
+// (ver FICHA_DRAFT_FIELDS en config.js) — las acciones de la ficha (registrar clase, cobrar,
+// horarios, materiales...) siguen guardando al instante como siempre, nunca entran acá. Se queda
+// visible al cambiar de pestaña dentro de la misma ficha (el borrador sigue siendo del mismo
+// alumno) y desaparece al guardar, descartar, o salir de la ficha (ver back/ficha-draft-* y el
+// guard de navegación del paso 124 en events.js).
+function vFichaDraftBar(){
+  const n = fichaDraftFieldCount();
+  return `<div class="draftbar no-print">
+    <span>Tenés cambios sin guardar — ${n} campo${n===1?"":"s"} tocado${n===1?"":"s"}</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="chip" data-a="ficha-draft-discard">Descartar</button>
+      <button class="chip on" data-a="ficha-draft-save">Guardar cambios</button>
+    </div>
+  </div>`;
 }
 
 // Fila de tarjetas "de un vistazo" arriba de Resumen (reusa hoyCard, la misma tarjeta del panel
@@ -772,6 +789,7 @@ function vFichaResumenGlance(s){
 /* ============ ficha → Resumen: vistazo rápido, avance por unidades, datos de contacto,
    informe/contrato y borrar alumno — todo lo que no tiene pestaña propia ============ */
 function vFichaResumen(s){
+  s = draftFor(s); // paso 136: los campos de este tab reflejan el borrador sin guardar, si hay uno
   const opt=(v,cur,l)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(l)}</option>`;
   let h = vFichaResumenGlance(s);
   const units=unitsFor(s);
@@ -975,6 +993,7 @@ function vFichaClases(s){
 
 /* ============ ficha → Pagos: tarifa/modalidad, pagos mensuales y seña ============ */
 function vFichaPagos(s){
+  s = draftFor(s); // paso 136: tarifa/modalidad (y seniaTipo/Valor vía vSeniaCard) reflejan el borrador
   let h = `<div class="formcard">
     <div class="frow">
       <div class="field"><div class="flabel">Tarifa (pesos)${s.modalidad==="hora"?" por hora":""}</div><input type="number" min="0" data-f="tarifa" placeholder="Sin cargar = sin cobro" value="${esc(s.tarifa||"")}"></div>

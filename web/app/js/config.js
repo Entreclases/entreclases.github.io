@@ -126,6 +126,11 @@ function detectPlatform(){
 // 131, ver topicOptionsHtml en helpers.js), además de las unidades/subunidades de la materia —
 // independientes de s.topics (avance por unidad, ver TOPIC_CYCLE abajo): loguear una clase con
 // cualquiera de estos strings no toca el avance de ninguna unidad, nunca se derivó de acá.
+// Campos de "datos" de la ficha (Resumen/Pagos) que pasan por confirmación explícita en vez de
+// autosave al tocarlos (paso 136) — ver applyFichaDraftField/draftFor en helpers.js y la barra
+// fija "Tenés cambios sin guardar" en vDetalle (views.js). Todo lo demás (acciones como registrar
+// clase/cobrar, y el resto de data-f/data-cf de la app) sigue guardando al instante como siempre.
+const FICHA_DRAFT_FIELDS = new Set(["name","career","subjectId","chair","phone","email","status","examDate","startDate","birthDate","notes","tarifa","modalidad","seniaTipo","seniaValor"]);
 const GENERIC_TOPICS = ["Ejercicios","Teoría","Nivelación","Repaso / parciales viejos"];
 const TOPIC_CYCLE = ["pendiente","visto","practica","parcial","noentra"];
 const TOPIC_META = {

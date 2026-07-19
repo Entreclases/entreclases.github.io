@@ -426,6 +426,48 @@ function update(id, patch){
   state.students = state.students.map(s => s.id===id ? {...s,...patch} : s);
   save(); render();
 }
+/* ============ borrador de la ficha (paso 136) ============
+   Los campos de "datos" de Resumen/Pagos (ver FICHA_DRAFT_FIELDS en config.js) no llaman a
+   update() al tocarlos: quedan acumulados en state.fichaDraft={id,patch}, fuera de
+   state.students, así que save()/scheduleSync() nunca los ven hasta confirmarlos con "Guardar
+   cambios" (ver ficha-draft-save en events.js, que sí hace update(s.id,patch) una sola vez).
+   draftFor(s) es lo que leen vFichaResumen/vFichaPagos para mostrar el valor tocado todavía sin
+   guardar en vez del valor viejo de state.students. */
+function draftFor(s){
+  return (state.fichaDraft && state.fichaDraft.id===s.id) ? {...s, ...state.fichaDraft.patch} : s;
+}
+function fichaDraftFieldCount(){ return state.fichaDraft ? Object.keys(state.fichaDraft.patch).length : 0; }
+function applyFichaDraftField(s, field, value){
+  if(!state.fichaDraft || state.fichaDraft.id!==s.id) state.fichaDraft={id:s.id, patch:{}};
+  const patch=state.fichaDraft.patch;
+  const cur=draftFor(s);
+  if(field==="subjectId"){
+    const dup=findDuplicateStudent(cur.name,value,s.id);
+    if(dup){ state.fichaError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
+    const m=subjById(value);
+    state.fichaError="";
+    patch.subjectId=value; patch.subject=m?m.name:s.subject;
+    // Sugerencia de carrera (paso 129): igual que en el alta de alumno, sólo si el borrador
+    // todavía no tiene una carrera propia cargada.
+    if(!(cur.career||"").trim() && m && m.careerIds && m.careerIds.length){
+      const c=careerById(m.careerIds[0]);
+      if(c) patch.career=c.nombre;
+    }
+    render(); return;
+  }
+  if(field==="name"){
+    const dup=findDuplicateStudent(value,cur.subjectId,s.id);
+    state.fichaError = dup ? `Ya tenés a ${dup.name} en esta materia.` : "";
+  }
+  // Cambiar el estado a mano (en vez de Pausar/Reanudar, paso 114) también limpia pausaHasta si
+  // ya no queda en "pausado", igual que hacía update() antes de este paso.
+  if(field==="status" && value!=="pausado"){
+    patch.status=value; patch.pausaHasta="";
+    render(); return;
+  }
+  patch[field]=value;
+  render();
+}
 /* ============ ajuste de tarifas en lote (paso 112) ============
    Aumento % o monto fijo a varias tarifas de una — ver vAjustarTarifas() en views.js para la
    vista previa y quién queda incluido/excluido. Sólo toca s.tarifa hacia adelante: recibos ya
