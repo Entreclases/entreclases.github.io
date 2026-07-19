@@ -662,6 +662,20 @@ function shouldShowBackupReminder(){
   return true;
 }
 
+/* ============ banner de bienvenida post-registro (paso 147) ============
+   Arranca al crear la cuenta (ver auth-signup en events.js) y se muestra en el tablero durante
+   FEEDBACK_BANNER_DAYS — nunca en modo demo, que no pasa por auth-signup. Se apaga sola pasado
+   el plazo o al descartarla a mano; no vuelve a aparecer una vez cerrada. */
+function startFeedbackBannerWindow(){
+  try{ localStorage.setItem(FEEDBACK_BANNER_UNTIL_KEY, String(Date.now()+FEEDBACK_BANNER_DAYS*86400000)); }catch(e){}
+}
+function feedbackBannerActive(){
+  if(IS_DEMO) return false;
+  try{ return Date.now() < (Number(localStorage.getItem(FEEDBACK_BANNER_UNTIL_KEY))||0); }
+  catch(e){ return false; }
+}
+function dismissFeedbackBanner(){ try{ localStorage.removeItem(FEEDBACK_BANNER_UNTIL_KEY); }catch(e){} }
+
 /* ============ alertas ============ */
 // cada alerta trae "wa": qué mensaje pre-armado de WhatsApp corresponde si el
 // profesor quiere escribirle al alumno directo desde acá (ver waMsgForAlert en views.js).

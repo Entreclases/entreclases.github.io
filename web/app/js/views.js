@@ -73,6 +73,14 @@ function themeNavBtn(){
 function logoutNavBtn(){
   return `<button class="navitem" data-a="nav-logout" title="Cerrar sesión">${ICON_LOGOUT}<span class="navitem-label">Salir</span></button>`;
 }
+// Botón discreto y permanente de feedback (paso 147) — mismo lugar que el resto del pie de la
+// barra, siempre visible, para que reportar algo nunca dependa de encontrar Cuenta primero.
+// Oculto en modo demo: no hay cuenta real detrás para asociar el reporte (mismo criterio que
+// sesIsAdmin() con IS_DEMO — la demo no toca el backend de verdad).
+function feedbackNavBtn(){
+  if(IS_DEMO) return "";
+  return `<button class="navitem" data-a="feedback-open" title="¿Sugerencias? Contanos qué te parece">${ICON_CHAT}<span class="navitem-label">Sugerencias</span></button>`;
+}
 // Foto del docente en la barra lateral (paso 137, sólo escritorio — .appnav-brand/.docente-mini
 // están ocultos en mobile, ver styles.css): sólo lectura acá, se edita desde Cuenta. En modo demo
 // avatarHtml ya cae solo en iniciales (avatarUrlFor corta con IS_DEMO), nunca inventa una foto.
@@ -86,14 +94,16 @@ function docenteMiniHtml(){
 function navShell(isAdmin){
   const items = isAdmin ? [...NAV_ITEMS,{view:"panel",action:"nav-panel",label:"Panel",icon:ICON_SHIELD}] : NAV_ITEMS;
   const isOn = (it) => state.view===it.view || (it.altViews||[]).includes(state.view);
+  const badgeFor = (it) => it.view==="panel" && state.reportesPendingCount
+    ? `<span class="navbadge">${state.reportesPendingCount>99?"99+":state.reportesPendingCount}</span>` : "";
   const itemsHtml = items.map(it=>
-    `<button class="navitem ${isOn(it)?"on":""}" data-a="${it.action}">${it.icon}<span class="navitem-label">${esc(it.label)}</span></button>`
+    `<button class="navitem ${isOn(it)?"on":""}" data-a="${it.action}">${it.icon}<span class="navitem-label">${esc(it.label)}</span>${badgeFor(it)}</button>`
   ).join("");
   return `<nav class="appnav no-print">
     <button class="appnav-brand" data-a="nav-tablero" aria-label="Ir al tablero"><span class="logo-mark">${ICON_CHECK}</span>Entreclases</button>
     <button class="navitem navitem-search" data-a="open-search" title="Buscar (atajo: /)">${ICON_SEARCH}<span class="navitem-label">Buscar</span></button>
     <div class="appnav-list">${itemsHtml}</div>
-    <div class="appnav-foot">${docenteMiniHtml()}${syncChip()}${themeNavBtn()}${logoutNavBtn()}</div>
+    <div class="appnav-foot">${docenteMiniHtml()}${syncChip()}${feedbackNavBtn()}${themeNavBtn()}${logoutNavBtn()}</div>
   </nav>`;
 }
 
@@ -272,6 +282,53 @@ function vEnvioOverlay(){
       </div>
       ${state.portalGrupoError?`<div class="saveerr" style="margin-top:8px">${esc(state.portalGrupoError)}</div>`:""}
       <div style="margin-top:14px;text-align:right"><button class="chip" data-a="envio-close">Cerrar</button></div>
+    </div>
+  </div>`;
+}
+
+// Feedback (paso 147): "¿Sugerencias?" en el pie de la barra — sin fricción, dos clicks (abrir +
+// enviar) y gracias. La pantalla actual (state.view) se adjunta sola al mandar (ver feedback-send
+// en events.js), nunca se le pide al docente que la tipee. Mismo patrón de overlay/modal que
+// vShareOverlay/vEnvioOverlay.
+function vFeedbackOverlay(){
+  if(!state.feedbackOpen) return "";
+  const status = state.feedbackStatus||"idle";
+  if(status==="ok"){
+    return `<div class="overlay no-print" data-a="feedback-close">
+      <div class="modal" data-a="feedback-modal-noop" style="max-width:360px;text-align:center">
+        <div class="ftitle" style="font-size:16px">¡Gracias!</div>
+        <div class="hint" style="margin:10px 0 14px">Ya nos llegó tu mensaje.</div>
+        <button class="chip" data-a="feedback-close">Cerrar</button>
+      </div>
+    </div>`;
+  }
+  const tipo = state.feedbackTipo||"problema";
+  return `<div class="overlay no-print" data-a="feedback-close">
+    <div class="modal" data-a="feedback-modal-noop" style="max-width:400px">
+      <div class="ftitle" style="font-size:16px">¿Sugerencias?</div>
+      <div class="hint" style="margin-bottom:10px">Un problema, una idea o algo que te gustó — nos sirve todo.</div>
+      <div class="tabs" style="margin-bottom:10px">
+        ${FEEDBACK_TIPOS.map(t=>`<button class="tabbtn ${tipo===t.id?"on":""}" data-a="feedback-tipo" data-f="${t.id}">${esc(t.label)}</button>`).join("")}
+      </div>
+      <div class="field"><textarea id="feedback-msg" placeholder="Contanos...">${esc(state.feedbackMsg||"")}</textarea></div>
+      <div class="hint" style="margin:6px 0 10px">Se adjunta sola la pantalla en la que estás — nunca datos de tus alumnos.</div>
+      ${status==="error"?`<div class="saveerr" style="margin-bottom:8px">${esc(state.feedbackError||"No se pudo enviar.")}</div>`:""}
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="chip" data-a="feedback-close">Cancelar</button>
+        <button class="primary" style="margin-left:0" data-a="feedback-send" ${status==="sending"?"disabled":""}>${status==="sending"?"Enviando…":"Enviar"}</button>
+      </div>
+    </div>
+  </div>`;
+}
+// Banner descartable de bienvenida post-registro (paso 147) — arranca en el tablero al crear la
+// cuenta y dura FEEDBACK_BANNER_DAYS; mismo patrón dismissible que vBackupReminder.
+function vFeedbackBanner(){
+  if(!feedbackBannerActive()) return "";
+  return `<div class="formcard" style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap">
+    <div style="font-size:13px;color:var(--muted)">¿Qué te está pareciendo Entreclases? Contanos — nos sirve tanto un problema como una idea o un simple "me gusta".</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+      <button class="chip" data-a="feedback-open">Contar algo</button>
+      <button class="del" style="font-size:20px" data-a="feedback-banner-dismiss" title="Descartar" aria-label="Descartar">×</button>
     </div>
   </div>`;
 }
@@ -533,6 +590,7 @@ function vTablero(){
   let h = pageHead("Tablero","Hoy",`<button class="btn btn-primary" data-a="new">+ Nuevo estudiante</button>`,
     "Lo que tenés que mirar hoy: clases del día, alertas y exámenes próximos.");
   h += vTips();
+  h += vFeedbackBanner();
   h += vBackupReminder();
   h += vCumpleanosBanner();
 
@@ -4045,12 +4103,24 @@ function vPanel(){
   return h;
 }
 
+// Tipos de reporte (paso 147): feedback del docente (problema/idea/me_gusta, ver FEEDBACK_TIPOS
+// en config.js) más "error_js", que sólo escribe logClientError() (sync.js) — nunca a mano.
+const REPORTE_TIPO_LABELS = {problema:"Problema", idea:"Idea", me_gusta:"Me gusta", error_js:"Error"};
 function vReportes(){
   const filter = state.reportFilter||"pendiente";
-  const list = (state.reportes||[]).filter(r=>filter==="todos"||r.estado===filter);
-  let h = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+  const tipoFilter = state.reportTipoFilter||"todos";
+  const list = (state.reportes||[])
+    .filter(r=>filter==="todos"||r.estado===filter)
+    .filter(r=>tipoFilter==="todos"||(r.tipo||"problema")===tipoFilter);
+  let h = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
     ${["pendiente","resuelto","todos"].map(f=>
       `<button class="chip ${filter===f?"on":""}" data-a="reportes-filter" data-f="${f}">${f==="todos"?"Todos":f==="pendiente"?"Pendientes":"Resueltos"}</button>`
+    ).join("")}
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    <button class="chip ${tipoFilter==="todos"?"on":""}" data-a="reportes-tipo-filter" data-f="todos">Todos los tipos</button>
+    ${Object.keys(REPORTE_TIPO_LABELS).map(t=>
+      `<button class="chip ${tipoFilter===t?"on":""}" data-a="reportes-tipo-filter" data-f="${t}">${REPORTE_TIPO_LABELS[t]}</button>`
     ).join("")}
   </div>`;
   if(state.reportesError) h += `<div class="saveerr">${esc(state.reportesError)}</div>`;
@@ -4059,7 +4129,8 @@ function vReportes(){
   else h += list.map(r=>`<div class="log" style="align-items:flex-start">
       <div class="body">
         <div style="font-weight:600">${esc(r.email||"—")}
-          <span class="hint">· ${esc(r.plataforma||"—")} · v${esc(r.version||"—")} · ${fmtDateTime(r.created_at)}</span></div>
+          <span class="chip" style="margin-left:6px;pointer-events:none;padding:1px 8px;font-size:11px">${esc(REPORTE_TIPO_LABELS[r.tipo]||"Problema")}</span>
+          <span class="hint">· ${esc(r.plataforma||"—")} · v${esc(r.version||"—")}${r.vista?" · "+esc(r.vista):""} · ${fmtDateTime(r.created_at)}</span></div>
         <div class="note">${esc(r.mensaje||"")}</div>
       </div>
       <button class="chip ${r.estado==="resuelto"?"on":""}" data-a="toggle-reporte" data-id="${esc(r.id)}">${r.estado==="resuelto"?"Resuelto ✓":"Marcar resuelto"}</button>
@@ -4634,6 +4705,7 @@ function render(){
   if(state.qrOverlay) m += vQrOverlay();
   if(state.shareOverlay) m += vShareOverlay();
   if(state.envioOverlay) m += vEnvioOverlay();
+  if(state.feedbackOpen) m += vFeedbackOverlay();
   if(state.agendaEdit) m += vAgendaEditOverlay();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
   const viewKey = state.view;

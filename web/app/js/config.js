@@ -19,6 +19,20 @@ const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCK_MS = 5*60*1000;
 const PENDING_TERMS_KEY = "tutoria-pending-terms-accept"; // email pendiente de registrar perfiles.terminos_aceptados_at tras confirmar el mail (paso 144)
 const LAST_COBROS_NOTIFY_KEY = "tutoria-last-cobros-notify-date"; // fecha (YYYY-MM-DD) del último aviso del sistema por cobros atrasados — uno por día, por dispositivo
+// Feedback y errores silenciosos (paso 147): FEEDBACK_BANNER_UNTIL_KEY guarda hasta cuándo se
+// muestra el banner de bienvenida post-registro (se arranca al crear la cuenta, ver auth-signup
+// en events.js); ERROR_LOG_COUNT_KEY es un contador en sessionStorage (no localStorage: el freno
+// es "por sesión de pestaña", se reinicia solo al abrir una nueva) para no ametrallar `reportes`
+// si algo entra en loop de errores.
+const FEEDBACK_BANNER_UNTIL_KEY = "tutoria-feedback-banner-until";
+const FEEDBACK_BANNER_DAYS = 4;
+const ERROR_LOG_COUNT_KEY = "tutoria-error-log-count";
+const ERROR_LOG_MAX_PER_SESSION = 5;
+const FEEDBACK_TIPOS = [
+  {id:"problema", label:"Problema"},
+  {id:"idea", label:"Idea"},
+  {id:"me_gusta", label:"Me gusta"},
+];
 // Biblioteca del portal (state.catalog.subjects[].materiales[].compartido + portales.publicado.biblioteca):
 // URLs firmadas de Storage con este vencimiento; se renuevan solas (ver maybeRenewPortalLibrary
 // en sync.js) cuando les queda menos de PORTAL_LINK_TTL_DAYS-PORTAL_LINK_RENEW_AFTER_DAYS de vida.

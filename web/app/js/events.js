@@ -460,6 +460,7 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="refresh-recursos"){ state.recursosLoaded=false; state.recursosError=""; loadRecursos(); }
   else if(a==="reportes-filter"){ state.reportFilter=el.dataset.f; }
+  else if(a==="reportes-tipo-filter"){ state.reportTipoFilter=el.dataset.f; }
   else if(a==="toggle-reporte"){
     const r=(state.reportes||[]).find(x=>String(x.id)===el.dataset.id);
     if(r) toggleReporte(r.id, r.estado);
@@ -713,6 +714,7 @@ document.addEventListener("click", (e)=>{
     if(pw.length<6){ authMsgShow("La contraseña tiene que tener al menos 6 caracteres."); return; }
     if(!acceptedTerms){ authMsgShow("Tenés que aceptar los términos y la política de privacidad."); return; }
     authMsgShow("Creando cuenta…",true);
+    startFeedbackBannerWindow();
     doSignup(em,pw).then(ok=>{
       if(ok){ registrarAceptacionTerminos(); render(); syncNow(); }
       else{
@@ -927,6 +929,28 @@ document.addEventListener("click", (e)=>{
     });
     return;
   }
+  else if(a==="feedback-open"){
+    state.feedbackOpen=true; state.feedbackTipo="problema"; state.feedbackMsg=""; state.feedbackStatus="idle"; state.feedbackError="";
+  }
+  else if(a==="feedback-close"){ state.feedbackOpen=false; }
+  else if(a==="feedback-modal-noop"){ return; }
+  else if(a==="feedback-tipo"){ state.feedbackTipo=el.dataset.f; }
+  else if(a==="feedback-send"){
+    const msg=(document.getElementById("feedback-msg").value||"").trim();
+    state.feedbackMsg=msg;
+    if(!msg){ state.feedbackStatus="error"; state.feedbackError="Escribí algo antes de enviar."; render(); return; }
+    if(!navigator.onLine){ state.feedbackStatus="error"; state.feedbackError="Se necesita conexión a internet para enviarlo."; render(); return; }
+    state.feedbackStatus="sending"; render();
+    sendReport(msg, state.feedbackTipo||"problema", state.view).then(()=>{
+      state.feedbackStatus="ok"; render();
+    }).catch(()=>{
+      state.feedbackStatus="error";
+      state.feedbackError = !navigator.onLine ? "Se necesita conexión a internet para enviarlo." : "No se pudo enviar. Probá de nuevo.";
+      render();
+    });
+    return;
+  }
+  else if(a==="feedback-banner-dismiss"){ dismissFeedbackBanner(); }
   else if(a==="auth-logout"){ setSes(null); state.view="tablero"; _navSnapshot=null; render(); return; }
   else if(a==="open"){
     state.view="detalle"; state.selId=el.dataset.id; state.tab="resumen"; state.confirmDel=false;
@@ -1978,6 +2002,7 @@ function activeOverlayName(){
   if(state.envioOverlay) return "envio";
   if(state.shareOverlay) return "share";
   if(state.agendaEdit) return "agendaEdit";
+  if(state.feedbackOpen) return "feedback";
   return null;
 }
 function navSnapshot(){
@@ -2021,6 +2046,7 @@ function applyNavSnapshot(snap){
   if(state.envioOverlay && !state.portalLoaded) loadPortal();
   state.agendaEdit = snap.m==="agendaEdit" ? snap.mx : null;
   state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
+  state.feedbackOpen = snap.m==="feedback";
   if((state.view==="detalle"||state.view==="informe"||state.view==="contrato") && !sel()){
     state.view="tablero"; state.selId=null;
   }
@@ -2079,6 +2105,21 @@ window.addEventListener("popstate", (e)=>{
   _navSnapshot = snap;
   render();
   _restoringNav = false;
+});
+
+/* ============ errores silenciosos (paso 147) ============
+   Enganchados antes que nada del arranque para no perderse errores tempranos. logClientError()
+   (sync.js) hace todo el trabajo (rate-limit, sesión, modo demo); acá sólo se extrae mensaje/stack
+   de cada tipo de evento, con su propio try/catch por si el navegador manda algo inesperado en
+   `e.error`/`e.reason`. */
+window.addEventListener("error", function(e){
+  try{ logClientError(e.message, e.error && e.error.stack); }catch(err){}
+});
+window.addEventListener("unhandledrejection", function(e){
+  try{
+    const r = e.reason;
+    logClientError(r && r.message ? r.message : String(r), r && r.stack);
+  }catch(err){}
 });
 
 /* ============ arranque ============ */

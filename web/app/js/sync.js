@@ -151,6 +151,7 @@ async function maybeHeartbeat(uid_, s){
         body:JSON.stringify({n_aperturas:nAperturas, n_syncs:nSyncs})});
     }catch(e){ /* silencioso */ }
   }
+  refreshReportesBadge();
 }
 
 // Registra la aceptación de términos y privacidad (perfiles.terminos_aceptados_at — ver
@@ -329,15 +330,37 @@ async function restoreBackup(id){
   }
 }
 
-/* ============ reportar un problema / panel admin (reportes y usuarios) ============ */
-async function sendReport(msg){
+/* ============ reportar un problema / panel admin (reportes y usuarios) ============
+   tipo (paso 147): "problema"/"idea"/"me_gusta" (feedback del docente, ver vFeedbackOverlay en
+   views.js) o "error_js" (capturado solo por logClientError() más abajo, nunca a mano). vista es
+   el state.view en el momento de mandar el reporte — auto-adjunta, sin que el docente tenga que
+   escribir dónde estaba. Columnas nuevas en `reportes`, ver migración 021 en cuaderno-supabase. */
+async function sendReport(msg, tipo, vista){
   const ses=getSes(); if(!ses) throw new Error("no-session");
   const s=await ensureToken();
   const uid_=jwtSub(s.access);
   const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
   const r=await fetch(SUPA_URL+"/rest/v1/reportes",{method:"POST", headers:h,
-    body:JSON.stringify([{user_id:uid_, email:ses.email, mensaje:msg, plataforma:detectPlatform(), version:APP_VERSION}])});
+    body:JSON.stringify([{user_id:uid_, email:ses.email, mensaje:msg, tipo:tipo||"problema", vista:vista||"", plataforma:detectPlatform(), version:APP_VERSION}])});
   if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.msg||("error "+r.status)); }
+}
+// Errores silenciosos (paso 147): window.onerror/unhandledrejection (enganchados en events.js)
+// llaman acá — nunca al revés, para que toda la lógica de rate-limit/sesión/demo viva en un solo
+// lugar. Jamás manda datos del cuaderno: sólo mensaje, un stack corto, la vista actual, la
+// versión de la app y el user agent (ya via detectPlatform()/APP_VERSION en sendReport). Se frena
+// solo a ERROR_LOG_MAX_PER_SESSION por sesión de pestaña (sessionStorage, no localStorage) y todo
+// el cuerpo va en un try/catch — este logger jamás puede tirar abajo la app que intenta vigilar.
+function errorLogCount(){ try{ return Number(sessionStorage.getItem(ERROR_LOG_COUNT_KEY))||0; }catch(e){ return 0; } }
+function bumpErrorLogCount(){ try{ sessionStorage.setItem(ERROR_LOG_COUNT_KEY, String(errorLogCount()+1)); }catch(e){} }
+function logClientError(message, stack){
+  try{
+    if(IS_DEMO) return;
+    if(!getSes()) return;
+    if(errorLogCount()>=ERROR_LOG_MAX_PER_SESSION) return;
+    bumpErrorLogCount();
+    const mensaje = String(message||"error").slice(0,300) + (stack?("\n"+String(stack).slice(0,300)):"");
+    sendReport(mensaje, "error_js", (typeof state!=="undefined"&&state.view)||"").catch(()=>{});
+  }catch(e){ /* el logger nunca puede romper nada, ni siquiera si sendReport tira sincrónico */ }
 }
 async function loadReportes(){
   try{
@@ -347,6 +370,7 @@ async function loadReportes(){
     if(!r.ok) throw new Error("error "+r.status);
     state.reportes=await r.json();
     state.reportesLoaded=true; state.reportesError="";
+    state.reportesPendingCount = state.reportes.filter(x=>x.estado!=="resuelto").length;
   }catch(e){
     state.reportesError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar los reportes.";
   }
@@ -535,6 +559,23 @@ async function toggleReporte(id,current){
     state.reportes=state.reportes.map(x=>x.id===id?{...x,estado:next}:x);
     render();
   }catch(e){ /* se puede reintentar tocando el botón de nuevo */ }
+  refreshReportesBadge();
+}
+// Contador de "nuevos" en el ítem "Panel" del nav (paso 147) — liviano (un solo count, sin traer
+// las filas) para no tener que abrir el panel para saber si hay algo pendiente. Llamado al
+// arrancar, junto al heartbeat (maybeHeartbeat, cada ~5min con la pestaña visible) y al resolver
+// un reporte a mano; sesIsAdmin() ya devuelve false en modo demo, así que ahí nunca pega a la red.
+async function refreshReportesBadge(){
+  if(!sesIsAdmin(getSes())) return;
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, Prefer:"count=exact"};
+    const r=await fetch(SUPA_URL+"/rest/v1/reportes?select=id&estado=eq.pendiente&limit=1",{headers:h});
+    if(!r.ok) return;
+    const total = Number((r.headers.get("content-range")||"").split("/")[1])||0;
+    state.reportesPendingCount = total;
+    render();
+  }catch(e){ /* silencioso, se reintenta en el próximo heartbeat */ }
 }
 
 /* ============ portal de invitados (tabla portales, migración 013) ============
