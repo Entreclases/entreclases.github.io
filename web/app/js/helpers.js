@@ -120,7 +120,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               informePeriod:"3m", informeImgBusy:false,
               agendaWeekOffset:0, sessionPrefillDate:"",
               agendaViewMode:"semana", agendaMonthOffset:0, agendaSelectedDay:null, agendaQuickAddOpen:false,
-              puntualCancelAskId:null, cobrosBannerOpen:false,
+              puntualCancelAskId:null, cobrosBannerOpen:false, registrarClaseTipo:null,
               portal:null, portalLoaded:false, portalError:"",
               portalSaving:false, portalSaveMsg:"", portalCopyMsg:"",
               portalGrupoBusy:null, portalGrupoError:"", portalGrupoCopyMsg:"",
@@ -1060,12 +1060,13 @@ function nextPendingPuntual(s, afterDate){
     .filter(x=>!x.cancelada && x.seniaEstado==="pendiente" && x.date>afterDate)
     .sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time))[0] || null;
 }
-// crea una clase puntual para studentId (usado tanto desde la ficha como desde "Programar clase
-// acá" en la agenda mensual) — snapshotea la seña si el alumno la tiene activa y devuelve un
-// aviso (o null) si la clase anterior de ese alumno todavía tiene la seña sin cobrar.
-function addPuntualClase(studentId, date, time, duration, link){
+// crea una próxima clase (agendado suelto, s.clasesPuntuales) para studentId — usado desde
+// "Registrar clase" → "Próxima clase" en la ficha y desde "Programar clase acá" en la agenda
+// mensual — snapshotea la seña si el alumno la tiene activa y devuelve un aviso (o null) si la
+// clase anterior de ese alumno todavía tiene la seña sin cobrar.
+function addPuntualClase(studentId, date, time, duration, link, topic){
   const s = state.students.find(x=>x.id===studentId); if(!s) return {warning:null};
-  const nueva = {id:uid(), date, time, duration, link:link||""};
+  const nueva = {id:uid(), date, time, duration, link:link||"", topic:topic||""};
   let warning = null;
   if(hasSenia(s)){
     nueva.seniaEstado="pendiente"; nueva.seniaMonto=seniaMontoFor(s);

@@ -216,6 +216,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="agenda-log"){
     state.selId=el.dataset.id; state.view="detalle"; state.tab="clases";
     state.sessionPrefillDate=el.dataset.date; state.confirmDel=false; state.fichaError="";
+    state.registrarClaseTipo="pasada";
   }
   else if(a==="export-agenda-ics"){
     const {events,label}=agendaIcsRangeForView();
@@ -643,6 +644,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="open"){
     state.view="detalle"; state.selId=el.dataset.id; state.tab="resumen"; state.confirmDel=false;
     state.simTimer=null; state.simPrefillNote=""; state.fichaError=""; state.sessionPrefillDate="";
+    state.registrarClaseTipo=null;
   }
   else if(a==="back"){ state.view="lista"; state.selId=null; state.simTimer=null; state.simPrefillNote=""; state.editSessionTopicId=null; }
   else if(a==="new"){ state.showNew=true; state.newStudentError=""; }
@@ -660,7 +662,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="fab-new-student"){ state.fabOpen=false; state.showNew=true; state.newStudentError=""; }
   else if(a==="fab-new-clase"){
     state.fabOpen=false;
-    if(sel()){ state.tab="clases"; state.sessionPrefillDate=today(); state.confirmDel=false; state.fichaError=""; }
+    if(sel()){ state.tab="clases"; state.sessionPrefillDate=today(); state.confirmDel=false; state.fichaError=""; state.registrarClaseTipo="pasada"; }
     else state.fabPick={target:"clases"};
   }
   else if(a==="fab-new-pago"){
@@ -676,7 +678,7 @@ document.addEventListener("click", (e)=>{
     const target=(state.fabPick&&state.fabPick.target)||"resumen";
     state.fabPick=null;
     state.view="detalle"; state.selId=el.dataset.id; state.tab=target; state.confirmDel=false; state.fichaError="";
-    if(target==="clases") state.sessionPrefillDate=today();
+    if(target==="clases"){ state.sessionPrefillDate=today(); state.registrarClaseTipo="pasada"; }
   }
   else if(a==="cancel-new"){ state.showNew=false; state.newStudentError=""; }
   else if(a==="create"){
@@ -723,6 +725,7 @@ document.addEventListener("click", (e)=>{
   }
   else if(a.startsWith("tab-")){
     state.tab=a.slice(4); state.confirmDel=false; state.fichaError=""; state.sessionPrefillDate=""; state.editSessionTopicId=null;
+    state.registrarClaseTipo=null;
     if(state.tab==="portal" && !state.portalLoaded){ state.portalError=""; loadPortal(); }
   }
   else if(a==="goto-subject-materials"){
@@ -879,6 +882,20 @@ document.addEventListener("click", (e)=>{
     const sid=el.dataset.id, st=state.students.find(x=>x.id===sid); if(!st) return;
     update(sid,{tagIds:(st.tagIds||[]).filter(id=>id!==el.dataset.tag)}); return;
   }
+  else if(a==="set-registrar-clase-tipo"){ state.registrarClaseTipo=el.dataset.f; render(); return; }
+  else if(a==="registrar-clase-back"){ state.registrarClaseTipo=null; render(); return; }
+  else if(a==="save-proxima-clase" && s){
+    const date=document.getElementById("pc-date").value; if(!date) return;
+    const time=document.getElementById("pc-time").value; if(!time) return;
+    const duration=parseInt(document.getElementById("pc-duration").value,10)||60;
+    const topic=document.getElementById("pc-topic").value;
+    const link=document.getElementById("pc-link").value.trim();
+    const {warning}=addPuntualClase(s.id, date, time, duration, link, topic);
+    state.registrarClaseTipo=null;
+    if(warning) alert(warning);
+    else toast("Próxima clase agendada");
+    return;
+  }
   else if(a==="save-session" && s){
     const date=document.getElementById("c-date").value; if(!date) return;
     state.sessionPrefillDate="";
@@ -888,6 +905,7 @@ document.addEventListener("click", (e)=>{
       const cobra=state.sessionAusenteCobra!=null ? state.sessionAusenteCobra : ausenciaCobraSugerida(motivo);
       update(s.id,{sessions:[...s.sessions,{id:uid(),date,note,ausente:{motivo,cobra}}]});
       state.sessionEstado="dada"; state.sessionAusenteMotivo=null; state.sessionAusenteCobra=null;
+      state.registrarClaseTipo=null;
       toast("Ausencia registrada"); return;
     }
     const goal=document.getElementById("c-goal").value.trim();
@@ -903,6 +921,7 @@ document.addEventListener("click", (e)=>{
       monto,
       objetivo:goal, objetivoResult:null,
       cobrada:false}]});
+    state.registrarClaseTipo=null;
     toast("Clase registrada"); return;
   }
   else if(a==="set-session-estado"){ state.sessionEstado=el.dataset.f; render(); return; }
@@ -968,16 +987,6 @@ document.addEventListener("click", (e)=>{
       update(s.id,{horarios:[...(st.horarios||[]), removed]});
       toast("Horario restaurado");
     }); return;
-  }
-  else if(a==="add-puntual" && s){
-    const date=document.getElementById("p-date").value; if(!date) return;
-    const time=document.getElementById("p-time").value; if(!time) return;
-    const duration=parseInt(document.getElementById("p-duration").value,10)||60;
-    const link=document.getElementById("p-link").value.trim();
-    const {warning}=addPuntualClase(s.id, date, time, duration, link);
-    if(warning) alert(warning);
-    else toast("Clase puntual agregada");
-    return;
   }
   else if(a==="del-puntual" && s){
     const removed=(s.clasesPuntuales||[]).find(x=>x.id===el.dataset.id);

@@ -837,19 +837,34 @@ function vFichaResumen(s){
   return h;
 }
 
-/* ============ ficha → Clases: registrar/revisar clases dictadas, horarios habituales, clases
-   puntuales y simulacros — todo lo que es "actividad" con el alumno ============ */
-function vFichaClases(s){
+/* ============ "Registrar clase" (paso 132): desplegable inicial con dos caminos — "Clase
+   pasada" (registro completo, lo de siempre) o "Próxima clase" (sólo agendar: crea una entrada
+   en s.clasesPuntuales, igual que antes hacía "Clases puntuales"/"Programar clase acá" en la
+   agenda). state.registrarClaseTipo (null|"pasada"|"proxima") gobierna qué se muestra. ============ */
+function vRegistrarClaseCard(s){
+  const tipo = state.registrarClaseTipo;
+  if(!tipo){
+    return `<div class="formcard"><div class="ftitle">Registrar clase</div>
+      <div class="hint" style="margin-bottom:10px">¿Ya la diste, o la estás agendando para más adelante?</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" data-a="set-registrar-clase-tipo" data-f="pasada">Clase pasada</button>
+        <button class="btn btn-ghost" data-a="set-registrar-clase-tipo" data-f="proxima">Próxima clase</button>
+      </div></div>`;
+  }
+  if(tipo==="proxima") return vProximaClaseForm(s);
+  return vClasePasadaForm(s);
+}
+function vClasePasadaForm(s){
   const estado = state.sessionEstado||"dada";
   const motivo = state.sessionAusenteMotivo||"aviso_tiempo";
   const cobraSugerida = state.sessionAusenteCobra!=null ? state.sessionAusenteCobra : ausenciaCobraSugerida(motivo);
-  let h = `<div class="formcard"><div class="ftitle">Registrar clase (30 segundos, apenas termina)</div>
+  return `<div class="formcard"><div class="ftitle">Clase pasada (30 segundos, apenas termina)</div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button class="chip ${estado==="dada"?"on":""}" data-a="set-session-estado" data-f="dada">Dada</button>
       <button class="chip ${estado==="ausente"?"on":""}" data-a="set-session-estado" data-f="ausente">Ausente</button>
     </div>
     <div class="frow">
-      <div class="field"><div class="flabel">Fecha</div><input type="date" id="c-date" value="${esc(state.sessionPrefillDate||today())}" data-enter="save-session"></div>
+      <div class="field"><div class="flabel">Fecha</div><input type="date" id="c-date" max="${today()}" value="${esc(state.sessionPrefillDate||today())}" data-enter="save-session"></div>
       ${estado==="dada" ? `
       <div class="field"><div class="flabel">Tema principal</div><select id="c-topic" data-enter="save-session">${topicOptionsHtml(s,"")}</select></div>
       <div class="field"><div class="flabel">¿Trajo la tarea?</div><select id="c-tarea" data-enter="save-session">
@@ -873,7 +888,33 @@ function vFichaClases(s){
       <input id="c-note" placeholder="${estado==="dada"?"Ej: se traba en cadena+cociente. Tarea: guía 5, ej. 8-12":"Ej: avisó por WhatsApp a la mañana"}" data-enter="save-session"></div>
     ${estado==="dada" ? `<div class="field"><div class="flabel">Objetivo de hoy (opcional)</div>
       <input id="c-goal" placeholder="Ej: que resuelva sola sistemas 2x2" data-enter="save-session"></div>` : ""}
-    <button class="primary" style="margin-top:10px;margin-left:0" data-a="save-session">Guardar</button></div>`;
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="primary" style="margin-left:0" data-a="save-session">Guardar</button>
+      <button class="chip" data-a="registrar-clase-back">‹ Volver</button>
+    </div></div>`;
+}
+function vProximaClaseForm(s){
+  return `<div class="formcard"><div class="ftitle">Próxima clase</div>
+    <div class="hint" style="margin-bottom:8px">Sólo la agendás — queda en la agenda y, cuando pase la fecha, aparece para registrarla como clase dada.</div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Fecha</div><input type="date" id="pc-date" min="${today()}" value="${today()}" data-enter="save-proxima-clase"></div>
+      <div class="field"><div class="flabel">Hora</div><input type="time" id="pc-time" value="18:00" data-enter="save-proxima-clase"></div>
+      <div class="field" style="max-width:130px"><div class="flabel">Duración (min)</div><input type="number" id="pc-duration" value="60" min="15" step="15" data-enter="save-proxima-clase"></div>
+    </div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Tema previsto (opcional)</div><select id="pc-topic" data-enter="save-proxima-clase">${topicOptionsHtml(s,"")}</select></div>
+      <div class="field"><div class="flabel">Link de videollamada (opcional, si es distinto del de arriba)</div><input id="pc-link" placeholder="https://…" data-enter="save-proxima-clase"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="primary" style="margin-left:0" data-a="save-proxima-clase">Agendar</button>
+      <button class="chip" data-a="registrar-clase-back">‹ Volver</button>
+    </div></div>`;
+}
+
+/* ============ ficha → Clases: registrar/revisar clases dictadas, horarios habituales, clases
+   puntuales y simulacros — todo lo que es "actividad" con el alumno ============ */
+function vFichaClases(s){
+  let h = vRegistrarClaseCard(s);
   const cobraPorClase = hasPagos(s) && (s.modalidad==="clase"||s.modalidad==="hora");
   const sorted=[...s.sessions].sort((a,b)=>b.date.localeCompare(a.date));
   h += sorted.length===0 ? `<div class="empty">Todavía no hay clases registradas.</div>`
@@ -939,7 +980,7 @@ function vFichaPagos(s){
         <option value="hora" ${s.modalidad==="hora"?"selected":""}>Por hora</option>
         <option value="mensual" ${s.modalidad==="mensual"?"selected":""}>Mensual</option></select></div></div>
     ${hasPagos(s)&&s.modalidad==="clase"?`<div class="hint" style="margin-top:2px">Marcá cada clase como cobrada desde la pestaña «Clases».</div>`:""}
-    ${hasPagos(s)&&s.modalidad==="hora"?`<div class="hint" style="margin-top:2px">Cada clase se cobra tarifa × horas dictadas (redondeado) y se marca como cobrada desde la pestaña «Clases» — si una clase puntual vale distinto, cargale un monto manual ahí mismo al registrarla.</div>`:""}
+    ${hasPagos(s)&&s.modalidad==="hora"?`<div class="hint" style="margin-top:2px">Cada clase se cobra tarifa × horas dictadas (redondeado) y se marca como cobrada desde la pestaña «Clases» — si alguna clase vale distinto, cargale un monto manual ahí mismo al registrarla.</div>`:""}
     ${hasPagos(s)&&s.modalidad==="mensual"?vPagosMensuales(s):""}
     ${!hasPagos(s)?`<div class="hint" style="margin-top:8px">Cargá una tarifa y elegí una modalidad para empezar a llevar el cobro de este alumno.</div>`:""}
   </div>`;
@@ -1143,18 +1184,11 @@ function vHorariosCard(s){
 }
 function vPuntualesCard(s){
   const list=[...(s.clasesPuntuales||[])].sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
-  let h = `<div class="formcard"><div class="ftitle">Clases puntuales</div>
-    <div class="hint" style="margin-bottom:8px">Clases sueltas que no siguen el horario habitual — una recuperación, una clase extra.</div>`;
-  h += list.length===0 ? `<div class="empty">Sin clases puntuales cargadas.</div>`
+  let h = `<div class="formcard"><div class="ftitle">Próximas clases</div>
+    <div class="hint" style="margin-bottom:8px">Clases agendadas sueltas — una recuperación, una clase extra. Se agregan desde "Registrar clase" → "Próxima clase", arriba.</div>`;
+  h += list.length===0 ? `<div class="empty">Sin próximas clases agendadas.</div>`
     : list.map(p=>vPuntualRow(s,p)).join("");
-  h += `<div class="frow" style="margin-top:8px;align-items:flex-end">
-    <div class="field"><div class="flabel">Fecha</div><input type="date" id="p-date" value="${today()}" data-enter="add-puntual"></div>
-    <div class="field"><div class="flabel">Hora</div><input type="time" id="p-time" value="18:00" data-enter="add-puntual"></div>
-    <div class="field" style="max-width:120px"><div class="flabel">Duración (min)</div><input type="number" id="p-duration" value="60" min="15" step="15" data-enter="add-puntual"></div>
-    <div class="field"><div class="flabel">Link (opcional, si es distinto del de arriba)</div><input id="p-link" placeholder="https://…" data-enter="add-puntual"></div>
-    <button class="chip" data-a="add-puntual" style="margin-bottom:2px">+ Agregar clase puntual</button></div>
-  </div>`;
-  return h;
+  return h + `</div>`;
 }
 // Una fila de "Clases puntuales": fecha/hora + (si el alumno cobra seña) el chip de estado
 // pendiente↔cobrada + el flujo de cancelar (confirmación con la consecuencia de la seña según
@@ -1165,6 +1199,7 @@ function vPuntualRow(s,p){
   const confirming = state.puntualCancelAskId===p.id;
   let h = `<div class="log" style="align-items:center;flex-wrap:wrap">
     <div class="body">${esc(DIAS_SEMANA[weekdayIdx(p.date)])} ${esc(fmtDate(p.date))} ${esc(p.time)} · ${p.duration||60} min
+      ${p.topic?` · <span class="tareatag">${esc(p.topic)}</span>`:""}
       ${p.cancelada?`<div class="note" style="color:var(--status-desaprobo-fg)">Cancelada ${esc(fmtDateTime(p.canceladaAt))}${senia?" · seña "+SENIA_ESTADO_META[senia].label.toLowerCase():""}</div>`:""}
     </div>`;
   if(p.link) h += `<a class="chip" target="_blank" rel="noopener" href="${esc(p.link)}">Link propio</a>`;
@@ -1216,7 +1251,7 @@ function vSeniaCard(s){
     </div>`;
     h += (s.seniaTipo==="porcentaje" && !(Number(s.tarifa)>0))
       ? `<div class="hint">Cargá una tarifa en esta ficha para que el porcentaje tenga sobre qué calcularse.</div>`
-      : `<div class="hint">Cada clase puntual que le programes va a pedir ${fmtMoney(seniaMontoFor(s))} de seña.</div>`;
+      : `<div class="hint">Cada próxima clase que le agendes va a pedir ${fmtMoney(seniaMontoFor(s))} de seña.</div>`;
   }
   return h + `</div>`;
 }
@@ -1252,7 +1287,7 @@ function vAgendaSemana(){
   const events = markOverlaps(agendaWeekEvents(weekStart));
   if(events.length===0){
     h += emptyState(ICON_CALENDAR, "Sin clases agendadas esta semana",
-      "Cargá horarios habituales o clases puntuales desde la ficha de cada alumno (pestaña «Clases»).",
+      "Cargá horarios habituales o agendá una próxima clase desde la ficha de cada alumno (pestaña «Clases»).",
       `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`);
     return h;
   }
