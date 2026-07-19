@@ -182,7 +182,7 @@ document.addEventListener("click", (e)=>{
     state.portalLoaded=false; state.portalError=""; state.portalCopyMsg=""; loadPortal();
     state.portalGrupoEditing=null; state.portalGrupoDraftAlumnos=[]; state.portalGrupoError="";
   }
-  else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; state.editPackId=null; state.catConfirmDelId=null; state.editUnitId=null; state.editSubunitId=null; }
+  else if(a==="nav-catalog"){ state.view="catalog"; state.selId=null; state.editSubjectId=null; state.editPackId=null; state.catConfirmDelId=null; state.editUnitId=null; state.editSubunitId=null; state.editCareerId=null; }
   else if(a==="nav-pagos"){ state.view="pagos"; state.selId=null; if(!state.pagosMonth) state.pagosMonth=currentMonthKey(); }
   else if(a==="nav-agenda"){ state.view="agenda"; state.selId=null; }
   else if(a==="nav-logout"){
@@ -293,20 +293,43 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="cat-add-career"){
     const v=(document.getElementById("new-career").value||"").trim(); if(!v) return;
-    if(!state.catalog.careers.includes(v)) state.catalog.careers.push(v);
+    if(!state.catalog.careers.some(c=>normName(c.nombre)===normName(v))) state.catalog.careers.push({id:uid(), nombre:v});
     touchCatalog(); return;
   }
-  else if(a==="cat-del-career"){ state.catalog.careers.splice(+el.dataset.i,1); touchCatalog(); return; }
+  else if(a==="cat-del-career"){
+    const id=el.dataset.id;
+    state.catalog.careers=state.catalog.careers.filter(c=>c.id!==id);
+    state.catalog.subjects.forEach(m=>{ if(m.careerIds) m.careerIds=m.careerIds.filter(x=>x!==id); });
+    if(state.editCareerId===id) state.editCareerId=null;
+    touchCatalog(); return;
+  }
+  else if(a==="cat-career-rename-start"){ state.editCareerId=el.dataset.id; }
+  else if(a==="cat-career-rename-done"){
+    const c=careerById(state.editCareerId); if(!c) return;
+    const v=(document.getElementById("career-rename-input").value||"").trim();
+    if(v) c.nombre=v;
+    state.editCareerId=null;
+    touchCatalog(); return;
+  }
+  else if(a==="cat-career-rename-cancel"){ state.editCareerId=null; }
+  else if(a==="cat-toggle-career"){
+    const m=subjById(state.editSubjectId); if(!m) return;
+    if(!Array.isArray(m.careerIds)) m.careerIds=[];
+    const id=el.dataset.id;
+    m.careerIds = m.careerIds.includes(id) ? m.careerIds.filter(x=>x!==id) : [...m.careerIds, id];
+    touchCatalog(); return;
+  }
+  else if(a==="cat-materias-groupby"){ state.catMateriasGroupBy=el.dataset.mode; }
   else if(a==="cat-add-subject"){
     const v=(document.getElementById("new-subject").value||"").trim(); if(!v) return;
-    const m={id:uid(), name:v, units:[], color:nextSubjectColor()};
+    const m={id:uid(), name:v, units:[], color:nextSubjectColor(), careerIds:[]};
     state.catalog.subjects.push(m); state.editSubjectId=m.id;
     loadMateriales(m.id);
     touchCatalog(); return;
   }
   else if(a==="cat-add-from-template"){
     const t=SUBJECT_TEMPLATES.find(x=>x.id===el.dataset.id); if(!t) return;
-    const m={id:uid(), name:t.name, units:normalizeUnits(t.units), color:nextSubjectColor()};
+    const m={id:uid(), name:t.name, units:normalizeUnits(t.units), color:nextSubjectColor(), careerIds:[]};
     state.catalog.subjects.push(m); state.editSubjectId=m.id;
     loadMateriales(m.id);
     touchCatalog(); return;
@@ -1153,6 +1176,13 @@ document.addEventListener("click", (e)=>{
     state.simTimer=null;
   }
   else if(a==="dismiss-backup-reminder"){ dismissBackupReminder(); }
+  else if(a==="ficha-new-career" && s){
+    const v=(prompt("Nombre de la nueva carrera:")||"").trim(); if(!v) return;
+    let c=state.catalog.careers.find(x=>normName(x.nombre)===normName(v));
+    if(!c){ c={id:uid(), nombre:v}; state.catalog.careers.push(c); state.catalog.updatedAt=Date.now(); }
+    update(s.id,{career:c.nombre});
+    return;
+  }
   else if(a==="ask-del"){ state.confirmDel=true; }
   else if(a==="cancel-del"){ state.confirmDel=false; }
   else if(a==="confirm-del" && s){
@@ -1208,6 +1238,17 @@ document.addEventListener("click", (e)=>{
     link.click(); URL.revokeObjectURL(url);
     markExported();
     toast("Copia descargada"); return;
+  }
+  else if(a==="new-career-inline"){
+    // Alta de alumno (vModal): crea la carrera sin re-renderizar el modal entero, para no perder
+    // lo que ya se tipeó en nombre/materia/notas (esos inputs no están atados a state, ver el
+    // comentario de vModal en views.js) — se toca el input de carrera directo, igual que
+    // n-subject-pick en handleFormChange.
+    const v=(prompt("Nombre de la nueva carrera:")||"").trim(); if(!v) return;
+    let c=state.catalog.careers.find(x=>normName(x.nombre)===normName(v));
+    if(!c){ c={id:uid(), nombre:v}; state.catalog.careers.push(c); state.catalog.updatedAt=Date.now(); save(); }
+    const inp=document.getElementById("n-career"); if(inp) inp.value=c.nombre;
+    return;
   }
   else if(a==="export-pagos-csv"){
     const mk = state.pagosMonth || currentMonthKey();
@@ -1425,6 +1466,20 @@ function handleFormChange(e){
   if(cf && cf.dataset.cf==="tarifa-ajuste-redondeo"){ tarifaAjusteState().redondeo=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="renta-month"){ state.rentaMonth=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="informe-period"){ state.informePeriod=cf.value; render(); return; }
+  // Sugerencia de carrera al elegir materia en el alta de alumno nuevo (paso 129) — igual que en
+  // la ficha, sólo si todavía no escribió una carrera a mano; acá se toca el input directo (sin
+  // pasar por state) porque el modal todavía no tiene un alumno al que patchear.
+  if(cf && cf.dataset.cf==="n-subject-pick"){
+    const careerInput=document.getElementById("n-career");
+    if(careerInput && !careerInput.value.trim()){
+      const m=subjById(cf.value);
+      if(m && m.careerIds && m.careerIds.length){
+        const c=careerById(m.careerIds[0]);
+        if(c) careerInput.value=c.nombre;
+      }
+    }
+    return;
+  }
   const lf=e.target.closest("[data-lf]");
   if(lf){
     if(lf.dataset.lf==="subject") state.listSubject=lf.value;
@@ -1442,7 +1497,15 @@ function handleFormChange(e){
     if(dup){ state.fichaError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
     const m=subjById(el.value);
     state.fichaError="";
-    update(s.id,{subjectId:el.value, subject:m?m.name:s.subject});
+    const patch={subjectId:el.value, subject:m?m.name:s.subject};
+    // Sugerencia de carrera (paso 129): si la materia elegida está vinculada a alguna carrera y
+    // la ficha todavía no tiene una carrera propia cargada, se autocompleta con la primera —
+    // el usuario la puede cambiar antes de guardar, nunca pisa una carrera ya elegida.
+    if(!(s.career||"").trim() && m && m.careerIds && m.careerIds.length){
+      const c=careerById(m.careerIds[0]);
+      if(c) patch.career=c.nombre;
+    }
+    update(s.id,patch);
     return;
   }
   if(el.dataset.f==="name"){

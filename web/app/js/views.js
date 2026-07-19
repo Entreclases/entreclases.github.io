@@ -551,7 +551,7 @@ function vLista(){
     </select>
     <select data-lf="career" style="width:auto">
       <option value="todas" ${state.listCareer==="todas"?"selected":""}>Todas las carreras</option>
-      ${state.catalog.careers.map(c=>`<option value="${esc(c)}" ${c===state.listCareer?"selected":""}>${esc(c)}</option>`).join("")}
+      ${state.catalog.careers.map(c=>`<option value="${esc(c.nombre)}" ${c.nombre===state.listCareer?"selected":""}>${esc(c.nombre)}</option>`).join("")}
     </select>
     <select data-lf="sem" style="width:auto">
       <option value="todos" ${state.listSem==="todos"?"selected":""}>Todo el semáforo</option>
@@ -802,8 +802,13 @@ function vFichaResumen(s){
   h += `<div class="formcard">
     <div class="frow">
       <div class="field"><div class="flabel">Nombre</div><input data-f="name" value="${esc(s.name)}"></div>
-      <div class="field"><div class="flabel">Carrera</div><select data-f="career">
-        ${careerOptions(s.career).map(c=>opt(c,s.career,c)).join("")}</select></div></div>
+      <div class="field"><div class="flabel">Carrera</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input data-f="career" list="careers-datalist" style="flex:1" placeholder="Elegí o escribí una carrera" value="${esc(s.career||"")}">
+          <button class="chip" data-a="ficha-new-career" style="padding:6px 10px;font-size:12px" title="Crear una carrera nueva">+ nueva</button>
+        </div>
+        <datalist id="careers-datalist">${(state.catalog.careers||[]).map(c=>`<option value="${esc(c.nombre)}">`).join("")}</datalist>
+      </div></div>
     <div class="frow">
       <div class="field"><div class="flabel">Materia</div><select data-f="subjectId">
         <option value="" ${!s.subjectId?"selected":""}>${s.subjectId?"—":esc(s.subject||"—")}</option>
@@ -2792,6 +2797,10 @@ function vCatalog(){
       return `<button class="subj-swatch ${sel?"sel":""}" data-a="cat-set-subject-color" data-color="${k}"
         style="background:var(--subj-${k}-fg)" title="${esc(SUBJECT_COLOR_LABELS[k])}">${sel?ICON_CHECK:""}</button>`;
     }).join("")}</div>
+    <div class="flabel" style="margin-top:12px">Carreras vinculadas (para agruparla al verla «Por carrera»)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">
+      ${c.careers.length ? c.careers.map(cr=>careerChip(cr,(em.careerIds||[]).includes(cr.id))).join("") : `<div class="empty">Todavía no cargaste ninguna carrera (sección «Carreras», más abajo).</div>`}
+    </div>
     <div class="flabel" style="margin-top:12px">Unidades y subunidades (se muestran en este orden)</div>
     ${em.units.map((u,i)=>vUnitRow(u,i,em.units.length,em.id)).join("") || `<div class="empty">Sin unidades todavía. Agregá la primera acá abajo.</div>`}
     <div class="frow" style="margin-top:8px;align-items:flex-end">
@@ -2819,15 +2828,31 @@ function vCatalog(){
     return h;
   }
   h += `<div class="formcard"><div class="ftitle">Carreras</div>
-  ${c.careers.map((x,i)=>`<div class="log" style="padding:7px 12px"><div class="body">${esc(x)}</div>
-    <button class="del" data-a="cat-del-career" data-i="${i}" title="Quitar" aria-label="Quitar">×</button></div>`).join("") || `<div class="empty">Sin carreras cargadas.</div>`}
+  ${(c.careers||[]).map(x=>{
+    const renaming = state.editCareerId===x.id;
+    if(renaming) return `<div class="log" style="padding:7px 12px">
+      <input id="career-rename-input" value="${esc(x.nombre)}" data-enter="cat-career-rename-done" autofocus>
+      <button class="chip" data-a="cat-career-rename-done">Guardar</button>
+      <button class="chip" data-a="cat-career-rename-cancel">Cancelar</button></div>`;
+    return `<div class="log" style="padding:7px 12px"><div class="body">${esc(x.nombre)}</div>
+    <button class="iconbtn" data-a="cat-career-rename-start" data-id="${x.id}" title="Renombrar" aria-label="Renombrar">${ICON_EDIT}</button>
+    <button class="del" data-a="cat-del-career" data-id="${x.id}" title="Quitar" aria-label="Quitar">×</button></div>`;
+  }).join("") || `<div class="empty">Sin carreras cargadas.</div>`}
   <div class="frow" style="margin-top:8px;align-items:flex-end">
     <div class="field"><input id="new-career" placeholder="Ej: Contador Público" data-enter="cat-add-career"></div>
     <button class="chip" data-a="cat-add-career" style="margin-bottom:2px">+ Agregar carrera</button></div>
-  <div class="hint" style="margin-top:6px">Quitar una carrera no afecta a los alumnos que ya la tienen: la conservan en su ficha.</div></div>`;
-  h += `<div class="formcard"><div class="ftitle">Materias y sus unidades</div>
-  ${c.subjects.map(m=>{
+  <div class="hint" style="margin-top:6px">Quitar una carrera no afecta a los alumnos que ya la tienen (conservan el texto en su ficha) ni desvincula del todo lo demás — sólo sale de las materias que la tenían enlazada. Vinculá materias con carreras desde el editor de cada materia, más abajo.</div></div>`;
+  h += `<div class="formcard"><div class="ftitle">Materias y sus unidades</div>`;
+  const groupBy = state.catMateriasGroupBy||"todas";
+  if((c.careers||[]).length){
+    h += `<div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="chip ${groupBy==="todas"?"on":""}" data-a="cat-materias-groupby" data-mode="todas">Todas</button>
+      <button class="chip ${groupBy==="carrera"?"on":""}" data-a="cat-materias-groupby" data-mode="carrera">Por carrera</button>
+    </div>`;
+  }
+  const subjectRow = (m)=>{
     const packNames=packsContaining(m.id).map(p=>p.name);
+    const linked=(m.careerIds||[]).map(careerById).filter(Boolean);
     const confirming = state.catConfirmDelId && state.catConfirmDelId.type==="subject" && state.catConfirmDelId.id===m.id;
     if(confirming) return `<div class="row"><div class="main" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <span style="font-size:13px;color:var(--status-desaprobo-fg)">¿Eliminar «${esc(m.name)}»? Va a la papelera por 7 días.</span>
@@ -2835,13 +2860,26 @@ function vCatalog(){
       <button class="chip" data-a="cat-cancel-del">Cancelar</button></div></div>`;
     return `<div class="row" style="cursor:pointer" data-a="cat-edit-subject" data-id="${m.id}">
     <div class="main"><b style="display:inline-flex;align-items:center;gap:7px">${subjectDot(m)}${esc(m.name)}</b> ${packNames.map(n=>`<span class="pill" style="color:var(--status-aprobo-fg);background:var(--bluebg)">${esc(n)}</span>`).join(" ")}
-      <div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div></div>
+      <div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div>
+      ${linked.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${linked.map(cr=>`<span class="pill" style="background:var(--soft)">${esc(cr.nombre)}</span>`).join("")}</div>`:""}</div>
     <div style="display:flex;align-items:center;gap:4px">
       <button class="chip" data-a="cat-duplicate-subject" data-id="${m.id}" title="Duplicar materia" aria-label="Duplicar materia" style="padding:6px 10px;font-size:12px">Duplicar</button>
       <button class="del" data-a="cat-ask-del-subject" data-id="${m.id}" title="Eliminar materia" aria-label="Eliminar materia">×</button>
     </div></div>`;
-  }).join("") || `<div class="empty">Sin materias cargadas.</div>`}
-  <div class="flabel" style="margin-top:12px">Empezar desde una plantilla</div>
+  };
+  if(groupBy==="carrera" && (c.careers||[]).length){
+    (c.careers||[]).forEach(cr=>{
+      const subs=c.subjects.filter(m=>(m.careerIds||[]).includes(cr.id));
+      if(!subs.length) return;
+      h += `<div class="flabel" style="margin-top:10px">${esc(cr.nombre)}</div>` + subs.map(subjectRow).join("");
+    });
+    const sinAsignar=c.subjects.filter(m=>!(m.careerIds||[]).length);
+    h += `<div class="flabel" style="margin-top:10px">Sin carrera asignada</div>`
+      + (sinAsignar.map(subjectRow).join("") || `<div class="empty">Ninguna.</div>`);
+  }else{
+    h += c.subjects.map(subjectRow).join("") || `<div class="empty">Sin materias cargadas.</div>`;
+  }
+  h += `<div class="flabel" style="margin-top:12px">Empezar desde una plantilla</div>
   <div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">
     ${SUBJECT_TEMPLATES.map(t=>`<button class="chip" data-a="cat-add-from-template" data-id="${t.id}">${esc(t.name)}</button>`).join("")}
   </div>
@@ -3887,10 +3925,15 @@ function vModal(){
     ${state.newStudentError?`<div class="saveerr">${esc(state.newStudentError)}</div>`:""}
     <div class="frow">
       <div class="field"><div class="flabel">Nombre *</div><input id="n-name" autofocus data-enter="create"></div>
-      <div class="field"><div class="flabel">Carrera</div><select id="n-career" data-enter="create">
-        ${state.catalog.careers.map(c=>`<option>${esc(c)}</option>`).join("")}</select></div></div>
+      <div class="field"><div class="flabel">Carrera</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="n-career" list="n-careers-datalist" style="flex:1" placeholder="Elegí o escribí una carrera" data-enter="create">
+          <button class="chip" data-a="new-career-inline" style="padding:6px 10px;font-size:12px" title="Crear una carrera nueva">+ nueva</button>
+        </div>
+        <datalist id="n-careers-datalist">${(state.catalog.careers||[]).map(c=>`<option value="${esc(c.nombre)}">`).join("")}</datalist>
+      </div></div>
     <div class="frow">
-      <div class="field"><div class="flabel">Materia</div><select id="n-subject" data-enter="create">
+      <div class="field"><div class="flabel">Materia</div><select id="n-subject" data-cf="n-subject-pick" data-enter="create">
         <optgroup label="Materias">
           ${state.catalog.subjects.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("")}
         </optgroup>

@@ -80,6 +80,7 @@ async function syncNow(force){
     if(!Array.isArray(catalog.packs)) catalog.packs=[];
     if(!Array.isArray(catalog.trash)) catalog.trash=[];
     normalizeCatalogUnits(catalog); // el catálogo remoto puede venir de un dispositivo con un cuaderno viejo (units como strings)
+    normalizeCatalogCareers(catalog, merged); // idem para careers, ver el comentario en helpers.js
 
     let remoteUpdatedAt=row?row.updated_at:null;
     const needsWrite = dirty || !row || !sameStudents(merged,remote) ||
@@ -296,6 +297,7 @@ async function restoreBackup(id){
     const now=Date.now();
     state.students=(b.data.students||[]).map(x=>({...x, updatedAt:now}));
     state.catalog=normalizeCatalogUnits({packs:[], trash:[], ...(b.data.catalog||defaultCatalog()), updatedAt:now});
+    normalizeCatalogCareers(state.catalog, state.students);
     state.confirmRestoreId=null; state.restoreStatus="idle";
     save(); syncNow(); render();
     loadBackups();
@@ -1279,7 +1281,7 @@ function purgeSubjectFromTrash(subjectId){
 // nueva queda usable de inmediato aunque la copia de archivos todavía esté en curso.
 async function duplicateSubject(subjectId){
   const src=subjById(subjectId); if(!src) return;
-  const nm={id:uid(), name:src.name+" (copia)", units:normalizeUnits(src.units), color:nextSubjectColor(), materiales:[]};
+  const nm={id:uid(), name:src.name+" (copia)", units:normalizeUnits(src.units), color:nextSubjectColor(), materiales:[], careerIds:[...(src.careerIds||[])]};
   state.catalog.subjects.push(nm);
   state.editSubjectId=nm.id; state.editPackId=null; state.catConfirmDelId=null;
   loadMateriales(nm.id);

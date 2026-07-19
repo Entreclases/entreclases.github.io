@@ -92,7 +92,7 @@ async function copyToClipboard(text){
 
 /* ============ estado ============ */
 let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPackId:null,
-              editUnitId:null, editSubunitId:null,
+              editUnitId:null, editSubunitId:null, editCareerId:null, catMateriasGroupBy:"todas",
               newPackName:"", newPackSubjects:[], newPackError:"",
               view:"tablero", selId:null, filter:"activo", tab:"temas",
               listSearch:"", listSubject:"todas", listCareer:"todas", listSem:"todos",
@@ -211,8 +211,36 @@ function normalizeUnits(raw){
          ? {id:uid(), nombre:sub} : {id:sub.id||uid(), nombre:sub.nombre||""})});
 }
 function normalizeCatalogUnits(catalog){
-  (catalog.subjects||[]).forEach(m=>{ m.units=normalizeUnits(m.units); });
+  (catalog.subjects||[]).forEach(m=>{
+    m.units=normalizeUnits(m.units);
+    if(!Array.isArray(m.careerIds)) m.careerIds=[];
+  });
   (catalog.trash||[]).forEach(t=>{ if(t.type==="subject" && t.subject) t.subject.units=normalizeUnits(t.subject.units); });
+  return catalog;
+}
+/* ============ carreras (paso 129): catalog.careers pasó de string[] a {id,nombre,color?}[] para
+   poder vincularlas a materias (subject.careerIds) sin perder el link si se renombran — mismo
+   motivo que id en subjects/tags. normalizeCareers() es la ÚNICA función que lee el formato
+   crudo (string suelto = cuaderno viejo) y siempre devuelve objetos, mismo patrón que
+   normalizeUnits(). s.career (por alumno) NO cambia de formato: sigue siendo el nombre en texto
+   plano de siempre, así que los filtros existentes (state.listCareer, careerOptions()) no se
+   tocan — sólo el catálogo global gana identidad propia. */
+function normalizeCareers(raw){
+  return (raw||[]).map(c => typeof c==="string"
+    ? {id:uid(), nombre:c}
+    : {id:c.id||uid(), nombre:c.nombre||"", ...(c.color?{color:c.color}:{})});
+}
+// Además de normalizar el formato, recupera cualquier texto de carrera que ya esté cargado en
+// s.career de algún alumno y todavía no exista en el catálogo (comparando sin mayúsculas/espacios
+// de más, como normName()) — así ningún cuaderno viejo pierde una carrera sólo porque nunca se
+// había agregado a la lista, sólo escrita a mano en una ficha.
+function normalizeCatalogCareers(catalog, students){
+  catalog.careers = normalizeCareers(catalog.careers);
+  (students||[]).forEach(s=>{
+    const name=(s.career||"").trim(); if(!name) return;
+    const n=normName(name);
+    if(!catalog.careers.some(c=>normName(c.nombre)===n)) catalog.careers.push({id:uid(), nombre:name});
+  });
   return catalog;
 }
 function makeUnit(nombre, orden){ return {id:uid(), nombre, orden:orden||0, subunidades:[]}; }
@@ -297,7 +325,21 @@ function deleteUnitWithUndo(subjectId, unitId){
     toast("Unidad restaurada");
   });
 }
-function careerOptions(cur){ const l=[...state.catalog.careers]; if(cur && !l.includes(cur)) l.push(cur); return l; }
+const careerById = (id) => (state.catalog.careers||[]).find(c=>c.id===id) || null;
+// Nombres de carreras para el <datalist>/<select> de la ficha (s.career sigue siendo texto
+// plano) — si el alumno tiene una carrera que ya no está en el catálogo (borrada, o texto libre
+// que nunca se agregó), se incluye igual para no perderla del selector actual.
+function careerOptions(cur){
+  const l=(state.catalog.careers||[]).map(c=>c.nombre);
+  if(cur && !l.includes(cur)) l.push(cur);
+  return l;
+}
+// Chip toggle para vincular/desvincular una carrera a una materia (editor de materia, ver
+// vCatalog) — mismo patrón visual que los chips de pack-toggle-subject, sin botón de borrado
+// propio: tocar el chip alterna el link.
+function careerChip(career, on){
+  return `<button class="chip ${on?"on":""}" data-a="cat-toggle-career" data-id="${esc(career.id)}">${esc(career.nombre)}</button>`;
+}
 function touchCatalog(){ state.catalog.updatedAt=Date.now(); save(); render(); }
 // Feedback breve y no intrusivo tras una acción (ver .toast-wrap en styles.css) — se apila en
 // state.toasts y se autodescarta solo pasado TOAST_MS (TOAST_UNDO_MS si tiene botón "Deshacer",
@@ -340,6 +382,7 @@ function load(){
   if(!Array.isArray(state.catalog.trash)) state.catalog.trash=[];
   if(!Array.isArray(state.catalog.tags)) state.catalog.tags=[];
   normalizeCatalogUnits(state.catalog);
+  normalizeCatalogCareers(state.catalog, state.students);
   // papelera (paso 76): alumnos y materias borrados quedan restaurables 7 días y se purgan solos
   // pasado ese plazo — students usa el mismo flag "deleted" que antes (ahora con ventana de 7
   // días en vez de 90), catalog.trash guarda materias enteras sacadas de catalog.subjects.
@@ -386,7 +429,7 @@ function applyTarifaAjuste(cambios){
   save(); render();
 }
 function emptyStudent(){
-  return { id:uid(), name:"", career:(state.catalog.careers[0]||"Ingeniería"), subject:"", subjectId:"",
+  return { id:uid(), name:"", career:((state.catalog.careers[0]&&state.catalog.careers[0].nombre)||"Ingeniería"), subject:"", subjectId:"",
     chair:"", status:"activo", semaforo:"sd", examDate:"", startDate:today(), notes:"",
     updatedAt:Date.now(), topics:{}, sessions:[], simulacros:[],
     tarifa:"", modalidad:"", pagos:[], recibos:[], informeComment:"", phone:"", examResults:[],
@@ -419,7 +462,7 @@ function sampleStudent(){
   units.forEach((u,i)=>{ topics[u.nombre] = cycle[i % cycle.length]; });
   return {
     id: uid(), name:"Alumno de ejemplo", sample:true,
-    career: state.catalog.careers[0]||"Ingeniería", subject: m?m.name:"", subjectId: m?m.id:"",
+    career: (state.catalog.careers[0]&&state.catalog.careers[0].nombre)||"Ingeniería", subject: m?m.name:"", subjectId: m?m.id:"",
     chair:"", status:"activo", semaforo:"amarillo",
     examDate: daysFromToday(6), startDate: daysFromToday(-20),
     notes:"Este alumno es un ejemplo para que veas cómo se usa la app — podés borrarlo cuando quieras desde su ficha.",
@@ -1590,5 +1633,6 @@ function buildDemoData(){
   };
 
   normalizeCatalogUnits(catalog); // por si algo (ej. la materia de la papelera, arriba) quedó con units sin normalizar
+  normalizeCatalogCareers(catalog, students);
   return { students, catalog, portal };
 }
