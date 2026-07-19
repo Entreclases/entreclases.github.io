@@ -105,8 +105,40 @@ function grupoHtml(grupo){
     : examenes.map(d=>`<div class="pvalue">${fmtDiaLocal(d)}</div>`).join("");
   return h + `</div></div>`;
 }
+// Una fila de archivo suelta (paso 128: reusada tanto sin agrupar por unidad como dentro de
+// cada sub-grupo de unidad, ver unitGroupsHtml más abajo).
+function fileRowHtml(it){
+  return `<div class="file">
+    <div class="filemain">${esc(it.nombre)}<div class="filemeta">${fmtBytes(it.bytes)}${it.at?" · "+fmtDate(it.at):""}</div></div>
+    <a class="dl" href="${esc(it.url)}" target="_blank" rel="noopener">Descargar</a>
+  </div>`;
+}
+// Sub-agrupa los materiales de una materia por unidad (paso 128) — unitNombre/unitOrden vienen
+// denormalizados al publicar (ver publicarPortal()/republishGrupoBlock() en sync.js), porque el
+// portal es standalone y no tiene acceso a catalog.subjects para resolver un unitId en vivo.
+// "General" (materiales sin unidad enlazada) va primero, después cada unidad en el orden del
+// catálogo (unitOrden) — mismo orden que ve el docente en Materias.
+function unitGroupsHtml(files){
+  const generales = files.filter(it=>!it.unitNombre);
+  const porUnidad = new Map();
+  files.forEach(it=>{
+    if(!it.unitNombre) return;
+    if(!porUnidad.has(it.unitNombre)) porUnidad.set(it.unitNombre, {orden: it.unitOrden==null?9999:it.unitOrden, files:[]});
+    porUnidad.get(it.unitNombre).files.push(it);
+  });
+  const grupos=[...porUnidad.entries()].sort((a,b)=>a[1].orden-b[1].orden);
+  let h="";
+  if(generales.length) h += `<div class="unitgroup"><div class="unitgroupname">General</div>${generales.map(fileRowHtml).join("")}</div>`;
+  grupos.forEach(([nombre,g])=>{
+    h += `<div class="unitgroup"><div class="unitgroupname">${esc(nombre)}</div>${g.files.map(fileRowHtml).join("")}</div>`;
+  });
+  return h;
+}
 // Agrupa por materia y arma la sección de Biblioteca (primera y bien visible: es la sección
-// principal del portal). filtro filtra por materia+nombre de archivo, case-insensitive.
+// principal del portal). filtro filtra por materia+nombre de archivo, case-insensitive. Dentro
+// de cada materia, si hay al menos un archivo con unidad denormalizada se sub-agrupa por unidad
+// (unitGroupsHtml); si la materia no tiene unidades cargadas, se muestra la lista plana de
+// siempre.
 function bibliotecaHtml(items, filtro){
   const f = (filtro||"").trim().toLowerCase();
   const filtered = f ? items.filter(it =>
@@ -121,14 +153,15 @@ function bibliotecaHtml(items, filtro){
     if(!bySubject.has(key)) bySubject.set(key, {color:it.color||SUBJECT_COLOR_FALLBACK, files:[]});
     bySubject.get(key).files.push(it);
   });
-  return [...bySubject.entries()].map(([materia, group])=>`
+  return [...bySubject.entries()].map(([materia, group])=>{
+    const hasUnits = group.files.some(it=>it.unitNombre);
+    const filesHtml = hasUnits ? unitGroupsHtml(group.files) : group.files.map(fileRowHtml).join("");
+    return `
     <div class="subject">
       <div class="subjectname"><span class="subj-dot" style="background:var(--subj-${group.color}-fg)"></span>${esc(materia)}</div>
-      ${group.files.map(it=>`<div class="file">
-        <div class="filemain">${esc(it.nombre)}<div class="filemeta">${fmtBytes(it.bytes)}${it.at?" · "+fmtDate(it.at):""}</div></div>
-        <a class="dl" href="${esc(it.url)}" target="_blank" rel="noopener">Descargar</a>
-      </div>`).join("")}
-    </div>`).join("");
+      ${filesHtml}
+    </div>`;
+  }).join("");
 }
 // Barras de avance que crecen al entrar en pantalla (paso 100) — mismo criterio que
 // observeGrowBars() en la app (events.js), pero standalone: portal.js no la carga.

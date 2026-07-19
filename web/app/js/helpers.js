@@ -241,6 +241,20 @@ function flattenUnitLabels(units){
   });
   return out;
 }
+// Unidades de nivel superior en un formato {id,label} listo para un <select> (paso 128, ver el
+// selector de unidad de vMaterialRow en views.js) — a propósito sólo el nivel de unidad, sin
+// subunidades: un material se enlaza a la unidad entera, no hace falta la granularidad de
+// subunidad que sí tiene el avance por temas (unitsFor/flattenUnitLabels más arriba).
+function flattenUnitOptions(units){
+  return (units||[]).map(u=>({id:u.id, label:u.nombre}));
+}
+// Materiales de una materia enlazados a una unidad puntual (chip de conteo en la lista de
+// unidades, ver vUnitRow en views.js) — materialesIndexFor vive en sync.js pero esto se llama
+// siempre después de que los seis scripts ya cargaron, así que el orden no importa (ver el
+// comentario de carga en CLAUDE.md).
+function materialesCountFor(subjectId, unitId){
+  return materialesIndexFor(subjectId).filter(m=>m.unitId===unitId).length;
+}
 function moveUnit(subjectId, unitId, dir){
   const m=subjById(subjectId); if(!m) return;
   const i=m.units.findIndex(u=>u.id===unitId), j=i+dir;

@@ -438,10 +438,16 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="mat-reload"){ loadMateriales(el.dataset.id); return; }
   else if(a==="mat-upload"){
-    const input=document.getElementById("mat-file");
+    const input=document.getElementById(el.dataset.input||"mat-file");
     const file=input && input.files && input.files[0];
     if(!file) return;
-    uploadMaterial(el.dataset.id, file); return;
+    uploadMaterial(el.dataset.id, file, el.dataset.unit||""); return;
+  }
+  else if(a==="mat-mode-general"){ state.materialesMode="general"; }
+  else if(a==="mat-mode-unidad"){ state.materialesMode="unidad"; }
+  else if(a==="mat-jump-unit"){
+    state.materialesMode="unidad";
+    state.materialesJumpUnitId=el.dataset.unit;
   }
   else if(a==="mat-toggle-share"){
     const entry=materialIndexEntry(el.dataset.id, el.dataset.name); if(!entry) return;
@@ -1364,6 +1370,11 @@ document.addEventListener("change",(e)=>{
   }
 });
 function handleFormChange(e){
+  // Selector "Enlazar a una unidad" de un material puntual (paso 128, ver vMaterialRow en
+  // views.js) — no usa data-cf porque el valor depende del archivo (data-name), no de una clave
+  // fija del switch de más abajo.
+  const mu=e.target.closest("[data-matunit]");
+  if(mu){ setMaterialUnit(mu.dataset.id, mu.dataset.name, mu.value); render(); return; }
   const cf=e.target.closest("[data-cf]");
   if(cf && cf.dataset.cf==="subj-name"){
     const m=subjById(state.editSubjectId); if(!m) return;

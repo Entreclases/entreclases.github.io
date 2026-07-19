@@ -73,6 +73,11 @@
   .file{display:flex;align-items:center;justify-content:space-between;gap:10px;
     padding:9px 0;border-top:1px solid var(--soft)}
   .subjectname + .file{border-top:none}
+  /* ============ sub-grupos por unidad dentro de una materia (paso 128) ============ */
+  .unitgroup + .unitgroup{margin-top:8px}
+  .unitgroupname{font-weight:600;font-size:12px;color:var(--faint);margin:10px 0 2px}
+  .subjectname + .unitgroup .unitgroupname{margin-top:0}
+  .unitgroupname + .file{border-top:none}
   .filemain{font-size:14px}
   .filemeta{font-size:12px;color:var(--faint);margin-top:2px}
   .dl{flex:0 0 auto;font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none;

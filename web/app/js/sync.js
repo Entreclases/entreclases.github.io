@@ -730,8 +730,14 @@ async function publicarPortal(){
     const biblioteca=await Promise.all(compartidos.map(async f=>{
       const path=materialPath(uid_, f.subjectId, f.name);
       const url=await signMaterialUrl(s, path, PORTAL_LINK_TTL_DAYS*86400);
+      // unitNombre/unitOrden: mismo criterio que republishGrupoBlock más abajo — denormalizado
+      // al publicar, para que el portal (standalone, sin catalog.subjects) pueda agrupar por
+      // unidad sin pedir nada nuevo al backend (ver bibliotecaHtml en portal.js).
+      const subj=subjById(f.subjectId);
+      const unit=(f.unitId && subj) ? (subj.units||[]).find(u=>u.id===f.unitId) : null;
       return {subjectId:f.subjectId, materia:f.subject, color:subjectColorKey(f.subjectId), nombre:materialDisplayName(f.name),
-        path, url, bytes:f.bytes||0, at:f.at||null, firmadoAt:Date.now()};
+        path, url, bytes:f.bytes||0, at:f.at||null, firmadoAt:Date.now(),
+        unitNombre:unit?unit.nombre:"", unitOrden:unit?unit.orden:null};
     }));
     const alumnoIds=[...new Set(Object.values(state.portal.tokensAlumnos||{}))];
     const alumnos={};
@@ -986,8 +992,13 @@ async function republishGrupoBlock(materiaId){
     const bibMateria=await Promise.all(compartidos.map(async f=>{
       const path=materialPath(uid_, materiaId, f.name);
       const url=await signMaterialUrl(s, path, PORTAL_LINK_TTL_DAYS*86400);
+      // unitNombre/unitOrden: nombre y orden de la unidad denormalizados AL PUBLICAR (paso 128),
+      // no un id vivo — el portal no tiene acceso a catalog.subjects, así que agrupar por unidad
+      // ahí (ver bibliotecaHtml en portal.js) necesita esta etiqueta ya resuelta.
+      const unit=(f.unitId && m) ? (m.units||[]).find(u=>u.id===f.unitId) : null;
       return {subjectId:materiaId, materia:m?m.name:"", color:subjectColorKey(materiaId), nombre:materialDisplayName(f.name),
-        path, url, bytes:f.bytes||0, at:f.at||null, firmadoAt:Date.now()};
+        path, url, bytes:f.bytes||0, at:f.at||null, firmadoAt:Date.now(),
+        unitNombre:unit?unit.nombre:"", unitOrden:unit?unit.orden:null};
     }));
     const bloque=buildGrupoBlock(materiaId, entry?entry.alumnos:[], bibMateria);
     const grupos={...((row.publicado&&row.publicado.grupos)||{})};
@@ -1042,8 +1053,9 @@ function materialesIndexMatches(subjectId, storageList){
   const idxKeys=new Set(idx.map(m=>key(m.name,m.bytes)));
   return storageList.every(f=>idxKeys.has(key(f.name,(f.metadata&&f.metadata.size)||0)));
 }
-// Preserva "compartido" (matcheando por nombre+bytes, misma clave que materialesIndexMatches)
-// para que reconciliar contra Storage no borre sin querer lo que ya está compartido en el portal.
+// Preserva "compartido" y "unitId" (matcheando por nombre+bytes, misma clave que
+// materialesIndexMatches) para que reconciliar contra Storage no borre sin querer lo que ya
+// está compartido en el portal ni el enlace a unidad de un material (paso 128).
 function reconcileMaterialesIndex(subjectId, storageList){
   if(materialesIndexMatches(subjectId, storageList)) return;
   const s=subjById(subjectId);
@@ -1052,8 +1064,18 @@ function reconcileMaterialesIndex(subjectId, storageList){
   s.materiales=storageList.map(f=>{
     const bytes=(f.metadata&&f.metadata.size)||0;
     const old=prev.get(f.name+"|"+bytes);
-    return {name:f.name, bytes, at:f.updated_at||f.created_at||null, compartido:!!(old&&old.compartido)};
+    return {name:f.name, bytes, at:f.updated_at||f.created_at||null, compartido:!!(old&&old.compartido), unitId:(old&&old.unitId)||""};
   });
+  touchCatalog();
+}
+// Cambia a qué unidad de la materia está enlazado un material (paso 128) — unitId vacío/""
+// significa "General" (sin unidad). No toca el portal: si el archivo ya estaba compartido, el
+// cambio se ve ahí recién con la próxima "Publicar cambios" (mismo criterio que ya tenía
+// mat-toggle-share antes de este paso, salvo el caso especial de dejar de compartir/borrar, que
+// sí saca el archivo al toque vía removeFromPortalBiblioteca).
+function setMaterialUnit(subjectId, fileName, unitId){
+  const entry=materialIndexEntry(subjectId, fileName); if(!entry) return;
+  entry.unitId=unitId||"";
   touchCatalog();
 }
 
@@ -1085,7 +1107,7 @@ async function loadMateriales(subjectId){
   }
   render();
 }
-async function uploadMaterial(subjectId, file){
+async function uploadMaterial(subjectId, file, unitId){
   if(!navigator.onLine){ state.materialesUploadError="offline"; render(); return; }
   if(file.size > MATERIAL_MAX_BYTES){
     state.materialesUploadError=`«${file.name}» pesa ${fmtBytes(file.size)} — el máximo por archivo es ${fmtBytes(MATERIAL_MAX_BYTES)}.`;
@@ -1104,7 +1126,7 @@ async function uploadMaterial(subjectId, file){
   state.materialesUploading=true; state.materialesUploadError=""; render();
   if(IS_DEMO){
     const subj=subjById(subjectId);
-    if(subj) subj.materiales=[...(subj.materiales||[]), {name:uid().slice(-6)+"-"+file.name, bytes:file.size, at:new Date().toISOString(), compartido:false}];
+    if(subj) subj.materiales=[...(subj.materiales||[]), {name:uid().slice(-6)+"-"+file.name, bytes:file.size, at:new Date().toISOString(), compartido:false, unitId:unitId||""}];
     touchCatalog();
     state.materialesUploading=false;
     await loadMateriales(subjectId);
@@ -1120,6 +1142,12 @@ async function uploadMaterial(subjectId, file){
     if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||("error "+r.status)); }
     state.materialesUploading=false;
     await loadMateriales(subjectId);
+    // El índice recién se crea al reconciliar contra Storage (loadMateriales de arriba), así que
+    // el unitId elegido en el selector de "subir" se pega después, no en el objeto pusheado acá.
+    if(unitId){
+      const entry=materialIndexEntry(subjectId, fileName);
+      if(entry){ entry.unitId=unitId; touchCatalog(); }
+    }
   }catch(e){
     state.materialesUploading=false;
     state.materialesUploadError = !navigator.onLine ? "offline" : "No se pudo subir el archivo.";

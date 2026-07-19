@@ -2743,7 +2743,7 @@ function vSubunitList(u){
   </div>`;
   return h;
 }
-function vUnitRow(u, i, total){
+function vUnitRow(u, i, total, subjectId){
   if(state.catConfirmDelId && state.catConfirmDelId.type==="unit" && state.catConfirmDelId.id===u.id){
     return `<div class="log unit-row"><div class="body">
       <span style="font-size:13px;color:var(--status-desaprobo-fg)">¿Eliminar «${esc(u.nombre)}»? Hay alumnos con avance registrado ahí — no se borra su historial, sólo deja de verse en la grilla.</span>
@@ -2753,6 +2753,10 @@ function vUnitRow(u, i, total){
       </div></div></div>`;
   }
   const renaming = state.editUnitId===u.id;
+  // Chip de conteo de materiales (paso 128) — tocarlo lleva directo al bloque de esta unidad en
+  // la sección Materiales de abajo, cambiando a modo "Por unidad" si hacía falta (ver
+  // mat-jump-unit en events.js y el scroll al final de render() en este mismo archivo).
+  const matCount = materialesCountFor(subjectId, u.id);
   return `<div class="log unit-row">
     <div class="unit-arrows">
       <button class="iconbtn" data-a="cat-unit-up" data-id="${u.id}" ${i===0?"disabled":""} title="Subir unidad" aria-label="Subir unidad">${ICON_CHEVRON_UP}</button>
@@ -2763,7 +2767,8 @@ function vUnitRow(u, i, total){
         ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><input id="unit-rename-input" value="${esc(u.nombre)}" data-enter="cat-unit-rename-done" autofocus>
            <button class="chip" data-a="cat-unit-rename-done">Guardar</button>
            <button class="chip" data-a="cat-unit-rename-cancel">Cancelar</button></div>`
-        : `<b class="unit-label" data-a-dbl="cat-unit-rename-start" data-id="${u.id}">${esc(u.nombre)}</b>`}
+        : `<b class="unit-label" data-a-dbl="cat-unit-rename-start" data-id="${u.id}">${esc(u.nombre)}</b>
+           <button class="chip" data-a="mat-jump-unit" data-unit="${u.id}" style="margin-left:6px;padding:2px 8px;font-size:11px" title="Ver materiales de esta unidad">${matCount} material${matCount===1?"":"es"}</button>`}
       ${vSubunitList(u)}
     </div>
     ${!renaming ? `<div style="display:flex;gap:2px;align-items:flex-start">
@@ -2788,7 +2793,7 @@ function vCatalog(){
         style="background:var(--subj-${k}-fg)" title="${esc(SUBJECT_COLOR_LABELS[k])}">${sel?ICON_CHECK:""}</button>`;
     }).join("")}</div>
     <div class="flabel" style="margin-top:12px">Unidades y subunidades (se muestran en este orden)</div>
-    ${em.units.map((u,i)=>vUnitRow(u,i,em.units.length)).join("") || `<div class="empty">Sin unidades todavía. Agregá la primera acá abajo.</div>`}
+    ${em.units.map((u,i)=>vUnitRow(u,i,em.units.length,em.id)).join("") || `<div class="empty">Sin unidades todavía. Agregá la primera acá abajo.</div>`}
     <div class="frow" style="margin-top:8px;align-items:flex-end">
       <div class="field"><input id="new-unit" placeholder="Ej: Límites y continuidad" data-enter="cat-add-unit"></div>
       <button class="primary" style="margin-bottom:2px" data-a="cat-add-unit">+ Agregar unidad</button></div>
@@ -2870,9 +2875,47 @@ function vCatalog(){
   return h;
 }
 
-/* ============ materiales de una materia (dentro de su editor) ============ */
+/* ============ materiales de una materia (dentro de su editor) ============
+   Paso 128: cada material puede enlazarse opcionalmente a una unidad de la materia (unitId en
+   s.materiales[], "" o ausente = "General", ver setMaterialUnit/reconcileMaterialesIndex en
+   sync.js). Con al menos una unidad cargada aparece un selector "General"/"Por unidad"
+   (state.materialesMode): "General" es la lista de siempre sin agrupar; "Por unidad" arma un
+   bloque por cada unidad (en su orden) más un bloque "General" para lo no enlazado, cada uno
+   con su propio input+botón de subir. El chip de conteo en vUnitRow (arriba) y el botón "Ver
+   materiales de esta unidad" disparan mat-jump-unit (events.js), que fuerza el modo "Por unidad"
+   y deja state.materialesJumpUnitId para que render() (al final de este archivo) haga scroll al
+   bloque una sola vez. */
+function vMaterialRow(subjectId, f, unitOptions){
+  const dn=materialDisplayName(f.name);
+  const size=(f.metadata&&f.metadata.size)||0;
+  const confirming = state.materialesConfirmDelName===f.name;
+  const idxEntry=materialIndexEntry(subjectId, f.name);
+  const compartido=!!(idxEntry && idxEntry.compartido);
+  const curUnitId=(idxEntry&&idxEntry.unitId)||"";
+  const unitSelect = unitOptions.length ? `<select data-matunit data-id="${subjectId}" data-name="${esc(f.name)}" title="Enlazar a una unidad" style="max-width:170px">
+      <option value="">General (sin unidad)</option>
+      ${unitOptions.map(o=>`<option value="${esc(o.id)}" ${o.id===curUnitId?"selected":""}>${esc(o.label)}</option>`).join("")}
+    </select>` : "";
+  return `<div class="log" style="align-items:center;flex-wrap:wrap">
+    <div class="body">${esc(dn)}<div class="note">${fmtBytes(size)} · ${fmtDateTime(f.updated_at||f.created_at)}</div></div>
+    ${!confirming ? `${unitSelect}
+      <button class="chip ${compartido?"on":""}" data-a="mat-toggle-share" data-id="${subjectId}" data-name="${esc(f.name)}" title="Compartir en el portal de alumnos">${compartido?"Compartido":"Compartir"}</button>
+      <button class="chip" data-a="mat-download" data-id="${subjectId}" data-name="${esc(f.name)}">Descargar</button>
+      <button class="del" data-a="mat-del-ask" data-name="${esc(f.name)}" title="Borrar" aria-label="Borrar">×</button>`
+    : `<span style="font-size:12px;color:var(--status-desaprobo-fg)">¿Borrar «${esc(dn)}»?</span>
+      <button class="danger" data-a="mat-del-confirm" data-id="${subjectId}" data-name="${esc(f.name)}" ${state.materialesDeleteStatus==="deleting"?"disabled":""}>Sí, borrar</button>
+      <button class="chip" data-a="mat-del-cancel">Cancelar</button>`}
+  </div>`;
+}
+function vMaterialUploadRow(subjectId, unitId, inputId, blocked, uploading){
+  return `<div class="frow" style="margin-top:8px;align-items:flex-end">
+    <div class="field"><div class="flabel">Subir archivo (máx. ${fmtBytes(MATERIAL_MAX_BYTES)})</div>
+      <input type="file" id="${inputId}" ${blocked||uploading?"disabled":""}></div>
+    <button class="chip" data-a="mat-upload" data-id="${subjectId}" data-unit="${unitId||""}" data-input="${inputId}" style="margin-bottom:2px" ${blocked||uploading?"disabled":""}>${uploading?"Subiendo…":"+ Subir"}</button>
+  </div>`;
+}
 function vMateriales(subjectId){
-  let h = `<div class="formcard"><div class="ftitle" style="display:flex;align-items:center;gap:8px">${subjectDot(subjectId)}Materiales</div>`;
+  let h = `<div class="formcard" id="materiales-block"><div class="ftitle" style="display:flex;align-items:center;gap:8px">${subjectDot(subjectId)}Materiales</div>`;
   if(!navigator.onLine || state.materialesError==="offline"){
     h += `<div class="hint">Necesitás conexión a internet para ver y subir materiales.</div></div>`;
     return h;
@@ -2897,32 +2940,47 @@ function vMateriales(subjectId){
   <div class="hint" style="margin-bottom:10px">${fmtBytes(totalBytes)} de ${fmtBytes(MATERIAL_MAX_TOTAL_BYTES)} usados (entre todas tus materias)</div>
   <div class="hint" style="margin-bottom:10px">${list.length}/${MATERIAL_MAX_COUNT} archivos · máx. ${fmtBytes(MATERIAL_MAX_BYTES)} cada uno</div>`;
   h += `<div class="hint" style="margin-bottom:8px">Tocá «Compartir» para incluir un archivo en la Biblioteca del portal para alumnos — después hace falta tocar «Publicar cambios» en Cuenta para que se vea (dejar de compartir o borrar el archivo lo saca del portal al toque).</div>`;
-  h += list.length===0 ? emptyState(ICON_BOOK,"Sin materiales todavía","Subí guías, resúmenes o ejercicios con el botón de abajo — quedan disponibles en cualquier dispositivo.") : list.map(f=>{
-    const dn=materialDisplayName(f.name);
-    const size=(f.metadata&&f.metadata.size)||0;
-    const confirming = state.materialesConfirmDelName===f.name;
-    const idxEntry=materialIndexEntry(subjectId, f.name);
-    const compartido=!!(idxEntry && idxEntry.compartido);
-    return `<div class="log" style="align-items:center;flex-wrap:wrap">
-      <div class="body">${esc(dn)}<div class="note">${fmtBytes(size)} · ${fmtDateTime(f.updated_at||f.created_at)}</div></div>
-      ${!confirming ? `<button class="chip ${compartido?"on":""}" data-a="mat-toggle-share" data-id="${subjectId}" data-name="${esc(f.name)}" title="Compartir en el portal de alumnos">${compartido?"Compartido":"Compartir"}</button>
-        <button class="chip" data-a="mat-download" data-id="${subjectId}" data-name="${esc(f.name)}">Descargar</button>
-        <button class="del" data-a="mat-del-ask" data-name="${esc(f.name)}" title="Borrar" aria-label="Borrar">×</button>`
-      : `<span style="font-size:12px;color:var(--status-desaprobo-fg)">¿Borrar «${esc(dn)}»?</span>
-        <button class="danger" data-a="mat-del-confirm" data-id="${subjectId}" data-name="${esc(f.name)}" ${state.materialesDeleteStatus==="deleting"?"disabled":""}>Sí, borrar</button>
-        <button class="chip" data-a="mat-del-cancel">Cancelar</button>`}
+
+  const m=subjById(subjectId);
+  const units=(m&&m.units)||[];
+  const unitOptions=flattenUnitOptions(units);
+  const mode = units.length ? (state.materialesMode||"general") : "general";
+  if(units.length){
+    h += `<div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="chip ${mode==="general"?"on":""}" data-a="mat-mode-general">General</button>
+      <button class="chip ${mode==="unidad"?"on":""}" data-a="mat-mode-unidad">Por unidad</button>
     </div>`;
-  }).join("");
-  if(state.materialesUploadError) h += `<div class="saveerr" style="margin-top:8px">${esc(state.materialesUploadError)}</div>`;
+  }
+  if(state.materialesUploadError) h += `<div class="saveerr" style="margin-bottom:8px">${esc(state.materialesUploadError)}</div>`;
   const full = list.length>=MATERIAL_MAX_COUNT;
   const totalFull = totalBytes>=MATERIAL_MAX_TOTAL_BYTES;
   const blocked = full||totalFull;
-  h += `<div class="frow" style="margin-top:10px;align-items:flex-end">
-    <div class="field"><div class="flabel">Subir archivo (máx. ${fmtBytes(MATERIAL_MAX_BYTES)})</div>
-      <input type="file" id="mat-file" ${blocked||state.materialesUploading?"disabled":""}></div>
-    <button class="chip" data-a="mat-upload" data-id="${subjectId}" style="margin-bottom:2px" ${blocked||state.materialesUploading?"disabled":""}>${state.materialesUploading?"Subiendo…":"+ Subir"}</button>
-  </div>
-  ${full?`<div class="hint" style="margin-top:6px">Llegaste al máximo de ${MATERIAL_MAX_COUNT} archivos para esta materia.</div>`:""}
+
+  if(list.length===0){
+    h += emptyState(ICON_BOOK,"Sin materiales todavía","Subí guías, resúmenes o ejercicios con el botón de abajo — quedan disponibles en cualquier dispositivo.");
+    h += vMaterialUploadRow(subjectId, "", "mat-file-general", blocked, state.materialesUploading);
+  } else if(mode==="general"){
+    h += list.map(f=>vMaterialRow(subjectId, f, unitOptions)).join("");
+    h += vMaterialUploadRow(subjectId, "", "mat-file-general", blocked, state.materialesUploading);
+  } else {
+    const enUnidad=(f)=>{ const e=materialIndexEntry(subjectId,f.name); return (e&&e.unitId)||""; };
+    const generales = list.filter(f=>!enUnidad(f));
+    h += `<div class="formcard" style="margin:10px 0" id="mat-unit-general">
+      <div class="ftitle" style="font-size:14px">General</div>
+      ${generales.length ? generales.map(f=>vMaterialRow(subjectId, f, unitOptions)).join("") : `<div class="empty" style="font-size:13px">Sin materiales generales.</div>`}
+      ${vMaterialUploadRow(subjectId, "", "mat-file-general", blocked, state.materialesUploading)}
+    </div>`;
+    units.forEach(u=>{
+      const items=list.filter(f=>enUnidad(f)===u.id);
+      const highlighted = state.materialesJumpUnitId===u.id;
+      h += `<div class="formcard" style="margin:10px 0${highlighted?";border-color:var(--accent);border-width:2px":""}" id="mat-unit-${u.id}">
+        <div class="ftitle" style="font-size:14px">${esc(u.nombre)}</div>
+        ${items.length ? items.map(f=>vMaterialRow(subjectId, f, unitOptions)).join("") : `<div class="empty" style="font-size:13px">Sin materiales en esta unidad.</div>`}
+        ${vMaterialUploadRow(subjectId, u.id, "mat-file-"+u.id, blocked, state.materialesUploading)}
+      </div>`;
+    });
+  }
+  h += `${full?`<div class="hint" style="margin-top:6px">Llegaste al máximo de ${MATERIAL_MAX_COUNT} archivos para esta materia.</div>`:""}
   ${!full&&totalFull?`<div class="hint" style="margin-top:6px">Llegaste al máximo de ${fmtBytes(MATERIAL_MAX_TOTAL_BYTES)} entre todas tus materias.</div>`:""}
   </div>`;
   return h;
@@ -3973,4 +4031,13 @@ function render(){
   const nn = document.getElementById("n-name"); if(nn) nn.focus();
   const gs = document.getElementById("global-search-input");
   if(gs && document.activeElement!==gs) gs.focus();
+  // Salto a un bloque de materiales por unidad (paso 128, ver mat-jump-unit en events.js) — un
+  // solo salto por click: se limpia acá después de usarlo, ya con el html de arriba pintado
+  // (así el borde resaltado de vMateriales alcanza a mostrarse durante este mismo render).
+  if(state.materialesJumpUnitId){
+    const targetId=state.materialesJumpUnitId;
+    state.materialesJumpUnitId=null;
+    const target=document.getElementById("mat-unit-"+targetId);
+    if(target) target.scrollIntoView({behavior:"smooth", block:"start"});
+  }
 }
