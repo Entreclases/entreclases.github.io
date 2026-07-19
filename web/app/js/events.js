@@ -691,7 +691,7 @@ document.addEventListener("click", (e)=>{
     state.authEmail=em;
     if(!em||!pw){ authMsgShow("Completá correo y contraseña."); return; }
     authMsgShow("Iniciando sesión…",true);
-    doLogin(em,pw).then(()=>{ resetLoginAttempts(); render(); syncNow(); })
+    doLogin(em,pw).then(()=>{ resetLoginAttempts(); flushPendingTermsAccept(em); render(); syncNow(); })
       .catch(err=>{
         if(isEmailNotConfirmedError(err)){
           state.pendingConfirmEmail=em; state.confirmStatus="idle"; state.confirmError=""; render();
@@ -707,13 +707,18 @@ document.addEventListener("click", (e)=>{
   else if(a==="auth-signup"){
     const em=(document.getElementById("auth-email").value||"").trim();
     const pw=document.getElementById("auth-pass").value||"";
+    const acceptedTerms=!!document.getElementById("auth-accept-terms").checked;
     state.authEmail=em;
     if(!em){ authMsgShow("Ingresá tu correo."); return; }
     if(pw.length<6){ authMsgShow("La contraseña tiene que tener al menos 6 caracteres."); return; }
+    if(!acceptedTerms){ authMsgShow("Tenés que aceptar los términos y la política de privacidad."); return; }
     authMsgShow("Creando cuenta…",true);
     doSignup(em,pw).then(ok=>{
-      if(ok){ render(); syncNow(); }
-      else{ state.pendingConfirmEmail=em; state.confirmStatus="idle"; state.confirmError=""; render(); }
+      if(ok){ registrarAceptacionTerminos(); render(); syncNow(); }
+      else{
+        try{ localStorage.setItem(PENDING_TERMS_KEY, em); }catch(e){}
+        state.pendingConfirmEmail=em; state.confirmStatus="idle"; state.confirmError=""; render();
+      }
     }).catch(err=>authMsgShow(friendlyAuthError(err)));
     return;
   }

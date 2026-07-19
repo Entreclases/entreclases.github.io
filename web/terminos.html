@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Términos y privacidad — Entreclases</title>
+<meta name="description" content="Términos de uso y política de privacidad de Entreclases: qué es el servicio, qué datos se guardan y dónde, tus derechos y la etapa gratuita de prueba.">
+<link rel="icon" href="app/icon-192.png">
+<meta name="theme-color" id="theme-color-meta" content="#1E2B4D">
+<script>
+  // Mismo selector de tema que la landing (web/index.html) — misma clave de localStorage
+  // (THEME_KEY) para que quede consistente si se abre desde el mismo dominio.
+  var THEME_KEY = "tutoria-theme";
+  var THEME_ORDER = ["system","light","dark"];
+  var THEME_LABELS = {system:"Automático",light:"Claro",dark:"Oscuro"};
+  var THEME_ICONS = {
+    system:'<svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>',
+    light:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
+    dark:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>'
+  };
+  function getTheme(){ try{ return localStorage.getItem(THEME_KEY) || "system"; }catch(e){ return "system"; } }
+  function isDarkEffective(t){
+    if(t==="dark") return true;
+    if(t==="light") return false;
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+  function updateThemeColorMeta(t){
+    var meta=document.getElementById("theme-color-meta");
+    if(meta) meta.setAttribute("content", isDarkEffective(t) ? "#0F1420" : "#1E2B4D");
+  }
+  function applyTheme(t){
+    var root=document.documentElement;
+    root.classList.remove("theme-light","theme-dark");
+    if(t==="light") root.classList.add("theme-light");
+    else if(t==="dark") root.classList.add("theme-dark");
+    updateThemeColorMeta(t);
+  }
+  applyTheme(getTheme());
+  if(window.matchMedia){
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function(){
+      if(getTheme()==="system") updateThemeColorMeta("system");
+    });
+  }
+  function updateThemeButton(t){
+    var btn=document.getElementById("theme-toggle");
+    if(!btn) return;
+    btn.innerHTML = THEME_ICONS[t];
+    var label = "Tema: "+THEME_LABELS[t]+" — tocar para cambiar";
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  }
+  function cycleTheme(){
+    var next = THEME_ORDER[(THEME_ORDER.indexOf(getTheme())+1) % THEME_ORDER.length];
+    try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+    applyTheme(next);
+    updateThemeButton(next);
+  }
+</script>
+<style>
+  @font-face{
+    font-family:'Inter'; font-style:normal; font-weight:400 700; font-display:swap;
+    src:url('fonts/inter-latin.woff2') format('woff2');
+  }
+  @font-face{
+    font-family:'Poppins'; font-style:normal; font-weight:700; font-display:swap;
+    src:url('fonts/poppins-700.woff2') format('woff2');
+  }
+  :root{
+    --bg:#F6F8FC; --bg-alt:#EEF1F9; --card:#FFFFFF; --border:#E4E9F5;
+    --ink:#12192E; --text:#1A2238; --text-soft:#5C6480;
+    --navy:#1E2B4D; --navy-2:#2F4272;
+    --accent:#14B8A6; --accent-dark:#0E9488; --accent-soft:#CFF7F0; --accent-strong:#0F766E;
+    --header-bg:rgba(246,248,252,.85);
+    --sans:'Inter',-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --display:'Poppins',var(--sans);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not(.theme-light):not(.theme-dark){
+      --bg:#0F1420; --bg-alt:#171D2C; --card:#1B2333; --border:#2B3348;
+      --ink:#EDEFF7; --text:#C7CCDC; --text-soft:#8890AA;
+      --navy:#2B3A63; --navy-2:#3D5089;
+      --accent:#2DD4C0; --accent-dark:#14B8A6; --accent-soft:#123C38; --accent-strong:#0F766E;
+      --header-bg:rgba(15,20,32,.85);
+    }
+  }
+  :root.theme-dark{
+    --bg:#0F1420; --bg-alt:#171D2C; --card:#1B2333; --border:#2B3348;
+    --ink:#EDEFF7; --text:#C7CCDC; --text-soft:#8890AA;
+    --navy:#2B3A63; --navy-2:#3D5089;
+    --accent:#2DD4C0; --accent-dark:#14B8A6; --accent-soft:#123C38; --accent-strong:#0F766E;
+    --header-bg:rgba(15,20,32,.85);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+  h1,h2{font-family:var(--display)}
+  a{color:var(--accent-dark)}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  .wrap{max-width:760px;margin:0 auto;padding:0 20px}
+
+  header.site{position:sticky;top:0;z-index:50;background:var(--header-bg);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);padding-top:env(safe-area-inset-top)}
+  .nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;row-gap:10px;
+    padding:14px calc(20px + env(safe-area-inset-right)) 14px calc(20px + env(safe-area-inset-left));max-width:1180px;margin:0 auto}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;color:var(--ink)}
+  .brand .mark{width:32px;height:32px;border-radius:9px;flex-shrink:0;
+    background:linear-gradient(135deg,var(--navy),var(--navy-2));
+    display:flex;align-items:center;justify-content:center}
+  .nav-actions{display:flex;align-items:center;gap:12px;flex-shrink:0}
+  .theme-toggle{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:34px;height:34px;border-radius:99px;border:1px solid var(--border);background:var(--card);
+    color:var(--ink);cursor:pointer;padding:0;transition:transform .12s ease,border-color .12s ease}
+  .theme-toggle:hover{border-color:var(--ink);transform:translateY(-1px)}
+  .theme-toggle svg{display:block}
+  .back-link{font-size:14px;font-weight:600;color:var(--text-soft)}
+  .back-link:hover{color:var(--ink)}
+
+  main{padding:44px 20px 60px}
+  .eyebrow{display:inline-block;background:var(--accent-soft);color:var(--accent-dark);
+    font-weight:700;font-size:12px;letter-spacing:.06em;padding:6px 14px;border-radius:20px;margin-bottom:16px}
+  h1{font-size:30px;line-height:1.2;font-weight:800;color:var(--ink);margin-bottom:10px;letter-spacing:-.01em}
+  .updated{font-size:13.5px;color:var(--text-soft);margin-bottom:8px}
+  .beta-note{background:var(--accent-soft);color:var(--accent-dark);border-radius:12px;
+    padding:14px 16px;font-size:14px;font-weight:600;line-height:1.55;margin:20px 0 30px}
+  article h2{font-size:19px;color:var(--ink);margin:32px 0 10px;letter-spacing:-.005em}
+  article p, article li{font-size:14.5px;line-height:1.7;color:var(--text)}
+  article p{margin-bottom:12px}
+  article ul{margin:0 0 12px 20px}
+  article li{margin-bottom:6px}
+  article strong{color:var(--ink)}
+  .change-note{margin-top:40px;padding-top:20px;border-top:1px solid var(--border);
+    font-size:13px;color:var(--text-soft)}
+
+  footer.site{padding:32px 20px;text-align:center;border-top:1px solid var(--border)}
+  footer.site .brand{justify-content:center;margin-bottom:10px}
+  footer.site p{color:var(--text-soft);font-size:13px}
+  footer.site a:hover{color:var(--ink)}
+  footer.site .copyright{margin-top:16px;font-size:11.5px;color:var(--text-soft);opacity:.75}
+
+  @media (max-width:680px){
+    main{padding:32px 16px 48px}
+    h1{font-size:25px}
+    .theme-toggle{width:44px;height:44px}
+  }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="nav">
+    <div class="brand">
+      <span class="mark">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </span>
+      Entreclases
+    </div>
+    <div class="nav-actions">
+      <a href="./index.html" class="back-link">← Volver al inicio</a>
+      <button type="button" id="theme-toggle" class="theme-toggle" onclick="cycleTheme()"></button>
+    </div>
+  </div>
+</header>
+<script>updateThemeButton(getTheme());</script>
+
+<main>
+  <div class="wrap">
+    <span class="eyebrow">TÉRMINOS Y PRIVACIDAD</span>
+    <h1>Términos de uso y política de privacidad</h1>
+    <div class="updated">Última actualización: 19 de julio de 2026.</div>
+
+    <div class="beta-note">
+      ⚠ Entreclases está en <strong>etapa gratuita de prueba (beta)</strong>. Es un servicio en desarrollo activo: puede tener errores, cambiar de funcionalidad de un día para el otro, o eventualmente interrumpirse. No garantizamos disponibilidad continua ni que los datos vayan a estar siempre disponibles — hacé tus propias copias con "Descargar copia (.json)" con la frecuencia que te haga sentir tranquilo.
+    </div>
+
+    <article>
+      <h2>1. Qué es Entreclases</h2>
+      <p>Entreclases es una aplicación pensada para que un profesor o profesora particular lleve el seguimiento de sus alumnos: avance por tema, clases dictadas, resultados de simulacros, agenda, cobros y materiales. La usás vos, como docente, para organizar tu propio trabajo — no es una red social ni un servicio para el alumno (salvo por el "portal", un link de solo lectura que vos decidís compartir, ver punto 3).</p>
+
+      <h2>2. Etapa de prueba y disponibilidad</h2>
+      <p>El servicio se ofrece hoy sin costo, mientras dura la etapa de prueba. Eso significa:</p>
+      <ul>
+        <li>Puede cambiar de funcionalidad, de diseño o de condiciones sin aviso previo extenso.</li>
+        <li>No hay un acuerdo de nivel de servicio (SLA): puede haber cortes, lentitud o mantenimiento sin garantía de tiempo de respuesta.</li>
+        <li>Si en el futuro el servicio pasara a tener un costo, o si tuviera que discontinuarse, te avisaríamos por mail con anticipación razonable.</li>
+      </ul>
+
+      <h2>3. Qué datos guardamos y dónde</h2>
+      <p>Guardamos únicamente lo que vos cargás para hacer tu seguimiento:</p>
+      <ul>
+        <li><strong>De tu cuenta:</strong> tu mail (para iniciar sesión) y la fecha en que aceptaste estos términos.</li>
+        <li><strong>De tu trabajo:</strong> los datos de tus alumnos que vos cargás (nombre, contacto, materia, avance, clases, ausencias, exámenes), tus cobros y pagos, tu agenda, tus materiales (archivos que subís) y tu configuración (plantillas, catálogo de materias, medios de cobro).</li>
+      </ul>
+      <p>Todo se guarda en un único proyecto de <strong>Supabase</strong> (un proveedor externo de base de datos e infraestructura), con reglas de acceso (RLS) que hacen que cada cuenta sólo pueda ver y modificar sus propios datos. Los archivos que subís (materiales, fotos de perfil, QR de cobro) se guardan en el almacenamiento (Storage) de ese mismo proyecto, también aislados por cuenta.</p>
+      <p>La app también funciona sin conexión: mientras no sincroniza, tus datos quedan guardados localmente en tu propio dispositivo (localStorage del navegador).</p>
+
+      <h2>4. No vendemos ni compartimos tus datos</h2>
+      <p>No vendemos, alquilamos ni compartimos tus datos ni los de tus alumnos con terceros con fines comerciales o publicitarios. La única excepción es lo que vos mismo decidís hacer público a través del <strong>portal del alumno</strong> (un link o QR que vos generás y compartís, con la información que vos elegís mostrar) — eso es una función de la app, no algo que hagamos nosotros con tus datos por nuestra cuenta.</p>
+
+      <h2>5. Tu responsabilidad como docente</h2>
+      <p>Vos sos quien carga datos de terceros (tus alumnos) en la app. Eso te convierte en responsable de:</p>
+      <ul>
+        <li>Contar con el permiso correspondiente de tus alumnos (o de sus padres/tutores, si son menores) para llevar este registro sobre ellos, si tu situación lo requiere.</li>
+        <li>El uso que le des a los cobros y recibos que generás en la app a los fines impositivos o fiscales que te correspondan — Entreclases es una herramienta de organización, no un sistema de facturación oficial ni asesoramiento contable.</li>
+      </ul>
+
+      <h2>6. Límites de almacenamiento</h2>
+      <p>Cada cuenta tiene, por ahora, un límite de <strong>100 archivos por materia</strong>, <strong>10 MB por archivo</strong> y <strong>50 MB en total</strong> de materiales (sumando todas las materias). Estos límites pueden ajustarse a medida que el servicio crece.</p>
+
+      <h2>7. Tu derecho a exportar y borrar tus datos</h2>
+      <p>Podés descargar una copia completa de tu cuaderno en cualquier momento con el botón "Descargar copia (.json)" (Estudiantes y Cuenta → Datos y respaldos) — es tuyo, y podés llevártelo cuando quieras.</p>
+      <p>Si querés que borremos tu cuenta y todos los datos asociados, escribinos a <a href="mailto:manugandini53@gmail.com">manugandini53@gmail.com</a> desde el mail de tu cuenta y lo hacemos.</p>
+
+      <h2>8. Baja por inactividad</h2>
+      <p>Si una cuenta queda inactiva por mucho tiempo, te avisamos por mail antes de tomar cualquier acción (a los 30 días de inactividad) y, si sigue sin uso, la cuenta y sus datos se eliminan (a los 5 meses de inactividad) — nunca sin aviso previo.</p>
+
+      <h2>9. Cuentas que ya existían</h2>
+      <p>Si ya tenías una cuenta creada antes de esta versión de los términos, se te considera que los aceptás al seguir usando la app — no hace falta que vuelvas a marcar el checkbox de aceptación.</p>
+
+      <h2>10. Ley aplicable y contacto</h2>
+      <p>Estos términos se rigen por las leyes de la República Argentina. Ante cualquier duda, reclamo o pedido (incluido el borrado de tu cuenta), escribinos a <a href="mailto:manugandini53@gmail.com">manugandini53@gmail.com</a>.</p>
+
+      <div class="change-note">Este documento puede actualizarse a medida que el servicio evoluciona. Si hacemos cambios importantes, la fecha de "Última actualización" de arriba cambia y, de ser un cambio relevante, te lo avisamos dentro de la app.</div>
+    </article>
+  </div>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="brand">
+      <span class="mark">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </span>
+      Entreclases
+    </div>
+    <p>Contacto: <a href="mailto:manugandini53@gmail.com">manugandini53@gmail.com</a></p>
+    <div class="copyright">© 2026 Entreclases</div>
+  </div>
+</footer>
+</body>
+</html>

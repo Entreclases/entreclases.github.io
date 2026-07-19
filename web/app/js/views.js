@@ -2664,6 +2664,10 @@ function vAuth(){
       </div>
       <div class="field" style="margin-top:8px"><div class="flabel">Contraseña${isLogin?"":" (mínimo 6 caracteres)"}</div>
         <input id="auth-pass" type="password" autocomplete="${isLogin?"current-password":"new-password"}" data-enter="${mainAction}" ${locked?"disabled":""}></div>
+      ${isLogin?"":`<label style="display:flex;align-items:flex-start;gap:8px;margin-top:12px;font-size:12.5px;color:var(--muted);cursor:pointer">
+        <input id="auth-accept-terms" type="checkbox" style="margin-top:2px;flex-shrink:0" ${locked?"disabled":""}>
+        <span>Leí y acepto los <a href="../terminos.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">términos y la política de privacidad</a>.</span>
+      </label>`}
       <button class="primary" style="margin:14px 0 0;margin-left:0;width:100%" data-a="${mainAction}" ${locked?"disabled":""}>${isLogin?"Iniciar sesión":"Crear cuenta"}</button>
       ${isLogin?`<button class="chip" style="margin-top:10px;border:none;background:none;padding:2px 0;color:var(--muted)" data-a="auth-forgot" ${locked?"disabled":""}>¿Olvidaste tu contraseña?</button>`:""}
       <div class="hint" id="authMsg" style="margin-top:10px;min-height:16px${locked?";color:var(--status-desaprobo-fg)":""}">${locked?esc("Demasiados intentos. Probá de nuevo en "+fmtLockRemaining(lockMs)+"."):""}</div>
@@ -2944,6 +2948,7 @@ function vCuenta(){
       ${!IS_NATIVE?`<div class="hint" style="margin-bottom:8px">Estás usando la v${esc(APP_VERSION)}${state.swUpdateReady?" — hay una versión nueva esperando arriba de todo, tocá «Actualizar».":"."}</div>
       <button class="chip" data-a="sw-check-update" ${state.swCheckStatus==="checking"?"disabled":""}>${state.swCheckStatus==="checking"?"Buscando…":"Buscar actualización"}</button>`
       :`<div class="hint">Estás usando la v${esc(APP_VERSION)}.</div>`}
+      <div class="hint" style="margin-top:8px"><a href="../terminos.html" target="_blank" rel="noopener">Términos y privacidad</a></div>
     </div>
     ${vCentroAyuda()}
     <div class="formcard"><div class="ftitle">Reportar un problema</div>

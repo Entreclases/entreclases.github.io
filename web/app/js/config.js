@@ -17,6 +17,7 @@ const BACKUP_REMINDER_SNOOZE_DAYS = 7; // cada cuánto reaparece el aviso si se 
 const LOGIN_ATTEMPTS_KEY = "tutoria-login-attempts"; // {count, lockUntil} — freno local a intentos de login seguidos, aparte del rate-limit propio de Supabase
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCK_MS = 5*60*1000;
+const PENDING_TERMS_KEY = "tutoria-pending-terms-accept"; // email pendiente de registrar perfiles.terminos_aceptados_at tras confirmar el mail (paso 144)
 const LAST_COBROS_NOTIFY_KEY = "tutoria-last-cobros-notify-date"; // fecha (YYYY-MM-DD) del último aviso del sistema por cobros atrasados — uno por día, por dispositivo
 // Biblioteca del portal (state.catalog.subjects[].materiales[].compartido + portales.publicado.biblioteca):
 // URLs firmadas de Storage con este vencimiento; se renuevan solas (ver maybeRenewPortalLibrary

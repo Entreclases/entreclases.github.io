@@ -153,6 +153,27 @@ async function maybeHeartbeat(uid_, s){
   }
 }
 
+// Registra la aceptación de términos y privacidad (perfiles.terminos_aceptados_at — ver
+// 021_terminos.sql en cuaderno-supabase, paso 144). Al crear la cuenta con confirmación de mail
+// pendiente todavía no hay sesión con la que hacer el PATCH, así que se guarda el email en
+// PENDING_TERMS_KEY y se reintenta acá mismo apenas hay un login exitoso de ese email (ver
+// flushPendingTermsAccept(), llamado desde el handler de auth-login en events.js). Los usuarios
+// que ya tenían cuenta antes de este paso nunca pasan por acá — se los considera aceptados.
+async function registrarAceptacionTerminos(){
+  try{
+    const s=await ensureToken();
+    const uid_=jwtSub(s.access);
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
+    await fetch(SUPA_URL+"/rest/v1/perfiles?user_id=eq."+encodeURIComponent(uid_), {method:"PATCH", headers:h,
+      body:JSON.stringify({terminos_aceptados_at:new Date().toISOString()})});
+  }catch(e){ /* silencioso: si falla, sigue pendiente y se reintenta en el próximo login */ return; }
+  try{ localStorage.removeItem(PENDING_TERMS_KEY); }catch(e){}
+}
+function flushPendingTermsAccept(email){
+  let pending=""; try{ pending=localStorage.getItem(PENDING_TERMS_KEY)||""; }catch(e){}
+  if(pending && pending===email) registrarAceptacionTerminos();
+}
+
 // Opt-in del resumen semanal por mail (perfiles.resumen_semanal — ver 014_resumen_semanal.sql
 // en cuaderno-supabase): arranca apagado por defecto; se guarda acá y lo respeta la función de
 // cron del backend. Optimista (cambia el toggle al toque) con rollback si falla el PATCH.
