@@ -581,7 +581,7 @@ function emptyStudent(){
     chair:"", status:"activo", semaforo:"sd", examDate:"", startDate:today(), notes:"",
     updatedAt:Date.now(), topics:{}, sessions:[], simulacros:[],
     tarifa:"", modalidad:"", pagos:[], recibos:[], informeComment:"", phone:"", email:"", examResults:[],
-    horarios:[], clasesPuntuales:[],
+    horarios:[], clasesPuntuales:[], packsClases:[],
     seniaActiva:false, seniaTipo:"monto", seniaValor:"",
     contratoResponsable:"", contratoDni:"", contratoFechaInicio:"", contratoClausulas:"",
     tagIds:[] };
@@ -695,6 +695,12 @@ function studentAlerts(s){
   if(gap!==null && gap>=10) out.push({text:`Sin clases hace ${gap} días — ¿sigue o pasarlo a pausado?`, wa:"clase"});
   const ausenciasMes = asistenciaStats(s, currentMonthKey()+"-01", today()).ausencias;
   if(ausenciasMes>=3) out.push({text:`${ausenciasMes} ausencias este mes`, wa:"clase"});
+  // paso 158: el último pack vendido se agotó (restantes en 0) y todavía no le vendieron uno
+  // nuevo (si ya le vendieron otro, ultimoPackClases() devuelve ESE, con restantes>0, y la
+  // alerta deja de aparecer sola).
+  const ultimoPack = ultimoPackClases(s);
+  if(ultimoPack && ultimoPack.restantes<=0)
+    out.push({text:`Se terminó el pack de ${ultimoPack.total} clases — ¿le vendés uno nuevo?`, wa:"pack"});
   return out;
 }
 
@@ -828,15 +834,55 @@ function pagoResumen(s, mk){
   const tarifa=Number(s.tarifa)||0;
   const clasesMes=(s.sessions||[]).filter(c=>monthKeyOf(c.date)===mk && !isAusente(c));
   if(s.modalidad==="clase"||s.modalidad==="hora"){
-    const cobradas=clasesMes.filter(c=>c.cobrada);
-    const pendientes=clasesMes.filter(c=>!c.cobrada);
-    const total=clasesMes.reduce((a,c)=>a+montoSesion(s,c),0);
-    const cobrado=cobradas.reduce((a,c)=>a+montoSesion(s,c),0);
+    // paso 158: una clase cubierta por un pack prepago (c.packClaseId) ya se cobró de una sola vez
+    // al vender el pack — no vuelve a sumar acá clase por clase (se excluye de facturables) para no
+    // duplicar ese ingreso; en cambio el pack completo entra como cobrado en el mes en que se pagó
+    // de verdad (packCobradoMes más abajo), no repartido entre las clases que cubre.
+    const facturables = clasesMes.filter(c=>!c.packClaseId);
+    const cobradas=facturables.filter(c=>c.cobrada);
+    const pendientes=facturables.filter(c=>!c.cobrada);
+    const totalFacturable=facturables.reduce((a,c)=>a+montoSesion(s,c),0);
+    const packCobradoMes=(s.pagos||[]).filter(p=>p.tipo==="packClase" && monthKeyOf(p.date)===mk).reduce((a,p)=>a+(Number(p.amount)||0),0);
+    const cobrado=cobradas.reduce((a,c)=>a+montoSesion(s,c),0) + packCobradoMes;
     const pendiente=pendientes.reduce((a,c)=>a+montoSesion(s,c),0);
-    return { clases:clasesMes.length, total, cobrado, pendiente };
+    return { clases:clasesMes.length, total:totalFacturable+packCobradoMes, cobrado, pendiente };
   }
   const cobrado=Math.min(tarifa, (s.pagos||[]).filter(p=>monthKeyOf(p.date)===mk).reduce((a,p)=>a+(Number(p.amount)||0),0));
   return { clases:clasesMes.length, total:tarifa, cobrado, pendiente:Math.max(0, tarifa-cobrado) };
+}
+/* ============ packs de clases prepagos (paso 158) ============
+   s.packsClases guarda el historial de packs vendidos a un alumno con modalidad "clase" u "hora"
+   (nunca "mensual" — ver vPackClasesCard en views.js, que sólo se muestra ahí). Cada venta es
+   TAMBIÉN un pago normal en s.pagos (tipo:"packClase", packId apuntando al pack) para reusar el
+   mismo recibo/flujo de WhatsApp que cualquier otro cobro (ver save-pack-clases en events.js) —
+   pagoResumen() de arriba ya sabe contar ese pago como ingreso el mes en que se cobró de verdad, sin
+   volver a facturar las clases que cubre. El pack "activo" es el último vendido (por fecha) que
+   todavía tiene clases restantes; cuando se agota, vender uno nuevo simplemente agrega otra entrada
+   al historial — no hace falta "cerrar" el viejo a mano. */
+function ultimoPackClases(s){
+  const arr=[...(s.packsClases||[])].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  return arr.length ? arr[arr.length-1] : null;
+}
+function packClasesActivo(s){
+  const u=ultimoPackClases(s);
+  return (u && u.restantes>0) ? u : null;
+}
+// Precio sugerido de un pack: tarifa por clase con un 10% de descuento, redondeado al centenar más
+// cercano — el profesor lo puede pisar a mano en el campo de precio antes de vender (placeholder,
+// nunca un valor forzado).
+function packClasesPrecioSugerido(s, cant){
+  const base = (Number(s.tarifa)||0) * (Number(cant)||0);
+  return Math.round(base*0.9/100)*100;
+}
+// Si el alumno tiene un pack activo, descuenta una clase de él y devuelve tanto el id a dejar en
+// la sesión (packClaseId) como el packsClases ya actualizado; sin pack activo (modalidad mensual,
+// sin pack vendido o ya agotado) no toca nada. Se usa al registrar una clase dada, individual
+// (events.js "save-session") o grupal (registrarClaseGrupal más abajo) — nunca en una ausencia.
+function aplicarDescuentoPack(s){
+  const activo = packClasesActivo(s);
+  if(!activo) return {packClaseId:null, packsClases:s.packsClases||[]};
+  const packsClases = (s.packsClases||[]).map(p=>p.id===activo.id ? {...p, restantes:p.restantes-1} : p);
+  return {packClaseId:activo.id, packsClases};
 }
 
 /* ============ recibos de pago: numeración simple por año (2026-001, 2026-002…), guardada en
@@ -861,6 +907,7 @@ function reciboFor(s, id){ return (s.recibos||[]).find(r=>r.id===id); }
 function reciboTipoLabel(tipo){
   if(tipo==="mensual") return "Mensualidad";
   if(tipo==="senia") return "Seña";
+  if(tipo==="packClase") return "Pack de clases";
   return "Clase";
 }
 // Medios de pago del docente (paso 141) en el pie del recibo — sólo si hay algo cargado en
@@ -898,9 +945,16 @@ function pagosCsvRows(monthKeys){
   alive().forEach(s=>{
     if(hasPagos(s) && (s.modalidad==="clase"||s.modalidad==="hora")){
       (s.sessions||[]).forEach(c=>{
-        if(isAusente(c) || !mkSet.has(monthKeyOf(c.date))) return;
+        // paso 158: una clase cubierta por un pack ya se cobró al vender el pack (fila propia más
+        // abajo, en la fecha real de venta) — acá no vuelve a aparecer ni como cobrada ni pendiente.
+        if(isAusente(c) || c.packClaseId || !mkSet.has(monthKeyOf(c.date))) return;
         rows.push({date:c.date, alumno:s.name, materia:s.subject||"", concepto:"Clase",
           monto:montoSesion(s,c), estado:c.cobrada?"Cobrada":"Pendiente"});
+      });
+      (s.pagos||[]).forEach(p=>{
+        if(p.tipo!=="packClase" || !mkSet.has(monthKeyOf(p.date))) return;
+        rows.push({date:p.date, alumno:s.name, materia:s.subject||"", concepto:"Pack de clases",
+          monto:Number(p.amount)||0, estado:"Cobrado"});
       });
     }
     if(hasPagos(s) && s.modalidad==="mensual"){
@@ -1095,7 +1149,9 @@ function cobrosAtrasadosSummary(diasAtraso){
   alive().filter(s=>s.status==="activo").forEach(s=>{
     if(hasPagos(s) && (s.modalidad==="clase"||s.modalidad==="hora")){
       (s.sessions||[]).forEach(c=>{
-        if(!isAusente(c) && !c.cobrada && daysSince(c.date)>=dias)
+        // paso 158: una clase cubierta por un pack (c.packClaseId) ya se cobró al vender el pack —
+        // nunca aparece como atrasada, aunque no tenga cobrada:true (ver pagoResumen más arriba).
+        if(!isAusente(c) && !c.packClaseId && !c.cobrada && daysSince(c.date)>=dias)
           items.push({studentId:s.id, kind:"clase", monto:montoSesion(s,c), date:c.date, sessionId:c.id});
       });
     }
@@ -1690,11 +1746,16 @@ function registrarClaseGrupal({topic, date, duration, note, grupoNombre, asisten
   });
   const patches = asistencias.map(a=>{
     const s = state.students.find(x=>x.id===a.studentId); if(!s) return null;
-    const session = a.ausente
-      ? {id:uid(), date, note:note||"", ausente:{motivo:a.ausente.motivo, cobra:a.ausente.cobra}, grupoClaseId, grupoClaseNombre:grupoNombre||"", grupoClaseMiembros:miembros}
-      : {id:uid(), date, topic:topic||"", tarea:a.tarea||"sd", note:note||"", duration, monto:a.monto!=null?a.monto:null,
-         objetivo:"", objetivoResult:null, cobrada:false, grupoClaseId, grupoClaseNombre:grupoNombre||"", grupoClaseMiembros:miembros};
-    return {id:a.studentId, patch:{sessions:[...(s.sessions||[]), session]}};
+    if(a.ausente){
+      const session = {id:uid(), date, note:note||"", ausente:{motivo:a.ausente.motivo, cobra:a.ausente.cobra}, grupoClaseId, grupoClaseNombre:grupoNombre||"", grupoClaseMiembros:miembros};
+      return {id:a.studentId, patch:{sessions:[...(s.sessions||[]), session]}};
+    }
+    // paso 158: mismo descuento de pack que save-session individual (events.js) — cada integrante
+    // con pack activo lo descuenta acá también, uno por uno.
+    const {packClaseId, packsClases} = aplicarDescuentoPack(s);
+    const session = {id:uid(), date, topic:topic||"", tarea:a.tarea||"sd", note:note||"", duration, monto:a.monto!=null?a.monto:null,
+      objetivo:"", objetivoResult:null, cobrada:false, packClaseId, grupoClaseId, grupoClaseNombre:grupoNombre||"", grupoClaseMiembros:miembros};
+    return {id:a.studentId, patch:{sessions:[...(s.sessions||[]), session], packsClases}};
   });
   updateMany(patches);
   return grupoClaseId;
@@ -2494,6 +2555,29 @@ function buildDemoData(){
       sess(4,"Ecuaciones e inecuaciones","hecha",true),
     ],
   }));
+
+  // 32-bis) Tobías — Álgebra, pack de 8 clases prepago con 5 ya usadas (paso 158): así la demo
+  // muestra "quedan 3 de 8" en la ficha (pestaña Pagos) y en "Registrar clase" sin depender de que
+  // el usuario venda uno a mano. El pago del pack (tipo "packClase") queda en s.pagos igual que
+  // cualquier otro cobro, con su propio recibo — ver packClasesActivo()/pagoResumen() en helpers.js.
+  const tobiasPackId = uid();
+  const tobiasPagoId = uid();
+  const tobias = mk({
+    name:"Tobías Roldán", subject:"Álgebra y Geometría Analítica", subjectId:"demo-alg", career:"Ingeniería",
+    semaforo:"verde", tarifa:8500, modalidad:"clase",
+    topics:{[unitsOf("tpl-algebra")[0]]:"visto",[unitsOf("tpl-algebra")[1]]:"practica"},
+    pagos:[{id:tobiasPagoId, date:addDays(today(),-35), amount:61200, tipo:"packClase", packId:tobiasPackId}],
+    packsClases:[{id:tobiasPackId, fecha:addDays(today(),-35), total:8, restantes:3, precio:61200, pagoId:tobiasPagoId}],
+    sessions:[
+      {id:uid(), date:addDays(today(),-28), topic:"Vectores en el plano y el espacio", tarea:"hecha", note:"", duration:60, monto:null, objetivo:"", objetivoResult:null, cobrada:false, packClaseId:tobiasPackId},
+      {id:uid(), date:addDays(today(),-21), topic:"Rectas y planos", tarea:"hecha", note:"", duration:60, monto:null, objetivo:"", objetivoResult:null, cobrada:false, packClaseId:tobiasPackId},
+      {id:uid(), date:addDays(today(),-14), topic:"Matrices y determinantes", tarea:"intentada", note:"", duration:60, monto:null, objetivo:"", objetivoResult:null, cobrada:false, packClaseId:tobiasPackId},
+      {id:uid(), date:addDays(today(),-7), topic:"Matrices y determinantes", tarea:"hecha", note:"", duration:60, monto:null, objetivo:"", objetivoResult:null, cobrada:false, packClaseId:tobiasPackId},
+      {id:uid(), date:addDays(today(),-1), topic:"Sistemas de ecuaciones", tarea:"hecha", note:"", duration:60, monto:null, objetivo:"", objetivoResult:null, cobrada:false, packClaseId:tobiasPackId},
+    ],
+  });
+  tobias.recibos=[recibo("packClase","Pack de 8 clases",61200,35)];
+  students.push(tobias);
 
   // 33-35) Trío grupal — Álgebra, un intensivo de tres alumnos con horario semanal compartido e
   // historial de clase en común (paso 157, "clases grupales"): mismo grupoClaseId en cada clase

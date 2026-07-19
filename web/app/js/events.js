@@ -1431,6 +1431,9 @@ document.addEventListener("click", (e)=>{
     const duration=durationRaw==="" ? null : (parseInt(durationRaw,10)||60);
     const montoEl=document.getElementById("c-monto");
     const monto=(s.modalidad==="hora" && montoEl && montoEl.value!=="") ? Number(montoEl.value) : null;
+    // paso 158: si tiene un pack de clases activo, esta clase lo descuenta en vez de sumar a
+    // pendiente/cobrado por clase (ver aplicarDescuentoPack/pagoResumen en helpers.js).
+    const {packClaseId, packsClases} = aplicarDescuentoPack(s);
     update(s.id,{sessions:[...s.sessions,{id:uid(),date,
       topic:document.getElementById("c-topic").value,
       tarea:document.getElementById("c-tarea").value,
@@ -1438,7 +1441,7 @@ document.addEventListener("click", (e)=>{
       duration,
       monto,
       objetivo:goal, objetivoResult:null,
-      cobrada:false}]});
+      cobrada:false, packClaseId}], packsClases});
     state.registrarClaseTipo=null;
     toast("Clase registrada");
     fireConfetti(); soundClase();
@@ -1623,12 +1626,36 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="del-pago" && s){
     const removed=(s.pagos||[]).find(x=>x.id===el.dataset.id);
-    update(s.id,{pagos:(s.pagos||[]).filter(x=>x.id!==el.dataset.id)});
+    // paso 158: si el pago borrado era la venta de un pack, el pack entero se va con él (no tiene
+    // sentido dejar un pack "huérfano" sin el cobro que lo respalda) — se restaura junto al pago si
+    // se deshace, con las clases que ya se le hayan descontado tal cual quedaron.
+    const removedPack = removed && removed.tipo==="packClase" ? (s.packsClases||[]).find(p=>p.id===removed.packId) : null;
+    update(s.id,{
+      pagos:(s.pagos||[]).filter(x=>x.id!==el.dataset.id),
+      ...(removedPack ? {packsClases:(s.packsClases||[]).filter(p=>p.id!==removedPack.id)} : {}),
+    });
     toast("Pago eliminado", "ok", ()=>{
       const st=state.students.find(x=>x.id===s.id); if(!st || !removed) return;
-      update(s.id,{pagos:[...(st.pagos||[]), removed]});
+      update(s.id,{
+        pagos:[...(st.pagos||[]), removed],
+        ...(removedPack ? {packsClases:[...(st.packsClases||[]), removedPack]} : {}),
+      });
       toast("Pago restaurado");
     }); return;
+  }
+  else if(a==="save-pack-clases" && s){
+    const cant = parseInt(document.getElementById("pack-clases-cant")?.value, 10) || Number(state.packClasesCant) || 8;
+    const precioEl = document.getElementById("pack-clases-precio");
+    const precio = (precioEl && precioEl.value!=="") ? Number(precioEl.value) : packClasesPrecioSugerido(s, cant);
+    if(!cant || cant<1 || !precio || precio<=0) return;
+    const date = document.getElementById("pack-clases-fecha")?.value || today();
+    const packId = uid(), pagoId = uid();
+    const pagos = [...(s.pagos||[]), {id:pagoId, date, amount:precio, tipo:"packClase", packId}];
+    const packsClases = [...(s.packsClases||[]), {id:packId, fecha:date, total:cant, restantes:cant, precio, pagoId}];
+    const r = crearRecibo(s, {tipo:"packClase", concepto:`Pack de ${cant} clases`, monto:precio, date});
+    update(s.id,{pagos, packsClases, recibos:[...(s.recibos||[]), r]});
+    toast("Pack vendido", "ok", null, {label:"Ver recibo", run:()=>{ state.reciboId=r.id; state.view="recibo"; }});
+    return;
   }
   else if(a==="pagos-tab"){ state.pagosTab=el.dataset.t; }
   else if(a==="toggle-tarifa-ajuste-alumno"){
@@ -2088,6 +2115,7 @@ function handleFormChange(e){
   if(cf && cf.dataset.cf==="stats-subject"){ state.statsSubjectId=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="compare-a"){ state.compareA=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="compare-b"){ state.compareB=cf.value; render(); return; }
+  if(cf && cf.dataset.cf==="pack-clases-cant"){ state.packClasesCant=parseInt(cf.value,10)||1; render(); return; }
   if(cf && cf.dataset.cf==="pagos-month"){ state.pagosMonth=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="pagos-export-period"){ state.pagosExportPeriod=cf.value; render(); return; }
   if(cf && cf.dataset.cf==="session-ausente-motivo"){ state.sessionAusenteMotivo=cf.value; state.sessionAusenteCobra=null; render(); return; }

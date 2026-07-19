@@ -1158,11 +1158,13 @@ function vClasePasadaForm(s){
   const estado = state.sessionEstado||"dada";
   const motivo = state.sessionAusenteMotivo||"aviso_tiempo";
   const cobraSugerida = state.sessionAusenteCobra!=null ? state.sessionAusenteCobra : ausenciaCobraSugerida(motivo);
+  const packActivo = estado==="dada" ? packClasesActivo(s) : null;
   return `<div class="formcard"><div class="ftitle">Clase pasada (30 segundos, apenas termina)</div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button class="chip ${estado==="dada"?"on":""}" data-a="set-session-estado" data-f="dada">Dada</button>
       <button class="chip ${estado==="ausente"?"on":""}" data-a="set-session-estado" data-f="ausente">Ausente</button>
     </div>
+    ${packActivo?`<div class="hint" style="margin-bottom:8px">Pack activo: quedan <b>${packActivo.restantes} de ${packActivo.total}</b> clases — al guardar se descuenta una sola, no hace falta cobrar esta clase aparte.</div>`:""}
     <div class="frow">
       <div class="field"><div class="flabel">Fecha</div><input type="date" id="c-date" max="${today()}" value="${esc(state.sessionPrefillDate||today())}" data-enter="save-session"></div>
       ${estado==="dada" ? `
@@ -1358,11 +1360,12 @@ function vFichaClases(s){
       ${s.modalidad==="hora"?`<span class="tareatag">${fmtMoney(montoSesion(s,c))}${c.monto!=null&&c.monto!==""?" (manual)":""}</span>`:""}
       ${c.tarea&&c.tarea!=="sd"?`<span class="tareatag" style="color:${TAREA_META[c.tarea].fg}">tarea: ${TAREA_META[c.tarea].label}</span>`:""}
       ${c.grupoClaseId?`<span class="tareatag" title="${esc((c.grupoClaseMiembros||[]).map(x=>x.name).join(", "))}">Clase grupal (${(c.grupoClaseMiembros||[]).length})</span>`:""}
+      ${c.packClaseId?`<span class="tareatag">Pack de clases</span>`:""}
       ${c.note?`<div class="note">${esc(c.note)}</div>`:""}
       ${c.objetivo?`<div class="note goaltag"><span class="icon-inline">${ICON_TARGET}</span> ${esc(c.objetivo)}${c.objetivoResult
         ? ` <span style="color:${OBJETIVO_META[c.objetivoResult.estado].fg}">· <span class="icon-inline">${OBJETIVO_ICONS[c.objetivoResult.estado]}</span> ${OBJETIVO_META[c.objetivoResult.estado].label}${c.objetivoResult.pct!=null?` (${c.objetivoResult.pct}%)`:""}</span>`
         : ` <span class="hint">· sin evaluar todavía</span>`}</div>` : ""}</div>
-      ${cobraPorClase?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
+      ${cobraPorClase&&!c.packClaseId?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
       <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`;
       }).join("");
   h += vVideollamadaDefaultCard(s);
@@ -1399,12 +1402,41 @@ function vFichaPagos(s){
         <option value="mensual" ${s.modalidad==="mensual"?"selected":""}>Mensual</option></select></div></div>
     ${hasPagos(s)&&s.modalidad==="clase"?`<div class="hint" style="margin-top:2px">Marcá cada clase como cobrada desde la pestaña «Clases».</div>`:""}
     ${hasPagos(s)&&s.modalidad==="hora"?`<div class="hint" style="margin-top:2px">Cada clase se cobra tarifa × horas dictadas (redondeado) y se marca como cobrada desde la pestaña «Clases» — si alguna clase vale distinto, cargale un monto manual ahí mismo al registrarla.</div>`:""}
+    ${hasPagos(s)&&(s.modalidad==="clase"||s.modalidad==="hora")?vPackClasesCard(s):""}
     ${hasPagos(s)&&s.modalidad==="mensual"?vPagosMensuales(s):""}
     ${!hasPagos(s)?`<div class="hint" style="margin-top:8px">Cargá una tarifa y elegí una modalidad para empezar a llevar el cobro de este alumno.</div>`:""}
   </div>`;
   h += vSeniaCard(s);
   h += vRecibosCard(s);
   h += vTarifaHistorialCard(s);
+  return h;
+}
+// Pack de clases prepago (paso 158) — sólo para modalidad "clase"/"hora" (nunca "mensual", ver el
+// gate en vFichaPagos). Vender uno registra un pago normal (mismo recibo/WhatsApp de siempre, ver
+// save-pack-clases en events.js) y cada clase que se registre después con este pack activo le
+// descuenta una sola (aplicarDescuentoPack en helpers.js) — el contador de acá y el de "Registrar
+// clase" (vClasePasadaForm) leen el mismo packClasesActivo().
+function vPackClasesCard(s){
+  const activo = packClasesActivo(s);
+  const hist = [...(s.packsClases||[])].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const cant = state.packClasesCant || 8;
+  let h = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--soft)">
+    <div class="flabel" style="margin-bottom:6px">Pack de clases prepago</div>`;
+  if(activo){
+    const agotandose = activo.restantes<=2;
+    h += `<div class="chip" style="margin-bottom:10px;${agotandose?"color:var(--status-desaprobo-fg);border-color:var(--status-desaprobo-fg)":"color:var(--status-activo-fg);border-color:var(--status-activo-fg)"}">Quedan ${activo.restantes} de ${activo.total} clases</div>`;
+  }
+  h += `<div class="hint" style="margin-bottom:8px">${activo?"¿Le vendés otro para cuando termine éste?":"Vendé un pack de varias clases prepago — cada clase que registres después se lo va descontando sola, sin marcarla cobrada aparte."}</div>
+    <div class="frow" style="align-items:flex-end">
+      <div class="field" style="max-width:110px"><div class="flabel">Cantidad</div><input type="number" min="1" data-cf="pack-clases-cant" value="${cant}"></div>
+      <div class="field"><div class="flabel">Precio total</div><input type="number" min="0" id="pack-clases-precio" placeholder="Sugerido: ${fmtMoney(packClasesPrecioSugerido(s,cant))}" data-enter="save-pack-clases"></div>
+      <div class="field" style="max-width:160px"><div class="flabel">Fecha</div><input type="date" id="pack-clases-fecha" value="${today()}" data-enter="save-pack-clases"></div>
+      <button class="chip" data-a="save-pack-clases" style="margin-bottom:2px">Vender pack</button></div>`;
+  if(hist.length){
+    h += `<div style="margin-top:8px">` + hist.map(p=>`<div class="log" style="margin-top:6px"><div class="d">${fmtDate(p.fecha)}</div>
+      <div class="body">${p.total} clases · ${fmtMoney(p.precio)}${p.restantes>0?` · quedan ${p.restantes}`:" · usado por completo"}</div></div>`).join("") + `</div>`;
+  }
+  h += `</div>`;
   return h;
 }
 // Historial de cambios de tarifa (paso 112) — sólo lo llena el ajuste en lote de Pagos →
@@ -2173,9 +2205,17 @@ function waQuickMessage(s){
   const d=daysTo(s.examDate);
   return (d!==null && d>=0 && d<=14) ? waMsgExamen(s) : waMsgProximaClase(s);
 }
+// Aviso de pack de clases agotado (paso 158, alerta "pack" de studentAlerts en helpers.js) — usa
+// el último pack vendido (ya en 0) para completar {clases} con la cantidad que tenía, aunque para
+// entonces ya no cuente como "activo".
+function waMsgPackAgotado(s){
+  const u = ultimoPackClases(s);
+  return mensajeTexto("packAgotado", {alumno:studentFirstName(s), clases:u?u.total:"", mail:s.email||""});
+}
 function waMsgForAlert(s, kind){
   if(kind==="examen") return waMsgExamen(s);
   if(kind==="tarea") return waMsgTareaHoy(s);
+  if(kind==="pack") return waMsgPackAgotado(s);
   return waMsgProximaClase(s);
 }
 // Recordatorio de pago pendiente (clases sin cobrar + mensualidad del mes + señas pendientes,
@@ -2305,6 +2345,7 @@ function vPagosResumen(){
       <div class="stat ${totalPendiente?"warn":""}"><b>${fmtMoney(totalPendiente)}</b><span>pendiente</span></div>
       <div class="stat"><b>${totalClases}</b><span>clases dadas</span></div>
     </div>`;
+    if(rows.some(({s})=>(s.packsClases||[]).length>0)) h += `<div class="hint" style="margin-bottom:10px">Un pack de clases prepago cuenta como cobrado el día que se vendió, no clase por clase — algún alumno puede mostrar más "clases dadas" que cobros sueltos por eso.</div>`;
 
     const nameCount={};
     rows.forEach(x=>{ const n=normName(x.s.name); nameCount[n]=(nameCount[n]||0)+1; });
@@ -2428,6 +2469,7 @@ function vRentabilidad(){
   </div>`;
   if(r.sinDuracion>0) h += `<div class="hint" style="margin-bottom:14px">${r.sinDuracion} clase${r.sinDuracion===1?"":"s"} sin duración cargada — se contaron como 1 hora.</div>`;
   if(r.clasesCount===0) h += `<div class="empty" style="margin-bottom:14px">Sin clases registradas este mes todavía.</div>`;
+  if(alive().some(s=>(s.packsClases||[]).length>0)) h += `<div class="hint" style="margin-bottom:14px">Un pack de clases prepago cuenta como ingreso el día que se vendió, no repartido entre las clases que cubre — por eso "clases dadas" y los ingresos de un mes puntual pueden no coincidir uno a uno.</div>`;
 
   const proy = rentabilidadProyeccion(mk);
   if(proy) h += `<div class="hint" style="margin-bottom:20px">Proyección del mes al ritmo actual (día ${proy.diasTranscurridos} de ${proy.diasEnMes}): ganancia neta ≈ <b>${fmtMoneySigned(proy.ganancia)}</b>.</div>`;
