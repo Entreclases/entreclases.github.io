@@ -647,7 +647,7 @@ document.addEventListener("click", (e)=>{
     state.registrarClaseTipo=null;
   }
   else if(a==="back"){ state.view="lista"; state.selId=null; state.simTimer=null; state.simPrefillNote=""; state.editSessionTopicId=null; }
-  else if(a==="new"){ state.showNew=true; state.newStudentError=""; }
+  else if(a==="new"){ state.showNew=true; state.newStudentError=""; state.newStudentAdvancedOpen=false; state.newStudentSeniaActiva=false; }
   else if(a==="load-sample"){
     const st=sampleStudent();
     state.students.push(st); save();
@@ -659,7 +659,7 @@ document.addEventListener("click", (e)=>{
   // Precarga lo que puede según el contexto — si ya estás en la ficha de un alumno, "nueva
   // clase"/"registrar pago" van directo a su pestaña; si no, primero piden elegir a quién.
   else if(a==="fab-toggle"){ state.fabOpen=!state.fabOpen; }
-  else if(a==="fab-new-student"){ state.fabOpen=false; state.showNew=true; state.newStudentError=""; }
+  else if(a==="fab-new-student"){ state.fabOpen=false; state.showNew=true; state.newStudentError=""; state.newStudentAdvancedOpen=false; state.newStudentSeniaActiva=false; }
   else if(a==="fab-new-clase"){
     state.fabOpen=false;
     if(sel()){ state.tab="clases"; state.sessionPrefillDate=today(); state.confirmDel=false; state.fichaError=""; state.registrarClaseTipo="pasada"; }
@@ -681,19 +681,50 @@ document.addEventListener("click", (e)=>{
     if(target==="clases"){ state.sessionPrefillDate=today(); state.registrarClaseTipo="pasada"; }
   }
   else if(a==="cancel-new"){ state.showNew=false; state.newStudentError=""; }
+  else if(a==="new-advanced-toggle"){
+    state.newStudentAdvancedOpen=!state.newStudentAdvancedOpen;
+    const div=document.getElementById("n-advanced");
+    if(div) div.style.display = state.newStudentAdvancedOpen ? "" : "none";
+    el.textContent = (state.newStudentAdvancedOpen?"▾":"▸")+" Opciones avanzadas";
+    return;
+  }
+  else if(a==="new-senia-toggle"){
+    state.newStudentSeniaActiva = el.dataset.f==="si";
+    const no=document.getElementById("n-senia-no"), si=document.getElementById("n-senia-si");
+    if(no) no.classList.toggle("on", !state.newStudentSeniaActiva);
+    if(si) si.classList.toggle("on", state.newStudentSeniaActiva);
+    const fields=document.getElementById("n-senia-fields");
+    if(fields) fields.style.display = state.newStudentSeniaActiva ? "" : "none";
+    return;
+  }
   else if(a==="create"){
     const name=document.getElementById("n-name").value.trim();
     if(!name){ document.getElementById("n-name").focus(); return; }
     const subjectVal=document.getElementById("n-subject").value;
     const career=document.getElementById("n-career").value;
+    const phone=document.getElementById("n-phone").value.trim();
+    const tarifa=document.getElementById("n-tarifa").value;
+    const modalidad=document.getElementById("n-modalidad").value;
+    const email=document.getElementById("n-email").value.trim();
+    const chair=document.getElementById("n-chair").value;
+    const birthDate=document.getElementById("n-birth").value;
     const examDate=document.getElementById("n-exam").value;
+    const videollamadaLink=document.getElementById("n-video").value.trim();
     const notes=document.getElementById("n-notes").value;
+    const tagsRaw=document.getElementById("n-tags").value.trim();
+    const tagIds = tagsRaw ? tagsRaw.split(",").map(t=>t.trim()).filter(Boolean).map(t=>getOrCreateTag(t).id) : [];
+    const seniaActiva=state.newStudentSeniaActiva;
+    const seniaTipo=document.getElementById("n-senia-tipo").value;
+    const seniaValor=document.getElementById("n-senia-valor").value;
     const makeStudent=(m)=>{
       const st=emptyStudent();
-      st.name=name; st.career=career;
+      st.name=name; st.career=career; st.phone=phone;
+      st.tarifa=tarifa; st.modalidad=modalidad;
       st.subjectId=m?m.id:""; st.subject=m?m.name:"";
       st.topics=m?Object.fromEntries(m.units.map(u=>[u.nombre,"pendiente"])):{};
-      st.examDate=examDate; st.notes=notes;
+      st.email=email; st.chair=chair; st.birthDate=birthDate; st.examDate=examDate;
+      st.videollamadaLink=videollamadaLink; st.notes=notes; st.tagIds=tagIds;
+      if(seniaActiva){ st.seniaActiva=true; st.seniaTipo=seniaTipo; st.seniaValor=seniaValor; }
       return st;
     };
     if(subjectVal.startsWith("pack:")){
@@ -719,8 +750,9 @@ document.addEventListener("click", (e)=>{
       if(dup){ state.newStudentError=`Ya tenés a ${dup.name} en esta materia.`; render(); return; }
       const st=makeStudent(subjById(subjectVal));
       state.students.push(st); save();
-      state.newStudentError=""; state.showNew=false; state.view="detalle"; state.selId=st.id; state.tab="resumen";
-      toast("Estudiante creado"); return;
+      state.newStudentError=""; state.showNew=false;
+      toast("Estudiante creado", "ok", null, {label:"Completar ficha", run:()=>{ state.view="detalle"; state.selId=st.id; state.tab="resumen"; }});
+      return;
     }
   }
   else if(a.startsWith("tab-")){
@@ -1364,7 +1396,7 @@ document.addEventListener("keydown",(e)=>{
     e.preventDefault(); state.searchOpen=true; state.searchQuery=""; state.searchSel=0; render(); return;
   }
   if(!state.searchOpen && !state.showNew && !typing && getSes() && !state.recovery && !e.ctrlKey && !e.metaKey && !e.altKey){
-    if(e.key==="n"){ e.preventDefault(); state.showNew=true; state.newStudentError=""; render(); return; }
+    if(e.key==="n"){ e.preventDefault(); state.showNew=true; state.newStudentError=""; state.newStudentAdvancedOpen=false; state.newStudentSeniaActiva=false; render(); return; }
     if(e.key==="c" && state.view==="detalle" && sel()){ e.preventDefault(); state.tab="clases"; render(); return; }
   }
   if(!state.searchOpen){

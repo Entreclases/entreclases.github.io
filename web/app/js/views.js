@@ -818,6 +818,10 @@ function vFichaResumen(s){
       <div class="field"><div class="flabel">Teléfono (WhatsApp)</div><input data-f="phone" placeholder="Ej: 11 2345-6789" value="${esc(s.phone||"")}"></div></div>
     <div class="hint" style="margin:-4px 0 8px">Cargalo sin el 0 del área ni el 15 — ej: código de área + número.</div>
     <div class="frow">
+      <div class="field"><div class="flabel">Mail de contacto (opcional)</div><input type="email" data-f="email" placeholder="alumno@mail.com" value="${esc(s.email||"")}"></div>
+      ${s.email?`<div class="field" style="max-width:180px;justify-content:flex-end;display:flex"><a class="chip" href="mailto:${esc(s.email)}" style="margin-bottom:2px">Escribir por mail</a></div>`:""}
+    </div>
+    <div class="frow">
       <div class="field"><div class="flabel">Estado</div><select data-f="status">
         ${Object.entries(STATUS_META).map(([k,m])=>opt(k,s.status,m.label)).join("")}</select></div>
       <div class="field"><div class="flabel">Fecha de examen / parcial</div><input type="date" data-f="examDate" value="${esc(s.examDate)}"></div>
@@ -1482,22 +1486,22 @@ function vExportIcsHint(){
    completar la plantilla (sin historial de clases, sin fecha de examen), devuelven una pregunta
    genérica fija en vez de mandar una plantilla a medio completar. */
 function waMsgCumple(s){
-  return mensajeTexto("cumpleanos", {alumno:studentFirstName(s)});
+  return mensajeTexto("cumpleanos", {alumno:studentFirstName(s), mail:s.email||""});
 }
 function waMsgProximaClase(s){
-  return mensajeTexto("proximaClase", {alumno:studentFirstName(s), materia:s.subject||"la materia"});
+  return mensajeTexto("proximaClase", {alumno:studentFirstName(s), materia:s.subject||"la materia", mail:s.email||""});
 }
 function waMsgTareaHoy(s){
   const last=[...(s.sessions||[])].filter(c=>!isAusente(c)).sort((a,b)=>b.date.localeCompare(a.date))[0];
   if(!last) return `Hola ${studentFirstName(s)}! ¿Cómo veníamos con la tarea?`;
   const tarea = last.note || last.topic || "lo que vimos en la última clase";
-  return mensajeTexto("tarea", {alumno:studentFirstName(s), fecha:fmtDate(last.date), tarea});
+  return mensajeTexto("tarea", {alumno:studentFirstName(s), fecha:fmtDate(last.date), tarea, mail:s.email||""});
 }
 function waMsgExamen(s){
   const d=daysTo(s.examDate);
   if(d===null) return `Hola ${studentFirstName(s)}! ¿Cómo venís con el estudio para el examen?`;
   return mensajeTexto("examen", {alumno:studentFirstName(s), materia:s.subject||"la materia",
-    dias:`${d} día${d===1?"":"s"}`, fecha:s.examDate?` (${fmtDate(s.examDate)})`:""});
+    dias:`${d} día${d===1?"":"s"}`, fecha:s.examDate?` (${fmtDate(s.examDate)})`:"", mail:s.email||""});
 }
 function waQuickMessage(s){
   const d=daysTo(s.examDate);
@@ -1515,14 +1519,15 @@ function waMsgForAlert(s, kind){
 function waMsgCobro(s){
   const total = pendienteTotalFor(s);
   const alumno = studentFirstName(s);
-  return total<=0 ? mensajeTexto("cobro", {alumno}) : mensajeTexto("avisoDeuda", {alumno, monto:fmtMoney(total)});
+  const mail = s.email||"";
+  return total<=0 ? mensajeTexto("cobro", {alumno, mail}) : mensajeTexto("avisoDeuda", {alumno, monto:fmtMoney(total), mail});
 }
 // Recordatorio de una clase de hoy/mañana (paso 111, plantilla "recordatorioClase") — la firma
 // con el nombre del docente se agrega aparte, sólo si está cargado (no es una variable de la
 // plantilla a propósito, para no duplicar ese dato en dos lugares editables).
 function waMsgRecordatorioClase(s, dia, hora){
   const doc = docenteFor();
-  const texto = mensajeTexto("recordatorioClase", {alumno:studentFirstName(s), materia:s.subject||"la materia", dia, hora});
+  const texto = mensajeTexto("recordatorioClase", {alumno:studentFirstName(s), materia:s.subject||"la materia", dia, hora, mail:s.email||""});
   return doc.nombre ? `${texto} Nos vemos — ${doc.nombre}` : texto;
 }
 // Botón "Recordar por WhatsApp" para una clase puntual de hoy/mañana (tablero Hoy y Agenda) —
@@ -3966,7 +3971,14 @@ function vSearchOverlay(){
   </div>`;
 }
 
+// Nota: los campos de este modal no están atados a `state` (a propósito, ver el comentario
+// de "new-career-inline" en events.js) — mostrar/ocultar "Opciones avanzadas" y "¿Cobrás seña?"
+// (paso 133) toca el DOM directo en vez de pasar por render(), para no perder lo ya tipeado en
+// otros campos. Los campos avanzados quedan siempre en el DOM (ocultos con display:none cuando
+// la sección está cerrada) — así lo que se cargó ahí no se pierde si se colapsa antes de crear.
 function vModal(){
+  const advOpen = state.newStudentAdvancedOpen;
+  const seniaActiva = state.newStudentSeniaActiva;
   return `<div class="overlay"><div class="modal">
     <div class="ftitle" style="font-size:16px">Nuevo estudiante</div>
     ${state.newStudentError?`<div class="saveerr">${esc(state.newStudentError)}</div>`:""}
@@ -3988,9 +4000,39 @@ function vModal(){
           ${state.catalog.packs.filter(p=>p.subjectIds.length>=2).map(p=>`<option value="pack:${p.id}">${esc(p.name)}</option>`).join("")}
         </optgroup>` : ""}
         <option value="">Otra / sin materia por ahora</option></select></div>
-      <div class="field"><div class="flabel">Fecha de examen (si ya la sabe)</div><input type="date" id="n-exam" data-enter="create"></div></div>
-    <div class="field"><div class="flabel">Notas iniciales (de dónde arranca, qué le cuesta)</div><textarea id="n-notes"></textarea></div>
-    <div class="hint" style="margin-top:8px">¿Cursa más de una materia? Cargalo una vez por cada materia — o elegí un pack para crear todas sus fichas de una.</div>
+      <div class="field"><div class="flabel">Teléfono (WhatsApp)</div><input id="n-phone" placeholder="Ej: 11 2345-6789" data-enter="create"></div></div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Tarifa (pesos)</div><input type="number" min="0" id="n-tarifa" placeholder="Sin cargar = sin cobro" data-enter="create"></div>
+      <div class="field"><div class="flabel">Modalidad de cobro</div><select id="n-modalidad" data-enter="create">
+        <option value="">—</option>
+        <option value="clase">Por clase</option>
+        <option value="hora">Por hora</option>
+        <option value="mensual">Mensual</option></select></div></div>
+    <div class="hint" style="margin-top:2px">¿Cursa más de una materia? Cargalo una vez por cada materia — o elegí un pack para crear todas sus fichas de una.</div>
+    <div style="margin-top:10px">
+      <button class="chip" id="n-adv-toggle" data-a="new-advanced-toggle">${advOpen?"▾":"▸"} Opciones avanzadas</button>
+    </div>
+    <div id="n-advanced" style="margin-top:10px;${advOpen?"":"display:none"}">
+      <div class="frow">
+        <div class="field"><div class="flabel">Mail de contacto (opcional)</div><input type="email" id="n-email" placeholder="alumno@mail.com" data-enter="create"></div>
+        <div class="field"><div class="flabel">Cátedra / universidad</div><input id="n-chair" data-enter="create"></div></div>
+      <div class="frow">
+        <div class="field"><div class="flabel">Cumpleaños (opcional)</div><input type="date" id="n-birth" data-enter="create"></div>
+        <div class="field"><div class="flabel">Fecha de examen (si ya la sabe)</div><input type="date" id="n-exam" data-enter="create"></div></div>
+      <div class="field"><div class="flabel">Link de videollamada (opcional)</div><input id="n-video" placeholder="https://meet.google.com/…" data-enter="create"></div>
+      <div class="field"><div class="flabel">Tags (separados por coma, opcional)</div><input id="n-tags" placeholder="Ej: ingreso, online" data-enter="create"></div>
+      <div class="field"><div class="flabel">Notas iniciales (de dónde arranca, qué le cuesta)</div><textarea id="n-notes"></textarea></div>
+      <div class="field"><div class="flabel">¿Cobrás seña?</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="chip ${!seniaActiva?"on":""}" id="n-senia-no" data-a="new-senia-toggle" data-f="no">No</button>
+          <button class="chip ${seniaActiva?"on":""}" id="n-senia-si" data-a="new-senia-toggle" data-f="si">Sí</button>
+        </div></div>
+      <div id="n-senia-fields" class="frow" style="${seniaActiva?"":"display:none"}">
+        <div class="field"><div class="flabel">Tipo</div><select id="n-senia-tipo">
+          <option value="monto">Monto fijo</option>
+          <option value="porcentaje">% de la tarifa</option></select></div>
+        <div class="field"><div class="flabel">Monto / porcentaje</div><input type="number" min="0" id="n-senia-valor" data-enter="create"></div></div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
       <button class="chip" data-a="cancel-new">Cancelar</button>
       <button class="primary" style="margin-left:0" data-a="create">Crear</button></div>
