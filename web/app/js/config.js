@@ -283,6 +283,16 @@ function defaultCancelPolicy(){ return {horasMinimas:24, siATiempo:"devuelve", t
 // recordatoriosFor() en helpers.js). notificacionesOS es la intención guardada; el permiso real
 // del navegador (Notification.permission) es local a cada dispositivo y no viaja en el JSON.
 function defaultRecordatorios(){ return {activo:true, diasAtraso:1, notificacionesOS:false}; }
+// Racha "días al día" (paso 155, state.catalog.racha) — mismo patrón que cancelPolicy/recordatorios:
+// sincroniza vía catalog, con este default para catálogos viejos que todavía no lo tienen (ver
+// rachaFor() en helpers.js). ultimoCheck (YYYY-MM-DD) es el último día que ya se evaluó — evita
+// recalcular más de una vez por día y evita romper la racha la primera vez que se usa el feature
+// (sin ultimoCheck previo no hay "ayer" con el que comparar). hitos guarda qué festejos (7/30/100
+// días) ya se mostraron, para no repetirlos si la racha se queda pisando ese número.
+// historial guarda los últimos RACHA_HISTORIAL_DIAS {date,alDia} — lo único que necesitaría un
+// futuro resumen semanal por mail (cuaderno-supabase) para armar "estuviste al día X de Y días".
+function defaultRacha(){ return {actual:0, mejor:0, ultimoCheck:null, hitos:[], historial:[]}; }
+const RACHA_HISTORIAL_DIAS = 7;
 // Costos del negocio (state.catalog.costos) — mismo patrón que cancelPolicy/recordatorios: sincroniza
 // vía catalog, con este default para catálogos viejos que todavía no lo tienen (ver costosFor() en
 // helpers.js). Cada costo tiene subjectId/studentId opcionales (nunca ambos) para asignarlo a una

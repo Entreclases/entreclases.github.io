@@ -127,6 +127,7 @@ function playTone(freqs, dur, type){
 function soundClase(){ playTone([660], 0.14, "sine"); }
 function soundCobro(){ playTone([880], 0.16, "triangle"); }
 function soundObjetivo(){ playTone([523.25,659.25,783.99], 0.32, "sine"); }
+function soundHito(){ playTone([523.25,659.25,783.99,1046.5], 0.36, "sine"); } // hito de racha (paso 155)
 
 /* ============ aviso de versión nueva (apps nativas) ============ */
 // Compara por partes numéricas en vez de string-equality para no avisar de una "versión
@@ -904,6 +905,8 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="toggle-sonidos"){ setSoundsOn(el.dataset.f==="si"); }
+  else if(a==="toggle-tu-dia"){ state.catalog.mostrarTuDia=el.dataset.f==="si"; touchCatalog(); return; }
+  else if(a==="marcar-recordatorio-examen"){ marcarExamRecordatorioEnviado(el.dataset.id); return; }
   else if(a==="set-theme"){ setTheme(el.dataset.f); }
   else if(a==="set-density"){ setDensity(el.dataset.f); }
   else if(a==="set-accent"){ setAccent(el.dataset.f); }
@@ -2137,6 +2140,7 @@ syncNow();
 checkForNewVersion();
 checkTauriUpdate();
 maybeNotifyCobros();
+checkRachaDiaria();
 
 /* PWA: registrar el service worker cuando la app está publicada (no en file://
    ni dentro de un contenedor nativo como Tauri o Capacitor, que ya resuelven

@@ -486,6 +486,40 @@ function vCumpleanosBanner(){
     ${hoy.map(s=>fila(s,"hoy")).join("")}${manana.map(s=>fila(s,"manana")).join("")}
   </div>`;
 }
+/* ============ "Tu día": checklist de pendientes reales + racha "días al día" (paso 155) ============
+   Apagable desde Cuenta → Preferencias (mostrarTuDia() en helpers.js). Cada fila de
+   pendingTasksToday() ya trae su acción; los exámenes son el único caso especial porque además
+   del botón de WhatsApp necesitan marcarse como "ya avisé" para no seguir apareciendo. */
+function vTuDiaRow(tarea){
+  if(tarea.kind==="examen"){
+    const s = state.students.find(x=>x.id===tarea.studentId);
+    return `<div class="hoy-row">
+      <span class="hoy-row-name">${esc(tarea.text)}</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${s&&hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waMsgForAlert(s,"examen"))}">${ICON_CHAT}</a>`:""}
+        <button class="chip" data-a="marcar-recordatorio-examen" data-id="${esc(tarea.studentId)}">Ya avisé</button>
+      </div>
+    </div>`;
+  }
+  const attrs = Object.entries(tarea.data||{}).map(([k,v])=>`data-${esc(k)}="${esc(String(v))}"`).join(" ");
+  return `<div class="hoy-row">
+    <span class="hoy-row-name">${esc(tarea.text)}</span>
+    <button class="chip" data-a="${esc(tarea.a)}" ${attrs}>Resolver</button>
+  </div>`;
+}
+function vTuDia(){
+  if(!mostrarTuDia()) return "";
+  const racha = rachaFor();
+  const tareas = pendingTasksToday();
+  return `<div class="formcard">
+    <div class="ftitle" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Tu día</span>${racha.actual>0?`<span style="font-size:14px;font-weight:700">🔥 ${racha.actual}</span>`:""}
+    </div>
+    ${tareas.length===0
+      ? emptyState(ICON_CHECK.replace('stroke="white"','stroke="currentColor"'), "Estás al día ✨", "No tenés pendientes reales para hoy.")
+      : `<div style="display:flex;flex-direction:column;gap:6px">${tareas.map(vTuDiaRow).join("")}</div>`}
+  </div>`;
+}
 /* ============ panel "Hoy": lo importante del día de un vistazo, arriba del tablero ============
    Tres bloques con la misma tarjeta (.ds-card.hoy-card): "Clases de hoy" (agenda del día,
    con botón registrar/ver), "Para cobrar" (reusa cobrosAtrasadosSummary/vCobrosBanner, el
@@ -593,6 +627,7 @@ function vTablero(){
   h += vFeedbackBanner();
   h += vBackupReminder();
   h += vCumpleanosBanner();
+  h += vTuDia();
 
   h += `<div class="hoy-grid">${vHoyClasesHoy()}${vHoyCobrar()}${vHoyProximo()}</div>`;
 
@@ -2965,6 +3000,13 @@ function vCuenta(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="chip ${!soundsOn()?"on":""}" data-a="toggle-sonidos" data-f="no">Apagados</button>
         <button class="chip ${soundsOn()?"on":""}" data-a="toggle-sonidos" data-f="si">Activados</button>
+      </div>
+    </div>
+    <div class="formcard"><div class="ftitle">Tu día y racha</div>
+      <div class="hint" style="margin-bottom:8px">La tarjeta "Tu día" del tablero, con tus pendientes reales de hoy y la racha de días al día.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="chip ${!mostrarTuDia()?"on":""}" data-a="toggle-tu-dia" data-f="no">Ocultar</button>
+        <button class="chip ${mostrarTuDia()?"on":""}" data-a="toggle-tu-dia" data-f="si">Mostrar Tu día y racha</button>
       </div>
     </div>
     ${vEscalaObjetivoCard()}

@@ -950,6 +950,14 @@ function buildPagosCsv(monthKeys){
 /* ============ recordatorios de cobro: clases sin cobrar + mensualidades vencidas + señas
    pendientes, todo junto, para el aviso diario del tablero (ver events.js: maybeNotifyCobros) ============ */
 function recordatoriosFor(){ return state.catalog.recordatorios || defaultRecordatorios(); }
+// "Tu día" y la racha (paso 155) — preferencia sincronizada (mismo criterio que escalaObjetivo):
+// apagable desde Cuenta → Preferencias, en cualquier dispositivo de la cuenta.
+function mostrarTuDia(){ return state.catalog.mostrarTuDia!==false; }
+// En modo demo la racha es fija (paso 155: "racha de 9 días... para que se vea"), no se recalcula.
+function rachaFor(){
+  if(IS_DEMO) return {actual:9, mejor:12, ultimoCheck:today(), hitos:[7]};
+  return {...defaultRacha(), ...(state.catalog.racha||{})};
+}
 function costosFor(){ return state.catalog.costos || defaultCostos(); }
 function docenteFor(){ return state.catalog.docente || defaultDocente(); }
 function cobrosDocenteFor(){ return state.catalog.cobrosDocente || defaultCobrosDocente(); }
@@ -1107,6 +1115,99 @@ function cobrosAtrasadosSummary(diasAtraso){
   return {items, total, count:items.length, byStudent};
 }
 
+/* ============ "Tu día": checklist honesta de pendientes reales de hoy (paso 155) ============
+   Sólo pendientes concretos y accionables, no alertas generales (para eso ya está el bloque
+   "Alertas" del tablero) — clases de hoy/ayer sin registrar, cobros vencidos, exámenes a <=3 días
+   sin recordatorio marcado, la semana que viene sin ninguna clase agendada y respaldo muy viejo.
+   Si esta lista vuelve vacía, ese día cuenta "al día" para la racha (ver checkRachaDiaria). */
+function pendingTasksToday(){
+  if(IS_DEMO){
+    // Fijo y determinístico (paso 155: "dos tareas pendientes para que se vea"), usando alumnos
+    // reales del demo para que las tarjetas se vean completas — las acciones son de sólo
+    // navegación (nunca guardan nada en modo demo, ver save()).
+    const acts = alive().filter(s=>s.status==="activo");
+    const out = [];
+    if(acts[0]) out.push({id:"demo-clase", text:`Registrar la clase de ${acts[0].name} (ayer)`, a:"nav-lista", data:{}});
+    out.push({id:"demo-cobros", text:"2 cobros atrasados", a:"nav-pagos", data:{}});
+    return out;
+  }
+  const tasks = [];
+  const t = today(), ayer = addDays(t,-1);
+  agendaRangeEvents(ayer,t).forEach(e=>{
+    if(!studentHasSessionOnDate(e.studentId,e.date))
+      tasks.push({id:`clase-${e.studentId}-${e.date}`, text:`Registrar la clase de ${e.studentName} (${e.date===t?"hoy":"ayer"})`,
+        a:"agenda-log", data:{id:e.studentId, date:e.date}});
+  });
+  const rec = recordatoriosFor();
+  if(rec.activo){
+    const cobros = cobrosAtrasadosSummary(rec.diasAtraso);
+    if(cobros.count>0)
+      tasks.push({id:"cobros", text:`${cobros.count} cobro${cobros.count===1?"":"s"} atrasado${cobros.count===1?"":"s"} (${fmtMoney(cobros.total)})`,
+        a:"nav-pagos", data:{}});
+  }
+  alive().filter(s=>s.status==="activo").forEach(s=>{
+    const d = daysTo(s.examDate);
+    if(d!==null && d>=0 && d<=3 && !examRecordatorioEnviado(s))
+      tasks.push({id:`examen-${s.id}`, text:`Recordale a ${s.name} el examen (${d===0?"hoy":`en ${d} día${d===1?"":"s"}`})`,
+        kind:"examen", studentId:s.id});
+  });
+  const proxLunes = addDays(mondayOfWeek(t),7), proxDomingo = addDays(proxLunes,6);
+  if(alive().some(s=>s.status==="activo") && agendaRangeEvents(proxLunes,proxDomingo).length===0)
+    tasks.push({id:"semana", text:"La semana que viene no tiene ninguna clase agendada todavía", a:"nav-agenda", data:{}});
+  if(shouldShowBackupReminder())
+    tasks.push({id:"respaldo", text:`Hace más de ${BACKUP_REMINDER_DAYS} días que no hacés un respaldo`, a:"export", data:{}});
+  return tasks;
+}
+// Pendientes que ya quedaron sin resolver de ayer (a diferencia de pendingTasksToday, que también
+// cuenta cosas de hoy) — es lo que decide si la racha sigue o se corta al chequear un día nuevo.
+// Simplificación asumida a propósito: sólo mira "ayer" (no reconstruye backlog de varios días si
+// la app estuvo varios días sin abrirse) y el chequeo de "semana que viene" sólo corre los lunes
+// (cuando "ayer" cerró la semana anterior) — mantiene la cuenta honesta sin necesitar guardar un
+// historial día por día.
+function rachaBacklogAyer(){
+  const ayer = addDays(today(),-1);
+  let n = 0;
+  agendaRangeEvents(ayer,ayer).forEach(e=>{ if(!studentHasSessionOnDate(e.studentId,ayer)) n++; });
+  const rec = recordatoriosFor();
+  if(rec.activo && cobrosAtrasadosSummary(rec.diasAtraso).count>0) n++;
+  alive().filter(s=>s.status==="activo").forEach(s=>{
+    const d = daysTo(s.examDate);
+    if(d!==null && d>=-1 && d<=2 && !examRecordatorioEnviado(s)) n++; // ayer ya estaba a <=3 días
+  });
+  if(weekdayIdx(today())===0 && alive().some(s=>s.status==="activo")
+    && agendaRangeEvents(today(),addDays(today(),6)).length===0) n++;
+  if(shouldShowBackupReminder()) n++;
+  return n;
+}
+// Chequeo diario de la racha (paso 155) — se llama una vez al arrancar (ver events.js) y se
+// autolimita a una vez por día vía racha.ultimoCheck. Los días sin nada pendiente cuentan como
+// "al día" igual que los días con pendientes resueltos (freeze automático, sin castigo). No corre
+// en modo demo (rachaFor() ya devuelve un valor fijo ahí) ni sin sesión iniciada.
+function checkRachaDiaria(){
+  if(IS_DEMO || !getSes()) return;
+  const r = rachaFor();
+  if(r.ultimoCheck===today()) return;
+  let {actual,mejor,hitos,historial} = r; hitos = hitos||[]; historial = historial||[];
+  if(r.ultimoCheck){ // sin chequeo previo no hay "ayer" con el que comparar: no penaliza el primer día
+    const alDia = rachaBacklogAyer()===0;
+    historial = [...historial, {date:addDays(today(),-1), alDia}].slice(-RACHA_HISTORIAL_DIAS);
+    if(!alDia){
+      if(actual>0) toast("Se reinició tu racha de días al día — sin drama, hoy arrancás de nuevo.");
+      actual = 0;
+    }else{
+      actual += 1;
+      if(actual>mejor) mejor = actual;
+      if([7,30,100].includes(actual) && !hitos.includes(actual)){
+        hitos = [...hitos, actual];
+        fireConfetti(); soundHito();
+        toast(`¡${actual} días al día seguidos! 🔥`);
+      }
+    }
+  }
+  state.catalog.racha = {actual, mejor, ultimoCheck:today(), hitos, historial};
+  touchCatalog();
+}
+
 /* ============ informe de progreso: período elegido para filtrar clases/simulacros ============ */
 const INFORME_PERIODS = {
   "1m":{label:"Último mes",days:30}, "3m":{label:"Últimos 3 meses",days:90},
@@ -1161,6 +1262,15 @@ function hasScheduledBeforeExam(s){
   const days = new Set((s.horarios||[]).map(h=>h.day));
   for(let d=from; d<=to; d=addDays(d,1)) if(days.has(weekdayIdx(d))) return true;
   return false;
+}
+// Recordatorio de examen ya enviado (paso 155, "Tu día"): se guarda en catalog, no en el alumno,
+// como {studentId: examDateAvisada} — se identifica por (alumno, examDate exacta), mismo criterio
+// que hasCurrentExamResult, así que una fecha de examen nueva (recuperatorio) vuelve a pedir aviso.
+function examRecordatorioEnviado(s){ return (state.catalog.examRecordatorios||{})[s.id]===s.examDate; }
+function marcarExamRecordatorioEnviado(id){
+  const s = state.students.find(x=>x.id===id); if(!s || !s.examDate) return;
+  state.catalog.examRecordatorios = {...(state.catalog.examRecordatorios||{}), [id]:s.examDate};
+  touchCatalog();
 }
 // eventos de un rango de fechas (inclusive) para todos los alumnos activos: horarios
 // habituales expandidos día a día dentro del rango + clases puntuales no canceladas que
