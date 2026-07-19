@@ -40,6 +40,16 @@ There is no build, lint, or test tooling.
 
 Note: any PWA installed from the site root *before* the landing page existed will keep opening to the landing page under its old install, since its service worker scope was `/`. Users need to uninstall that and reinstall from `/app/` instead — the current app can only be installed from within `/app/`.
 
+### Rollback si una versión sale mal
+
+El deploy es automático (push a `main` → GitHub Pages), así que revertir es simplemente volver a pushear el estado anterior — no hay ningún paso manual de infra de por medio:
+
+1. `git revert` de los commits de la versión problemática (o `git revert <primer-commit>^..<último-commit>` si son varios), **nunca** `git reset --hard` sobre `main` ya pusheado. Si hace falta un punto de referencia conocido-bueno, los checkpoints de versión están tageados (p. ej. `v2.2.4`, ver `git tag`); confirmar con `git tag` que el tag de la última versión estable existe antes de dar por hecho que se puede volver ahí.
+2. `git push` — el mismo workflow (`deploy-pages.yml`) redeploya automáticamente el estado revertido, sin acción manual en GitHub Pages.
+3. Subir el número de `CACHE` en `web/app/sw.js` como parte del revert (si el revert no lo hace solo porque el propio `sw.js` no cambió entre versiones, bumpearlo a mano) — si no, los navegadores con la versión mala ya cacheada no van a pedir los archivos revertidos hasta que el service worker note el cambio de `CACHE`.
+4. Si la versión mala incluía una migración SQL ya aplicada en Supabase (`cuaderno-supabase`), el revert del código *no* revierte la base — evaluar caso por caso si hace falta una migración inversa a mano en el SQL Editor (no hay rollback automático de SQL en este proyecto).
+5. Verificar en `https://entreclases.github.io` (o `/app/?demo=1`) que el sitio quedó en el estado esperado; puede tardar un minuto en propagar el deploy y hasta que cada usuario vea el toast de "nueva versión disponible" y actualice.
+
 ## Desktop packaging (Tauri) — moved to its own repo, currently paused
 
 The Tauri wrapper (`src-tauri/`, `scripts/generate-latest-json.js`, and the desktop-only `package.json`/`@tauri-apps/cli` dependency) used to live in this repo but was moved out to its own repo, [`cuaderno-desktop`](https://github.com/manugandini53-design/cuaderno-desktop), so its build tooling has its own history separate from the app's. **That repo is currently paused** — its README documents how to resume (cloning both repos as siblings, where the private signing key lives, which env vars a release build needs) and flags a pending decision about whether future desktop releases keep publishing from this repo or move to `cuaderno-desktop`. Nothing about `identifier`, the updater `pubkey`, or the updater `endpoints` changed in that move.

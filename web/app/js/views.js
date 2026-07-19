@@ -4456,6 +4456,17 @@ function vActividad(){
 }
 
 const SUPABASE_FREE_LIMIT_BYTES = 500*1024*1024;
+const SUPABASE_STORAGE_FREE_LIMIT_BYTES = 1024*1024*1024;
+function usageBar(label, bytes, limitBytes){
+  const pct = Math.min(100, bytes/limitBytes*100);
+  const barColor = pct>=90 ? "var(--red)" : pct>=70 ? "var(--amber)" : "var(--green)";
+  return `<div class="stitle">${esc(label)}</div>
+  <div role="progressbar" aria-label="${esc(label)}" aria-valuenow="${pct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"
+    style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;margin-bottom:6px">
+    <div style="height:100%;width:${pct.toFixed(1)}%;background:${barColor};border-radius:99px"></div>
+  </div>
+  <div class="hint" style="margin-bottom:20px">${fmtBytes(bytes)} de ${fmtBytes(limitBytes)} (${pct.toFixed(1)}%) — plan gratuito de Supabase</div>`;
+}
 function vRecursos(){
   let h = `<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
     <button class="chip" data-a="refresh-recursos">Actualizar</button></div>`;
@@ -4464,15 +4475,8 @@ function vRecursos(){
   const data = state.recursos;
   if(!data) return h + `<div class="empty">No se pudieron cargar los recursos.</div>`;
 
-  const dbBytes = data.db_bytes||0;
-  const pct = Math.min(100, dbBytes/SUPABASE_FREE_LIMIT_BYTES*100);
-  const barColor = pct>=90 ? "var(--red)" : pct>=70 ? "var(--amber)" : "var(--green)";
-  h += `<div class="stitle">Uso de base de datos</div>
-  <div role="progressbar" aria-label="Uso de base de datos" aria-valuenow="${pct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"
-    style="background:var(--soft);border-radius:99px;height:14px;overflow:hidden;margin-bottom:6px">
-    <div style="height:100%;width:${pct.toFixed(1)}%;background:${barColor};border-radius:99px"></div>
-  </div>
-  <div class="hint" style="margin-bottom:20px">${fmtBytes(dbBytes)} de ${fmtBytes(SUPABASE_FREE_LIMIT_BYTES)} (${pct.toFixed(1)}%) — plan gratuito de Supabase</div>`;
+  h += usageBar("Uso de base de datos", data.db_bytes||0, SUPABASE_FREE_LIMIT_BYTES);
+  h += usageBar("Uso de storage (materiales)", data.storage_bytes||0, SUPABASE_STORAGE_FREE_LIMIT_BYTES);
 
   const usuarios = [...(data.usuarios||[])].sort((a,b)=>
     ((b.cuaderno_bytes||0)+(b.respaldos_bytes||0)) - ((a.cuaderno_bytes||0)+(a.respaldos_bytes||0)));
@@ -4482,9 +4486,22 @@ function vRecursos(){
       <div class="body">
         <div style="font-weight:600">${esc(u.email||"—")} <span class="hint">· ${esc(u.rol||"—")}</span></div>
         <div class="note">${u.alumnos||0} alumno${u.alumnos===1?"":"s"} · cuaderno ${fmtBytes(u.cuaderno_bytes)}
-          · ${u.respaldos||0} respaldo${u.respaldos===1?"":"s"} (${fmtBytes(u.respaldos_bytes)})</div>
+          · ${u.respaldos||0} respaldo${u.respaldos===1?"":"s"} (${fmtBytes(u.respaldos_bytes)})
+          · materiales ${fmtBytes(u.storage_bytes)}</div>
       </div>
     </div>`).join("");
+
+  const topStorage = [...(data.usuarios||[])].filter(u=>(u.storage_bytes||0)>0)
+    .sort((a,b)=>(b.storage_bytes||0)-(a.storage_bytes||0)).slice(0,5);
+  if(topStorage.length){
+    h += `<div class="stitle" style="margin-top:20px">Top 5 por uso de storage</div>`;
+    h += topStorage.map((u,i)=>`<div class="log">
+      <div class="body">
+        <div style="font-weight:600">${i+1}. ${esc(u.email||"—")}</div>
+        <div class="note">${fmtBytes(u.storage_bytes)}</div>
+      </div>
+    </div>`).join("");
+  }
 
   h += `<div class="hint" style="margin-top:18px">El uso de memoria/CPU del servidor se ve solo en el dashboard de Supabase; acá se mide lo que ocupan los datos.</div>`;
   return h;
