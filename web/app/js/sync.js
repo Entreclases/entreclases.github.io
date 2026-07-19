@@ -1028,6 +1028,27 @@ async function actualizarAlumnosGrupo(materiaId, alumnoIds){
   }
   state.portalGrupoBusy=null; render();
 }
+// Enviar la llave grupal a varios (paso 140): marca/desmarca "enviado" para un alumno de la
+// llave, guardado en tokens_grupos[tok].enviados (studentId -> timestamp) — mismo jsonb que ya
+// tiene alumnos/materiaId, sin columna nueva. Optimista (como togglePortalHabilitado): se pinta
+// ya mismo y se revierte sólo si falla el guardado.
+async function toggleEnvioGrupo(materiaId, studentId){
+  const tok=tokenForGrupo(materiaId); if(!tok || !state.portal) return;
+  const entry=state.portal.tokensGrupos[tok];
+  const prevEnviados=entry.enviados||{};
+  const enviados={...prevEnviados};
+  if(enviados[studentId]) delete enviados[studentId]; else enviados[studentId]=Date.now();
+  const tokensGrupos={...state.portal.tokensGrupos, [tok]:{...entry, enviados}};
+  state.portal.tokensGrupos=tokensGrupos; render();
+  try{
+    const {uid_, h}=await fetchPortalRow("tokens_grupos");
+    await patchPortalRow(uid_, h, {tokens_grupos:tokensGrupos});
+  }catch(e){
+    state.portal.tokensGrupos={...tokensGrupos, [tok]:entry};
+    state.portalGrupoError = !navigator.onLine ? "Sin conexión a internet." : "No se pudo guardar. Probá de nuevo.";
+    render();
+  }
+}
 // Re-arma y guarda sólo el bloque de una materia puntual. A diferencia de republishAlumnoBlock,
 // SÍ firma de nuevo los materiales compartidos de esta materia (materialesIndexFor) en vez de
 // reusar publicado.biblioteca: esta última sólo se arma al tocar "Publicar cambios" general, así

@@ -127,7 +127,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               portalSaving:false, portalSaveMsg:"", portalCopyMsg:"",
               portalGrupoBusy:null, portalGrupoError:"", portalGrupoCopyMsg:"",
               portalGrupoEditing:null, portalGrupoDraftAlumnos:[],
-              shareOverlay:null,
+              shareOverlay:null, envioOverlay:null,
               avisoSaving:false, avisoError:"",
               toasts:[],
               fabOpen:false, fabPick:null,

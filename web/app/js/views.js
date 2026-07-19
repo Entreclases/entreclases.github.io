@@ -226,9 +226,51 @@ function vShareOverlayGrupo(m, o){
     <button class="chip" data-a="share-copy">Copiar link</button>
     <button class="chip" data-a="qr-open" data-url="${esc(url)}" data-title="Portal de ${esc(m.name)}">Ver QR</button>
     <button class="chip" data-a="share-regen" ${busy?"disabled":""}>Regenerar</button>
+    <button class="chip" data-a="envio-open" data-materia="${esc(m.id)}">Enviar a los alumnos</button>
   </div>
   <div class="hint" style="margin-top:10px">Para sumar o sacar alumnos del grupo, andá a Cuenta → Portal → Llaves grupales → «Editar alumnos».</div>
   ${state.portalGrupoError?`<div class="saveerr" style="margin-top:8px">${esc(state.portalGrupoError)}</div>`:""}`;
+}
+// Enviar la llave grupal a varios a la vez (paso 140): WhatsApp no deja mandar a varios de una
+// desde la web, así que esto es el máximo asistido posible — un botón de WhatsApp por alumno con
+// mensaje pre-armado (editable acá mismo, misma plantilla que Cuenta → Mensajes) y un "enviado"
+// que se marca al click y persiste (tokens_grupos[tok].enviados, ver toggleEnvioGrupo en sync.js)
+// para retomar donde quedaste. "Mandar por mail a todos" va todo en CCO (nunca en Para, para no
+// exponer mails de unos alumnos a otros) — ver envio-mail-todos en events.js.
+function vEnvioOverlay(){
+  const o = state.envioOverlay; if(!o) return "";
+  const m = subjById(o.materiaId); if(!m) return "";
+  const tok = tokenForGrupo(o.materiaId); if(!tok) return "";
+  const entry = (state.portal && state.portal.tokensGrupos[tok]) || {alumnos:[], enviados:{}};
+  const enviados = entry.enviados || {};
+  const url = portalUrl(tok);
+  const alumnos = (entry.alumnos||[]).map(id=>state.students.find(x=>x.id===id)).filter(Boolean)
+    .sort((a,b)=>a.name.localeCompare(b.name));
+  return `<div class="overlay no-print" data-a="envio-close">
+    <div class="modal" data-a="envio-modal-noop" style="max-width:460px">
+      <div class="ftitle" style="font-size:16px">Enviar llave grupal — ${esc(m.name)}</div>
+      <div class="hint" style="margin-bottom:10px">WhatsApp no permite mandar a varios de una desde la web — este es el máximo posible: uno por uno, asistido, marcando a quién ya le mandaste para retomar donde quedaste.</div>
+      <div class="field"><div class="flabel">Mensaje (variables: {alumno}, {materia}, {link}, {mail})</div>
+        <textarea data-cf="mensaje-compartirLlaveGrupal" rows="3">${esc(mensajesFor().compartirLlaveGrupal||"")}</textarea></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+        <button class="chip" data-a="envio-copy-msg">Copiar mensaje</button>
+        <button class="chip" data-a="envio-copy-lista">Copiar lista</button>
+        <button class="chip" data-a="envio-mail-todos">Mandar por mail a todos</button>
+      </div>
+      <div style="max-height:280px;overflow-y:auto;border-top:1px solid var(--soft);padding-top:6px">
+      ${alumnos.length===0 ? `<div class="empty">Esta llave todavía no incluye alumnos.</div>` : alumnos.map(s=>{
+        const sent = !!enviados[s.id];
+        return `<div class="log" style="align-items:center;flex-wrap:wrap">
+          <div class="body">${esc(s.name)}${sent?`<div class="note">Enviado ${esc(fmtDateTime(enviados[s.id]))}</div>`:""}</div>
+          ${hasPhone(s)?`<a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgCompartirLlaveGrupal(s,m.name,url))}">WhatsApp</a>`:`<span class="hint">Sin WhatsApp cargado</span>`}
+          <button class="chip ${sent?"on":""}" data-a="envio-toggle" data-materia="${esc(o.materiaId)}" data-id="${esc(s.id)}">${sent?"Enviado ✓":"Marcar enviado"}</button>
+        </div>`;
+      }).join("")}
+      </div>
+      ${state.portalGrupoError?`<div class="saveerr" style="margin-top:8px">${esc(state.portalGrupoError)}</div>`:""}
+      <div style="margin-top:14px;text-align:right"><button class="chip" data-a="envio-close">Cerrar</button></div>
+    </div>
+  </div>`;
 }
 
 /* ============ chip de estado de datos: guardado/sincronizando/sin conexión/error, siempre
@@ -1798,6 +1840,16 @@ function waMsgExamen(s){
 function waMsgCompartirLlave(s, link){
   return mensajeTexto("compartirLlave", {alumno:studentFirstName(s), link, mail:s.email||""});
 }
+// Compartir la llave GRUPAL de una materia por WhatsApp (paso 140) — mismo criterio que
+// waMsgCompartirLlave, con la materia como variable extra. genericoMsgCompartirLlaveGrupal()
+// arma la versión sin nombre (para "Copiar mensaje", pensado para pegar donde sea) limpiando el
+// espacio doble que deja {alumno} vacío.
+function waMsgCompartirLlaveGrupal(s, materiaName, link){
+  return mensajeTexto("compartirLlaveGrupal", {alumno:studentFirstName(s), materia:materiaName, link, mail:s.email||""});
+}
+function genericoMsgCompartirLlaveGrupal(materiaName, link){
+  return mensajeTexto("compartirLlaveGrupal", {alumno:"", materia:materiaName, link, mail:""}).replace(/\s{2,}/g," ").trim();
+}
 function waQuickMessage(s){
   const d=daysTo(s.examDate);
   return (d!==null && d>=0 && d<=14) ? waMsgExamen(s) : waMsgProximaClase(s);
@@ -2973,6 +3025,7 @@ function vPortalGrupoRow(m){
       <button class="chip" data-a="qr-open" data-url="${esc(portalUrl(token))}" data-title="Portal de ${esc(m.name)}">Ver QR</button>
       <button class="chip" data-a="portal-grupo-editar-abrir" data-materia="${esc(m.id)}" ${busy?"disabled":""}>Editar alumnos</button>
       <button class="chip" data-a="portal-grupo-regen" data-materia="${esc(m.id)}" ${busy?"disabled":""}>Regenerar llave</button>
+      <button class="chip" data-a="envio-open" data-materia="${esc(m.id)}">Enviar a los alumnos</button>
       <button class="danger" data-a="portal-grupo-revoke" data-materia="${esc(m.id)}" ${busy?"disabled":""}>Borrar</button>
     </div>
     <div class="hint" style="margin-top:8px">Incluye a ${incluidos} alumno${incluidos===1?"":"s"} de ${esc(m.name)}.</div>`;
@@ -4454,6 +4507,7 @@ function render(){
   if(state.fabPick) m += vFabPickOverlay();
   if(state.qrOverlay) m += vQrOverlay();
   if(state.shareOverlay) m += vShareOverlay();
+  if(state.envioOverlay) m += vEnvioOverlay();
   if(state.agendaEdit) m += vAgendaEditOverlay();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
   const viewKey = state.view;

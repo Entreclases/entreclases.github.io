@@ -745,6 +745,49 @@ document.addEventListener("click", (e)=>{
     if(o.kind==="alumno") regenerarLlaveAlumno(o.id); else regenerarLlaveGrupo(o.id);
     return;
   }
+  // Enviar la llave grupal a varios (paso 140): mini-modal aparte de vShareOverlay/vPortalGrupoRow,
+  // disparable desde cualquiera de los dos (ver "Enviar a los alumnos" en ambos).
+  else if(a==="envio-open"){ state.envioOverlay={materiaId:el.dataset.materia}; }
+  else if(a==="envio-close"){ state.envioOverlay=null; }
+  else if(a==="envio-modal-noop"){ return; }
+  else if(a==="envio-toggle"){ toggleEnvioGrupo(el.dataset.materia, el.dataset.id); return; }
+  else if(a==="envio-copy-msg"){
+    const o=state.envioOverlay; if(!o) return;
+    const m=subjById(o.materiaId); const tok=tokenForGrupo(o.materiaId);
+    if(!m || !tok) return;
+    copyToClipboard(genericoMsgCompartirLlaveGrupal(m.name, portalUrl(tok)))
+      .then(()=>toast("Mensaje copiado"))
+      .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
+    return;
+  }
+  else if(a==="envio-copy-lista"){
+    const o=state.envioOverlay; if(!o) return;
+    const m=subjById(o.materiaId); const tok=tokenForGrupo(o.materiaId);
+    if(!m || !tok || !state.portal) return;
+    const entry=state.portal.tokensGrupos[tok]||{alumnos:[]};
+    const url=portalUrl(tok);
+    const alumnos=(entry.alumnos||[]).map(id=>state.students.find(x=>x.id===id)).filter(Boolean);
+    const texto=alumnos.map(x=>`${x.name}:\n${waMsgCompartirLlaveGrupal(x,m.name,url)}`).join("\n\n");
+    copyToClipboard(texto)
+      .then(()=>toast("Lista copiada"))
+      .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
+    return;
+  }
+  else if(a==="envio-mail-todos"){
+    const o=state.envioOverlay; if(!o) return;
+    const m=subjById(o.materiaId); const tok=tokenForGrupo(o.materiaId);
+    if(!m || !tok || !state.portal) return;
+    const entry=state.portal.tokensGrupos[tok]||{alumnos:[]};
+    const alumnos=(entry.alumnos||[]).map(id=>state.students.find(x=>x.id===id)).filter(Boolean);
+    const conMail=alumnos.filter(x=>x.email);
+    const sinMail=alumnos.filter(x=>!x.email);
+    if(!conMail.length){ alert("Ninguno de los alumnos incluidos tiene mail cargado en su ficha."); return; }
+    const cuerpo=genericoMsgCompartirLlaveGrupal(m.name, portalUrl(tok));
+    const mailto=`mailto:?bcc=${encodeURIComponent(conMail.map(x=>x.email).join(","))}&subject=${encodeURIComponent("Acceso a "+m.name)}&body=${encodeURIComponent(cuerpo)}`;
+    if(sinMail.length) alert("Quedan afuera (sin mail cargado): "+sinMail.map(x=>x.name).join(", "));
+    window.location.href=mailto;
+    return;
+  }
   else if(a==="set-theme"){ setTheme(el.dataset.f); }
   else if(a==="set-density"){ setDensity(el.dataset.f); }
   else if(a==="set-accent"){ setAccent(el.dataset.f); }
@@ -1792,6 +1835,7 @@ function activeOverlayName(){
   if(state.searchOpen) return "search";
   if(state.fabPick) return "fabPick";
   if(state.qrOverlay) return "qr";
+  if(state.envioOverlay) return "envio";
   if(state.shareOverlay) return "share";
   if(state.agendaEdit) return "agendaEdit";
   return null;
@@ -1802,6 +1846,7 @@ function navSnapshot(){
   if(m==="fabPick") mx = {target: state.fabPick.target||"resumen"};
   else if(m==="qr") mx = {url: state.qrOverlay.url, title: state.qrOverlay.title||""};
   else if(m==="share") mx = {kind: state.shareOverlay.kind, id: state.shareOverlay.id};
+  else if(m==="envio") mx = {materiaId: state.envioOverlay.materiaId};
   else if(m==="agendaEdit") mx = {...state.agendaEdit};
   return {
     v: state.view,
@@ -1832,6 +1877,8 @@ function applyNavSnapshot(snap){
   state.qrOverlay = snap.m==="qr" ? snap.mx : null;
   state.shareOverlay = snap.m==="share" ? {...snap.mx, busy:false} : null;
   if(state.shareOverlay && !state.portalLoaded) loadPortal();
+  state.envioOverlay = snap.m==="envio" ? snap.mx : null;
+  if(state.envioOverlay && !state.portalLoaded) loadPortal();
   state.agendaEdit = snap.m==="agendaEdit" ? snap.mx : null;
   state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
   if((state.view==="detalle"||state.view==="informe"||state.view==="contrato") && !sel()){

@@ -297,6 +297,8 @@ const MENSAJES_META = [
     default:"*Recibo Nº {numero}*\nFecha: {fecha}\nConcepto: {concepto}\nMonto: {monto}\n{saldo}\nAlumno/a: {alumno}\n{docente}\n\n_Generado con Entreclases_" },
   { key:"compartirLlave", label:"Compartir acceso al portal (paso 139)", vars:"{alumno}, {link}, {mail}",
     default:"¡Hola {alumno}! Te paso tu acceso al portal, donde vas a poder ver tu próxima clase y avance: {link}" },
+  { key:"compartirLlaveGrupal", label:"Compartir llave grupal (paso 140)", vars:"{alumno}, {materia}, {link}, {mail}",
+    default:"¡Hola {alumno}! Te paso el acceso grupal de {materia}, donde vas a encontrar material y las próximas clases: {link}" },
 ];
 function defaultMensajes(){ const o={}; MENSAJES_META.forEach(m=>{ o[m.key]=m.default; }); return o; }
 // 0=Lunes .. 6=Domingo — usado por los horarios habituales y la vista Agenda.
