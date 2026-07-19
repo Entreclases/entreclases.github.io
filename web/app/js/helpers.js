@@ -127,6 +127,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               portalSaving:false, portalSaveMsg:"", portalCopyMsg:"",
               portalGrupoBusy:null, portalGrupoError:"", portalGrupoCopyMsg:"",
               portalGrupoEditing:null, portalGrupoDraftAlumnos:[],
+              shareOverlay:null,
               avisoSaving:false, avisoError:"",
               toasts:[],
               fabOpen:false, fabPick:null,
@@ -956,6 +957,20 @@ function mensajeTexto(key, vars){ return fillTemplate(mensajesFor()[key], vars);
 // señas ni comentarios privados (ver buildAlumnoBlock() en sync.js, que es lo único que lee esto
 // para armar el JSON público).
 function portalShareFor(s){ return s.portalShare || {proximaClase:false, tareas:false, avance:false}; }
+// Llave a mano (paso 139): fecha de creación/renovación de la llave individual de un alumno,
+// guardada en publicado.llavesAt (studentId -> timestamp) — vive dentro del mismo jsonb
+// "publicado" que ya viaja en cada "Publicar cambios" (ver publicarPortal en sync.js, que
+// preserva esta llave al partir de {...state.portal.publicado}), así que no hace falta ninguna
+// columna nueva. Es un vencimiento sólo informativo/de higiene (no lo hace cumplir el backend:
+// portal_publico() sigue resolviendo por token, no por fecha) — "Renovar" es simplemente
+// regenerar la llave, que ya de por sí corta el link anterior.
+function llaveAlumnoCreatedAt(studentId){
+  return (state.portal && state.portal.publicado && state.portal.publicado.llavesAt && state.portal.publicado.llavesAt[studentId]) || null;
+}
+function llaveAlumnoVenceDias(studentId){
+  const at = llaveAlumnoCreatedAt(studentId); if(!at) return null;
+  return Math.ceil((at + PORTAL_LINK_TTL_DAYS*86400000 - Date.now()) / 86400000);
+}
 // Próxima clase de un alumno puntual (no importa el estado del alumno, a diferencia de
 // agendaRangeEvents que sólo mira activos): la más próxima entre sus clases puntuales futuras
 // no canceladas y la próxima ocurrencia de cada horario habitual dentro de los próximos 7 días.

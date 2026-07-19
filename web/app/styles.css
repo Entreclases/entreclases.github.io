@@ -255,6 +255,10 @@
             background:var(--greenbg);color:var(--status-activo-fg);display:flex;align-items:center;justify-content:center;
             font-size:15px;line-height:1;text-decoration:none}
   .wa-quick svg{width:16px;height:16px}
+  .share-quick{flex-shrink:0;width:32px;height:32px;border-radius:99px;border:1px solid var(--blueline);
+            background:var(--bluebg);color:var(--status-aprobo-fg);display:flex;align-items:center;justify-content:center;
+            font-size:15px;line-height:1;text-decoration:none}
+  .share-quick svg{width:16px;height:16px}
   .examresult{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
               border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:14px}
   .agenda-event{background:var(--soft);border-radius:8px;padding:var(--agenda-event-pad);margin-bottom:var(--agenda-event-mb);font-size:12.5px}
@@ -804,6 +808,7 @@
     .del{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;padding:0}
     .subj-swatch{width:44px;height:44px}
     .wa-quick{width:44px;height:44px}
+    .share-quick{width:44px;height:44px}
     .sembtn{min-width:44px;min-height:44px;justify-content:center}
     .primary,.danger,.tabbtn,button.chip,a.chip{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
     .navitem{min-height:44px}

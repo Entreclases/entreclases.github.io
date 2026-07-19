@@ -853,11 +853,15 @@ async function removeFromPortalBiblioteca(subjectId, fileName){
 async function generarLlaveAlumno(studentId){
   state.portalAlumnoBusy=studentId; state.portalAlumnoError=""; render();
   try{
-    const {uid_, h, row}=await fetchPortalRow("tokens_alumnos");
+    const {uid_, h, row}=await fetchPortalRow("tokens_alumnos,publicado");
     const tokensAlumnos={...(row.tokens_alumnos||{})};
-    if(!Object.keys(tokensAlumnos).some(k=>tokensAlumnos[k]===studentId)) tokensAlumnos[genPortalToken()]=studentId;
-    await patchPortalRow(uid_, h, {tokens_alumnos:tokensAlumnos});
-    if(state.portal) state.portal.tokensAlumnos=tokensAlumnos;
+    const yaExiste = Object.keys(tokensAlumnos).some(k=>tokensAlumnos[k]===studentId);
+    if(!yaExiste) tokensAlumnos[genPortalToken()]=studentId;
+    const llavesAt={...((row.publicado&&row.publicado.llavesAt)||{})};
+    if(!yaExiste) llavesAt[studentId]=Date.now();
+    const publicado={...(row.publicado||{}), llavesAt};
+    await patchPortalRow(uid_, h, {tokens_alumnos:tokensAlumnos, publicado});
+    if(state.portal){ state.portal.tokensAlumnos=tokensAlumnos; state.portal.publicado=publicado; }
     await republishAlumnoBlock(studentId);
   }catch(e){
     state.portalAlumnoError = !navigator.onLine ? "Sin conexión a internet." : "No se pudo generar la llave. Probá de nuevo.";
@@ -868,12 +872,14 @@ async function regenerarLlaveAlumno(studentId){
   if(!confirm("La llave anterior de este alumno deja de funcionar de inmediato. ¿Regenerar?")) return;
   state.portalAlumnoBusy=studentId; state.portalAlumnoError=""; render();
   try{
-    const {uid_, h, row}=await fetchPortalRow("tokens_alumnos");
+    const {uid_, h, row}=await fetchPortalRow("tokens_alumnos,publicado");
     const tokensAlumnos={...(row.tokens_alumnos||{})};
     Object.keys(tokensAlumnos).forEach(k=>{ if(tokensAlumnos[k]===studentId) delete tokensAlumnos[k]; });
     tokensAlumnos[genPortalToken()]=studentId;
-    await patchPortalRow(uid_, h, {tokens_alumnos:tokensAlumnos});
-    if(state.portal){ state.portal.tokensAlumnos=tokensAlumnos; state.portalAlumnoCopyMsg=""; }
+    const llavesAt={...((row.publicado&&row.publicado.llavesAt)||{}), [studentId]:Date.now()};
+    const publicado={...(row.publicado||{}), llavesAt};
+    await patchPortalRow(uid_, h, {tokens_alumnos:tokensAlumnos, publicado});
+    if(state.portal){ state.portal.tokensAlumnos=tokensAlumnos; state.portal.publicado=publicado; state.portalAlumnoCopyMsg=""; }
   }catch(e){
     state.portalAlumnoError = !navigator.onLine ? "Sin conexión a internet." : "No se pudo regenerar la llave. Probá de nuevo.";
   }
@@ -888,13 +894,38 @@ async function revocarLlaveAlumno(studentId){
     Object.keys(tokensAlumnos).forEach(k=>{ if(tokensAlumnos[k]===studentId) delete tokensAlumnos[k]; });
     const alumnos={...((row.publicado&&row.publicado.alumnos)||{})};
     delete alumnos[studentId];
-    const publicado={...(row.publicado||{}), alumnos};
+    const llavesAt={...((row.publicado&&row.publicado.llavesAt)||{})};
+    delete llavesAt[studentId];
+    const publicado={...(row.publicado||{}), alumnos, llavesAt};
     await patchPortalRow(uid_, h, {tokens_alumnos:tokensAlumnos, publicado});
     if(state.portal){ state.portal.tokensAlumnos=tokensAlumnos; state.portal.publicado=publicado; }
   }catch(e){
     state.portalAlumnoError = !navigator.onLine ? "Sin conexión a internet." : "No se pudo revocar la llave. Probá de nuevo.";
   }
   state.portalAlumnoBusy=null; render();
+}
+// Llaves a mano (paso 139): abre el mini-modal de "Compartir acceso" desde la ficha, una materia
+// o la lista, sin pasar por Cuenta → Portal. Si el portal general todavía no está activado, lo
+// activa solo (mismo criterio que activarlo desde Cuenta) — si no, la llave que se genera acá no
+// serviría de nada. Guarda contra que el docente haya cerrado el mini-modal mientras esto corría.
+async function openShareOverlay(kind, id){
+  state.shareOverlay={kind, id, busy:true}; render();
+  if(!state.portalLoaded) await loadPortal();
+  if(!state.shareOverlay || state.shareOverlay.id!==id) return;
+  if(state.portalError && !state.portal){ state.shareOverlay.busy=false; render(); return; }
+  if(state.portal && !state.portal.habilitado) await togglePortalHabilitado(true);
+  if(!state.shareOverlay || state.shareOverlay.id!==id) return;
+  if(state.portal && !state.portal.habilitado){ state.shareOverlay.busy=false; render(); return; } // no se pudo activar el portal (offline/error) — nada para generar todavía
+  if(kind==="alumno"){
+    if(!tokenForStudent(id)) await generarLlaveAlumno(id);
+  }else{
+    if(!tokenForGrupo(id)){
+      const alumnoIds = alive().filter(x=>x.subjectId===id).map(x=>x.id);
+      await generarLlaveGrupo(id, alumnoIds);
+    }
+  }
+  if(!state.shareOverlay || state.shareOverlay.id!==id) return;
+  state.shareOverlay.busy=false; render();
 }
 // Re-arma y guarda sólo el bloque de un alumno puntual (sin tocar biblioteca ni el de otros
 // alumnos) — no firma nada, así que es liviano y se puede disparar seguido. Lee/escribe la fila

@@ -723,6 +723,28 @@ document.addEventListener("click", (e)=>{
       .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
     return;
   }
+  // Llaves a mano (paso 139): mini-modal de "Compartir acceso", disparable desde la ficha, una
+  // materia (Materias) o la lista, sin pasar por Cuenta → Portal — ver openShareOverlay (sync.js)
+  // y vShareOverlay (views.js). Todo lee/escribe contra state.shareOverlay en vez de sel(), a
+  // propósito: a diferencia de las acciones "portal-alumno-*"/"portal-grupo-*" de más arriba
+  // (pensadas sólo para la ficha/Cuenta), estas tienen que andar igual sin una ficha abierta.
+  else if(a==="share-open"){ openShareOverlay(el.dataset.kind, el.dataset.id); return; }
+  else if(a==="share-close"){ state.shareOverlay=null; }
+  else if(a==="share-modal-noop"){ return; }
+  else if(a==="share-copy"){
+    const o=state.shareOverlay; if(!o) return;
+    const token = o.kind==="alumno" ? tokenForStudent(o.id) : tokenForGrupo(o.id);
+    if(!token) return;
+    copyToClipboard(portalUrl(token))
+      .then(()=>toast("Link copiado"))
+      .catch(()=>toast("No se pudo copiar — seleccioná el texto manualmente.","error"));
+    return;
+  }
+  else if(a==="share-regen"){
+    const o=state.shareOverlay; if(!o) return;
+    if(o.kind==="alumno") regenerarLlaveAlumno(o.id); else regenerarLlaveGrupo(o.id);
+    return;
+  }
   else if(a==="set-theme"){ setTheme(el.dataset.f); }
   else if(a==="set-density"){ setDensity(el.dataset.f); }
   else if(a==="set-accent"){ setAccent(el.dataset.f); }
@@ -753,6 +775,10 @@ document.addEventListener("click", (e)=>{
     state.view="detalle"; state.selId=el.dataset.id; state.tab="resumen"; state.confirmDel=false;
     state.simTimer=null; state.simPrefillNote=""; state.fichaError=""; state.sessionPrefillDate="";
     state.registrarClaseTipo=null;
+    // Llave a mano (paso 139): carga el portal en segundo plano al abrir la ficha (si no estaba
+    // cargado ya) para que el indicador de llave del header (vLlaveBadge) tenga con qué pintarse
+    // sin obligar a pasar por Cuenta primero.
+    if(!state.portalLoaded) loadPortal();
   }
   else if(a==="back"){ state.view="lista"; state.selId=null; state.simTimer=null; state.simPrefillNote=""; state.editSessionTopicId=null; }
   else if(a==="ficha-draft-save"){
@@ -1766,6 +1792,7 @@ function activeOverlayName(){
   if(state.searchOpen) return "search";
   if(state.fabPick) return "fabPick";
   if(state.qrOverlay) return "qr";
+  if(state.shareOverlay) return "share";
   if(state.agendaEdit) return "agendaEdit";
   return null;
 }
@@ -1774,6 +1801,7 @@ function navSnapshot(){
   let mx = null;
   if(m==="fabPick") mx = {target: state.fabPick.target||"resumen"};
   else if(m==="qr") mx = {url: state.qrOverlay.url, title: state.qrOverlay.title||""};
+  else if(m==="share") mx = {kind: state.shareOverlay.kind, id: state.shareOverlay.id};
   else if(m==="agendaEdit") mx = {...state.agendaEdit};
   return {
     v: state.view,
@@ -1802,6 +1830,8 @@ function applyNavSnapshot(snap){
   state.searchOpen = snap.m==="search";
   state.fabPick = snap.m==="fabPick" ? (snap.mx || {target:"resumen"}) : null;
   state.qrOverlay = snap.m==="qr" ? snap.mx : null;
+  state.shareOverlay = snap.m==="share" ? {...snap.mx, busy:false} : null;
+  if(state.shareOverlay && !state.portalLoaded) loadPortal();
   state.agendaEdit = snap.m==="agendaEdit" ? snap.mx : null;
   state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
   if((state.view==="detalle"||state.view==="informe"||state.view==="contrato") && !sel()){

@@ -151,6 +151,86 @@ function vQrOverlay(){
   </div>`;
 }
 
+// Llaves a mano (paso 139): mini-modal de "Compartir acceso" — llave individual (ficha, lista) o
+// grupal (materia) sin pasar por Cuenta → Portal. openShareOverlay() (sync.js) ya se ocupó de
+// activar el portal general y generar la llave si hacía falta antes de que esto se pinte; acá
+// sólo se muestra el resultado (o el estado de carga/error mientras tanto). Mismo patrón de
+// overlay/modal que vQrOverlay — click afuera cierra, click adentro no propaga.
+function vShareOverlay(){
+  const o = state.shareOverlay; if(!o) return "";
+  let title="", body="";
+  if(o.kind==="alumno"){
+    const st = state.students.find(x=>x.id===o.id);
+    if(!st) return "";
+    title = "Compartir acceso — "+esc(st.name);
+    body = vShareOverlayAlumno(st, o);
+  }else{
+    const m = subjById(o.id);
+    if(!m) return "";
+    title = "Llave grupal — "+esc(m.name);
+    body = vShareOverlayGrupo(m, o);
+  }
+  return `<div class="overlay no-print" data-a="share-close">
+    <div class="modal" data-a="share-modal-noop" style="max-width:400px">
+      <div class="ftitle" style="font-size:16px">${title}</div>
+      ${body}
+      <div style="margin-top:14px;text-align:right"><button class="chip" data-a="share-close">Cerrar</button></div>
+    </div>
+  </div>`;
+}
+function vShareOverlayAlumno(s, o){
+  if(o.busy || !state.portalLoaded) return skeletonRows(2);
+  if(state.portalError && !state.portal){
+    return `<div class="saveerr">${esc(state.portalError)}</div>
+    <button class="chip" data-a="share-open" data-kind="alumno" data-id="${esc(s.id)}">Reintentar</button>`;
+  }
+  const token = tokenForStudent(s.id);
+  if(!token){
+    const err = state.portalAlumnoError || state.portalError;
+    return (err?`<div class="saveerr">${esc(err)}</div>`:"") +
+      `<button class="chip" data-a="share-open" data-kind="alumno" data-id="${esc(s.id)}">Reintentar</button>`;
+  }
+  const url = portalUrl(token);
+  const dias = llaveAlumnoVenceDias(s.id);
+  const vencida = dias!==null && dias<=0;
+  const busy = state.portalAlumnoBusy===s.id;
+  return `<div class="hint" style="margin-bottom:10px">Un link propio para ${esc(s.name)}, sin login — nunca muestra notas, pagos, señas ni comentarios privados.</div>
+  <div class="field"><input readonly value="${esc(url)}" onclick="this.select()"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button class="chip" data-a="share-copy">Copiar link</button>
+    ${hasPhone(s)?`<a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgCompartirLlave(s,url))}">WhatsApp</a>`:""}
+    <button class="chip" data-a="qr-open" data-url="${esc(url)}" data-title="Portal de ${esc(s.name)}">Ver QR</button>
+    <button class="chip" data-a="share-regen" ${busy?"disabled":""}>Regenerar</button>
+  </div>
+  <div class="hint" style="margin-top:10px">${dias===null ? "Llave activa." : vencida ? "Esta llave ya venció — regenerala para renovarla." : `Vence en ${dias} día${dias===1?"":"s"}.`}</div>
+  ${state.portalAlumnoError?`<div class="saveerr" style="margin-top:8px">${esc(state.portalAlumnoError)}</div>`:""}`;
+}
+function vShareOverlayGrupo(m, o){
+  if(o.busy || !state.portalLoaded) return skeletonRows(2);
+  if(state.portalError && !state.portal){
+    return `<div class="saveerr">${esc(state.portalError)}</div>
+    <button class="chip" data-a="share-open" data-kind="materia" data-id="${esc(m.id)}">Reintentar</button>`;
+  }
+  const token = tokenForGrupo(m.id);
+  if(!token){
+    const err = state.portalGrupoError || state.portalError;
+    return (err?`<div class="saveerr">${esc(err)}</div>`:"") +
+      `<button class="chip" data-a="share-open" data-kind="materia" data-id="${esc(m.id)}">Reintentar</button>`;
+  }
+  const url = portalUrl(token);
+  const incluidos = ((state.portal.tokensGrupos[token]||{}).alumnos||[]).length;
+  const busy = state.portalGrupoBusy===m.id;
+  return `<div class="hint" style="margin-bottom:10px">Incluye a ${incluidos} alumno${incluidos===1?"":"s"} de ${esc(m.name)} — ven la biblioteca de la materia y las próximas clases/exámenes del grupo, nunca notas ni pagos.</div>
+  <div class="field"><input readonly value="${esc(url)}" onclick="this.select()"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button class="chip" data-a="share-copy">Copiar link</button>
+    <button class="chip" data-a="qr-open" data-url="${esc(url)}" data-title="Portal de ${esc(m.name)}">Ver QR</button>
+    <button class="chip" data-a="share-regen" ${busy?"disabled":""}>Regenerar</button>
+  </div>
+  <div class="hint" style="margin-top:10px">Para sumar o sacar alumnos del grupo, andá a Cuenta → Portal → Llaves grupales → «Editar alumnos».</div>
+  ${state.portalGrupoError?`<div class="saveerr" style="margin-top:8px">${esc(state.portalGrupoError)}</div>`:""}`;
+}
+
 /* ============ chip de estado de datos: guardado/sincronizando/sin conexión/error, siempre
    visible en el nav. El id="syncStatus" en el span interno es a propósito: setStatus() (sync.js)
    ya lo pisa directo con innerHTML en cada tick de sync, sin pasar por un render() completo. */
@@ -631,6 +711,7 @@ function vAlumnoRow(s){
       <div class="right">${right}</div>
     </button>
     ${hasPhone(s)?`<a class="wa-quick" title="Enviar WhatsApp" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">${ICON_CHAT}</a>`:""}
+    <button class="share-quick" data-a="share-open" data-kind="alumno" data-id="${esc(s.id)}" title="Compartir acceso al portal" aria-label="Compartir acceso al portal">${ICON_LINK}</button>
   </div>`;
 }
 
@@ -723,6 +804,10 @@ function vDetalle(){
         <h2>${esc(s.name)}</h2>${semDot(s.semaforo,16,true)}${pill(s.status)}${examplePill(s)}</div>
       <div class="semlabel">${esc(SEM_META[s.semaforo||"sd"].label)}${(s.semaforo||"sd")==="sd"?" — tocá el círculo para marcar cómo viene":""}</div>
       <div style="font-size:13px;color:var(--muted)">${esc(s.career)} · ${esc(s.subject||"materia s/d")}${s.chair?" · "+esc(s.chair):""} · desde ${fmtDate(s.startDate)}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <button class="chip" data-a="share-open" data-kind="alumno" data-id="${esc(s.id)}">Compartir acceso</button>
+        ${vLlaveBadge(s)}
+      </div>
     </div>
     ${(s.examDate&&d!==null&&d>=0)?`<span class="count big ${d<=7?"urgent":""}">examen: ${d===0?"HOY":d+" día"+(d===1?"":"s")}</span>`:""}
   </div>`;
@@ -1173,6 +1258,20 @@ function vGoalClosure(s){
   </div>`;
 }
 
+// Indicador chico de llave de portal (paso 139, dethead de la ficha) — si el alumno tiene llave
+// activa y cuándo vence (vencimiento sólo informativo, ver llaveAlumnoVenceDias en helpers.js),
+// con "Renovar" (=regenerar) en un click. Sin llave generada, no muestra nada — para eso está el
+// botón "Compartir acceso" al lado, que la genera.
+function vLlaveBadge(s){
+  if(!state.portalLoaded || !tokenForStudent(s.id)) return "";
+  const dias = llaveAlumnoVenceDias(s.id);
+  const vencida = dias!==null && dias<=0;
+  const label = dias===null ? "Llave activa" : vencida ? "Llave vencida" : `Llave activa · vence en ${dias} día${dias===1?"":"s"}`;
+  const busy = state.portalAlumnoBusy===s.id;
+  return `<span class="pill" style="${vencida?"color:var(--status-desaprobo-fg);background:var(--redbg)":"background:var(--soft)"}">${esc(label)}</span>
+    <button class="chip" data-a="portal-alumno-regen" style="padding:4px 8px;font-size:11px" ${busy?"disabled":""}>Renovar</button>`;
+}
+
 // Llave individual de portal para este alumno (ficha → Ficha): generar/copiar/regenerar/revocar
 // el link, y elegir qué ve — SIEMPRE explícito y acotado a estos tres checkboxes. A propósito no
 // hay forma de compartir notas del alumno, pagos, señas ni comentarios privados desde acá: ver
@@ -1203,6 +1302,8 @@ function vPortalAlumnoCard(s){
       <button class="chip" data-a="portal-alumno-regen" ${busy?"disabled":""}>Regenerar llave</button>
       <button class="danger" data-a="portal-alumno-revoke" ${busy?"disabled":""}>Revocar</button>
     </div>
+    ${(()=>{ const dias=llaveAlumnoVenceDias(s.id); if(dias===null) return ""; const vencida=dias<=0;
+      return `<div class="hint" style="margin-top:8px">${vencida?"Esta llave ya venció — «Regenerar llave» arriba la renueva.":`Vence en ${dias} día${dias===1?"":"s"}.`}</div>`; })()}
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--soft)">
       <div class="flabel" style="margin-bottom:6px">Qué ve este alumno en su portal</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -1691,6 +1792,11 @@ function waMsgExamen(s){
   if(d===null) return `Hola ${studentFirstName(s)}! ¿Cómo venís con el estudio para el examen?`;
   return mensajeTexto("examen", {alumno:studentFirstName(s), materia:s.subject||"la materia",
     dias:`${d} día${d===1?"":"s"}`, fecha:s.examDate?` (${fmtDate(s.examDate)})`:"", mail:s.email||""});
+}
+// Compartir la llave de portal por WhatsApp (paso 139) — la única plantilla que arma su propia
+// variable de fondo (link) en vez de leerla del alumno, ver vShareOverlay().
+function waMsgCompartirLlave(s, link){
+  return mensajeTexto("compartirLlave", {alumno:studentFirstName(s), link, mail:s.email||""});
 }
 function waQuickMessage(s){
   const d=daysTo(s.examDate);
@@ -3105,6 +3211,7 @@ function vCatalog(){
       <div class="sub">${m.units.length} unidad${m.units.length===1?"":"es"}</div>
       ${linked.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${linked.map(cr=>`<span class="pill" style="background:var(--soft)">${esc(cr.nombre)}</span>`).join("")}</div>`:""}</div>
     <div style="display:flex;align-items:center;gap:4px">
+      <button class="chip" data-a="share-open" data-kind="materia" data-id="${m.id}" title="Llave grupal para esta materia" aria-label="Llave grupal para esta materia" style="padding:6px 10px;font-size:12px">Llave grupal</button>
       <button class="chip" data-a="cat-duplicate-subject" data-id="${m.id}" title="Duplicar materia" aria-label="Duplicar materia" style="padding:6px 10px;font-size:12px">Duplicar</button>
       <button class="del" data-a="cat-ask-del-subject" data-id="${m.id}" title="Eliminar materia" aria-label="Eliminar materia">×</button>
     </div></div>`;
@@ -4346,6 +4453,7 @@ function render(){
   if(state.searchOpen) m += vSearchOverlay();
   if(state.fabPick) m += vFabPickOverlay();
   if(state.qrOverlay) m += vQrOverlay();
+  if(state.shareOverlay) m += vShareOverlay();
   if(state.agendaEdit) m += vAgendaEditOverlay();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
   const viewKey = state.view;
