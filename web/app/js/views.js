@@ -1448,7 +1448,8 @@ function vAgendaEvent(e, date){
   const already = past && studentHasSessionOnDate(e.studentId, e.date);
   const borderColor = e.subjectId ? `var(--subj-${subjectColorKey(e.subjectId)}-fg)` : "transparent";
   const waBtn = date===today() ? vWaRecordarClaseBtn(e,"hoy") : date===addDays(today(),1) ? vWaRecordarClaseBtn(e,"mañana") : "";
-  return `<div class="agenda-event ${e.overlap?"overlap":""}" style="border-left:3px solid ${borderColor}">
+  return `<div class="agenda-event ${e.overlap?"overlap":""}" style="border-left:3px solid ${borderColor};cursor:pointer"
+    data-a="agenda-event-open" data-student-id="${e.studentId}" data-kind="${e.kind}" data-source-id="${e.sourceId}" data-orig-date="${e.origDate||e.date}">
     <div class="agenda-time">${esc(e.time)} <span class="hint">${e.duration}min</span></div>
     <div class="agenda-who">${e.subjectId?subjectDot(e.subjectId):""} <b>${esc(e.studentName)}</b>${e.subject?` <span class="hint">· ${esc(e.subject)}</span>`:""}</div>
     ${e.seniaEstado?`<span class="chip" style="margin-top:4px;color:${SENIA_ESTADO_META[e.seniaEstado].fg};border-color:${SENIA_ESTADO_META[e.seniaEstado].fg}">Seña ${SENIA_ESTADO_META[e.seniaEstado].label.toLowerCase()}</span>`:""}
@@ -1458,6 +1459,80 @@ function vAgendaEvent(e, date){
     ${!past && e.link ? `<a class="chip" style="margin-top:6px" target="_blank" rel="noopener" href="${esc(e.link)}">Entrar a la clase</a>` : ""}
     ${waBtn ? `<div style="margin-top:6px">${waBtn}</div>` : ""}
   </div>`;
+}
+
+/* ============ popover de edición de una clase desde la agenda (paso 135) ============
+   Se abre al clickear cualquier tarjeta de vAgendaEvent (los botones internos siguen ganando la
+   acción por closest("[data-a]")). Cambiar fecha/hora/duración/link de una clase puntual (kind
+   "puntual") se aplica directo, porque es una única ocurrencia. Si viene de un horario habitual
+   (kind "horario"), esos mismos campos quedan en agendaEditPending hasta elegir alcance ("sólo
+   esta clase" genera una excepción puntual sobre esa fecha; "todas" cambia el horario recurrente
+   entero) — ver applyHorarioEdit en helpers.js. El tema previsto no tiene alcance porque un
+   horario habitual no tiene tema propio: siempre se guarda como excepción de esa ocurrencia. */
+function vAgendaEditOverlay(){
+  const edit = state.agendaEdit; if(!edit) return "";
+  const ev = findAgendaEditEvent(edit);
+  if(!ev){ state.agendaEdit=null; state.agendaEditPending=null; return ""; }
+  const past = ev.date<today();
+  const already = past && studentHasSessionOnDate(ev.studentId, ev.date);
+  const overlap = agendaEditOverlap(ev);
+  const pending = ev.kind==="horario" ? state.agendaEditPending : null;
+  const dateVal = pending && pending.date!=null ? pending.date : ev.date;
+  const timeVal = pending && pending.time!=null ? pending.time : ev.time;
+  const durVal = pending && pending.duration!=null ? pending.duration : ev.duration;
+  const linkVal = pending && pending.link!=null ? pending.link : (ev.link||"");
+
+  let h = `<div class="overlay" data-a="agenda-edit-close">
+    <div class="modal" data-a="agenda-edit-noop" style="max-width:400px">
+      <div class="ftitle" style="font-size:16px">Editar clase</div>
+      <div class="hint" style="margin-bottom:10px">
+        <b style="cursor:pointer;text-decoration:underline" data-a="agenda-edit-goto-ficha" data-id="${ev.studentId}">${esc(ev.studentName)}</b>
+        ${ev.subject?` · ${esc(ev.subject)}`:""}${ev.kind==="horario"?` · clase recurrente los ${esc(DIAS_SEMANA[ev.horario.day])}`:""}
+      </div>
+      <div class="frow">
+        <div class="field"><div class="flabel">Fecha</div><input type="date" data-cf="agenda-edit-date" value="${esc(dateVal)}"></div>
+        <div class="field"><div class="flabel">Hora</div><input type="time" data-cf="agenda-edit-time" value="${esc(timeVal)}"></div>
+        <div class="field" style="max-width:120px"><div class="flabel">Duración (min)</div><input type="number" min="15" step="15" data-cf="agenda-edit-duration" value="${esc(String(durVal))}"></div>
+      </div>
+      <div class="field" style="margin-top:8px"><div class="flabel">Tema previsto</div><input type="text" data-cf="agenda-edit-topic" value="${esc(ev.topic||"")}" placeholder="Opcional"></div>
+      <div class="field" style="margin-top:8px"><div class="flabel">Link de videollamada</div><input type="text" data-cf="agenda-edit-link" value="${esc(linkVal)}" placeholder="Opcional"></div>
+      ${overlap?`<div class="hint" style="color:var(--status-desaprobo-fg);margin-top:8px;display:flex;align-items:center;gap:4px"><span class="icon-inline" style="width:12px;height:12px">${ICON_WARNING}</span> se superpone con otra clase</div>`:""}`;
+
+  if(pending){
+    h += `<div class="formcard" style="margin-top:10px">
+      <div class="hint" style="margin-bottom:8px">Esta clase es parte de un horario recurrente. ¿El cambio aplica a...?</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="chip" data-a="agenda-edit-scope-solo">Sólo a esta clase</button>
+        <button class="chip" data-a="agenda-edit-scope-todas">Todas las de este horario</button>
+        <button class="chip" data-a="agenda-edit-scope-cancel">Deshacer cambio</button>
+      </div>
+    </div>`;
+  }
+
+  h += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+    ${past && !already ? `<button class="chip" data-a="agenda-edit-register">Registrar esta clase</button>` : ""}
+    ${!past && ev.link ? `<a class="chip" target="_blank" rel="noopener" href="${esc(ev.link)}">Entrar a la clase</a>` : ""}
+    ${!state.agendaEditCancelConfirm ? `<button class="chip" data-a="agenda-edit-cancel-ask">Cancelar / ausencia</button>` : ""}
+    ${!state.agendaEditDeleteConfirm ? `<button class="chip" data-a="agenda-edit-delete-ask">${ev.kind==="puntual"?"Borrar esta clase":"Eliminar este horario"}</button>` : ""}
+  </div>`;
+
+  if(state.agendaEditCancelConfirm){
+    h += `<div class="hint" style="margin-top:8px">¿Seguro? Se marca como cancelada/ausente.
+      <button class="chip" data-a="agenda-edit-cancel-confirm">Sí, cancelar</button>
+      <button class="chip" data-a="agenda-edit-cancel-cancel">No</button></div>`;
+  }
+  if(state.agendaEditDeleteConfirm){
+    h += `<div class="hint" style="margin-top:8px">¿Seguro? ${ev.kind==="puntual"?"Se borra esta clase puntual.":"Se elimina TODO el horario recurrente, no sólo esta clase."}
+      <button class="chip" data-a="agenda-edit-delete-confirm">Sí, eliminar</button>
+      <button class="chip" data-a="agenda-edit-delete-cancel">No</button></div>`;
+  }
+
+  h += `<div style="display:flex;justify-content:flex-end;margin-top:14px">
+    <button class="chip" data-a="agenda-edit-close">Cerrar</button>
+  </div>
+    </div>
+  </div>`;
+  return h;
 }
 
 /* ============ agenda semanal imprimible (paso 118) ============
@@ -4192,6 +4267,7 @@ function render(){
   if(state.searchOpen) m += vSearchOverlay();
   if(state.fabPick) m += vFabPickOverlay();
   if(state.qrOverlay) m += vQrOverlay();
+  if(state.agendaEdit) m += vAgendaEditOverlay();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
   const viewKey = state.view;
   const viewChanged = viewKey!==_prevViewKey;

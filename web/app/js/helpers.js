@@ -985,29 +985,128 @@ function hasScheduledBeforeExam(s){
 // habituales expandidos día a día dentro del rango + clases puntuales no canceladas que
 // caen en él. Generaliza lo que antes hacía agendaWeekEvents (semana = rango de 7 días) para
 // que la vista mensual pueda pedir el mismo tipo de evento sobre varias semanas de una.
+// Excepciones por ocurrencia (paso 135): h.exceptions es un objeto {fechaOriginal: override},
+// donde fechaOriginal es la fecha que le hubiera tocado por su día de semana habitual. override
+// es {cancelled:true} (se saltea esa clase) o {date,time,duration,link,topic} (esa ocurrencia
+// puntual quedó movida/editada — date puede ser la misma fecha original u otra distinta, si se
+// cambió de día "sólo para esta clase"). Se procesan en dos pasadas: la primera arma las
+// ocurrencias "normales" saltando cualquier fecha con excepción (para no duplicarla), la segunda
+// agrega cada excepción no cancelada en su fecha final (que puede caer dentro del rango pedido
+// aunque su fecha original no, o viceversa).
 function agendaRangeEvents(fromDate, toDate){
   const events = [];
   alive().filter(s=>s.status==="activo").forEach(s=>{
-    if((s.horarios||[]).length){
+    (s.horarios||[]).forEach(h=>{
+      const exceptions = h.exceptions || {};
       for(let d=fromDate; d<=toDate; d=addDays(d,1)){
-        const dow=weekdayIdx(d);
-        (s.horarios||[]).filter(h=>h.day===dow).forEach(h=>{
-          events.push({studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId,
-            date:d, time:h.time, duration:Number(h.duration)||60, kind:"horario", sourceId:h.id,
-            link:linkVideollamadaFor(s,h.link)});
-        });
+        if(h.day!==weekdayIdx(d)) continue;
+        if(Object.prototype.hasOwnProperty.call(exceptions,d)) continue; // lo cubre la 2da pasada (o está cancelada)
+        events.push({studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId,
+          date:d, time:h.time, duration:Number(h.duration)||60, kind:"horario", sourceId:h.id,
+          origDate:d, link:linkVideollamadaFor(s,h.link)});
       }
-    }
+      Object.keys(exceptions).forEach(origDate=>{
+        const ex=exceptions[origDate]; if(!ex || ex.cancelled) return;
+        const date=ex.date||origDate;
+        if(date<fromDate || date>toDate) return;
+        events.push({studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId,
+          date, time:ex.time||h.time, duration:Number(ex.duration||h.duration)||60,
+          kind:"horario", sourceId:h.id, origDate, moved:date!==origDate, topic:ex.topic||"",
+          link:linkVideollamadaFor(s, ex.link!=null?ex.link:h.link)});
+      });
+    });
     (s.clasesPuntuales||[]).forEach(p=>{
       if(p.cancelada) return;
       if(p.date>=fromDate && p.date<=toDate) events.push({
         studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId,
         date:p.date, time:p.time, duration:Number(p.duration)||60,
-        kind:"puntual", sourceId:p.id, seniaEstado:p.seniaEstado,
+        kind:"puntual", sourceId:p.id, seniaEstado:p.seniaEstado, topic:p.topic||"",
         link:linkVideollamadaFor(s,p.link) });
     });
   });
   return events;
+}
+// resuelve la ocurrencia que está editando el popover de la agenda (paso 135) con sus valores
+// vigentes ahora mismo (aplicando la excepción de ese horario si la hay) — separado de los
+// eventos ya expandidos de agendaRangeEvents porque edit.origDate puede no caer en ningún rango
+// que se esté mostrando en pantalla (p.ej. si ya se editó "sólo esta clase" y se movió lejos).
+function findAgendaEditEvent(edit){
+  if(!edit) return null;
+  const s = state.students.find(x=>x.id===edit.studentId); if(!s) return null;
+  if(edit.kind==="puntual"){
+    const p=(s.clasesPuntuales||[]).find(x=>x.id===edit.sourceId); if(!p || p.cancelada) return null;
+    return {studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId, s,
+      kind:"puntual", sourceId:p.id, date:p.date, time:p.time, duration:Number(p.duration)||60,
+      link:p.link||"", topic:p.topic||"", seniaEstado:p.seniaEstado};
+  }
+  const h=(s.horarios||[]).find(x=>x.id===edit.sourceId); if(!h) return null;
+  const ex=(h.exceptions||{})[edit.origDate];
+  if(ex && ex.cancelled) return null;
+  return {studentId:s.id, studentName:s.name, subject:s.subject, subjectId:s.subjectId, s, horario:h,
+    kind:"horario", sourceId:h.id, origDate:edit.origDate,
+    date: ex ? (ex.date||edit.origDate) : edit.origDate,
+    time: ex ? (ex.time||h.time) : h.time,
+    duration: Number(ex ? (ex.duration||h.duration) : h.duration)||60,
+    link: ex && ex.link!=null ? ex.link : (h.link||""),
+    topic: ex ? (ex.topic||"") : ""};
+}
+// ¿esta ocurrencia (studentId+kind+sourceId+date) se superpone con otra clase el mismo día? —
+// mismo criterio que markOverlaps(), recalculado sólo para la fecha de la ocurrencia que se está
+// editando en el popover.
+function agendaEditOverlap(ev){
+  if(!ev) return false;
+  const events = markOverlaps(agendaRangeEvents(ev.date, ev.date));
+  const match = events.find(e=>e.kind===ev.kind && e.sourceId===ev.sourceId && e.date===ev.date);
+  return match ? match.overlap : false;
+}
+// aplica un cambio de día/hora/duración/link a una ocurrencia de horario habitual: "todas" cambia
+// el horario recurrente entero (patch.date, si vino, sólo se usa para derivar el nuevo día de la
+// semana — no se guarda una fecha puntual en un horario recurrente); "solo" en cambio genera/edita
+// la excepción de esa fecha puntual, dejando el resto de la recurrencia intacta.
+function applyHorarioEdit(studentId, horarioId, origDate, patch, scope){
+  const s = state.students.find(x=>x.id===studentId); if(!s) return;
+  if(scope==="todas"){
+    const horarios = (s.horarios||[]).map(h=>{
+      if(h.id!==horarioId) return h;
+      const next = {...h};
+      if(patch.time!=null) next.time=patch.time;
+      if(patch.duration!=null) next.duration=Number(patch.duration)||60;
+      if(patch.link!=null) next.link=patch.link;
+      if(patch.date!=null) next.day=weekdayIdx(patch.date);
+      return next;
+    });
+    update(studentId,{horarios});
+  }else{
+    const h=(s.horarios||[]).find(x=>x.id===horarioId); if(!h) return;
+    const prevEx=(h.exceptions||{})[origDate]||{};
+    const merged={
+      date: patch.date!=null?patch.date:(prevEx.date||origDate),
+      time: patch.time!=null?patch.time:(prevEx.time||h.time),
+      duration: patch.duration!=null?(Number(patch.duration)||60):(prevEx.duration||h.duration),
+      link: patch.link!=null?patch.link:(prevEx.link!=null?prevEx.link:h.link),
+      topic: patch.topic!=null?patch.topic:(prevEx.topic||""),
+    };
+    const exceptions={...(h.exceptions||{}), [origDate]:merged};
+    const horarios=s.horarios.map(x=>x.id===horarioId?{...x,exceptions}:x);
+    update(studentId,{horarios});
+  }
+}
+// cancela (ausencia) una única ocurrencia de un horario recurrente sin tocar el resto — deja una
+// excepción {cancelled:true} en esa fecha puntual.
+function cancelHorarioOccurrence(studentId, horarioId, origDate){
+  const s = state.students.find(x=>x.id===studentId); if(!s) return;
+  const h=(s.horarios||[]).find(x=>x.id===horarioId); if(!h) return;
+  const exceptions={...(h.exceptions||{}), [origDate]:{cancelled:true}};
+  const horarios=s.horarios.map(x=>x.id===horarioId?{...x,exceptions}:x);
+  update(studentId,{horarios});
+}
+// edita una clase puntual en el lugar (fecha/hora/duración/link/tema) — a diferencia de un
+// horario habitual, una clase puntual siempre es una única ocurrencia, así que no hace falta
+// preguntar alcance.
+function editPuntualClase(studentId, puntualId, patch){
+  const s = state.students.find(x=>x.id===studentId); if(!s) return;
+  const clasesPuntuales=(s.clasesPuntuales||[]).map(x=>x.id===puntualId?{...x,...patch}:x);
+  update(studentId,{clasesPuntuales});
 }
 function agendaWeekEvents(weekStart){ return agendaRangeEvents(weekStart, addDays(weekStart,6)); }
 // Qué exportar a .ics (paso 110): el mismo período que se está viendo en Agenda — la semana

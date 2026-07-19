@@ -231,6 +231,73 @@ document.addEventListener("click", (e)=>{
     state.sessionPrefillDate=el.dataset.date; state.confirmDel=false; state.fichaError="";
     state.registrarClaseTipo="pasada";
   }
+  else if(a==="agenda-event-open"){
+    state.agendaEdit={studentId:el.dataset.studentId, kind:el.dataset.kind, sourceId:el.dataset.sourceId, origDate:el.dataset.origDate};
+    state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
+  }
+  else if(a==="agenda-edit-close"){
+    state.agendaEdit=null; state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
+  }
+  else if(a==="agenda-edit-noop"){ return; }
+  else if(a==="agenda-edit-goto-ficha"){
+    const id=el.dataset.id;
+    state.agendaEdit=null; state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
+    state.selId=id; state.view="detalle"; state.tab="resumen";
+  }
+  else if(a==="agenda-edit-register"){
+    const ev=findAgendaEditEvent(state.agendaEdit); if(!ev) return;
+    state.agendaEdit=null; state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
+    state.selId=ev.studentId; state.view="detalle"; state.tab="clases";
+    state.sessionPrefillDate=ev.date; state.confirmDel=false; state.fichaError="";
+    state.registrarClaseTipo="pasada";
+  }
+  else if(a==="agenda-edit-scope-solo"){
+    const ev=findAgendaEditEvent(state.agendaEdit); if(!ev || !state.agendaEditPending) return;
+    applyHorarioEdit(ev.studentId, ev.sourceId, ev.origDate, state.agendaEditPending, "solo");
+    if(state.agendaEditPending.date!=null) state.agendaEdit.origDate=state.agendaEditPending.date;
+    state.agendaEditPending=null;
+    toast("Clase movida");
+  }
+  else if(a==="agenda-edit-scope-todas"){
+    const ev=findAgendaEditEvent(state.agendaEdit); if(!ev || !state.agendaEditPending) return;
+    applyHorarioEdit(ev.studentId, ev.sourceId, ev.origDate, state.agendaEditPending, "todas");
+    state.agendaEditPending=null;
+    toast("Horario actualizado");
+  }
+  else if(a==="agenda-edit-scope-cancel"){ state.agendaEditPending=null; }
+  else if(a==="agenda-edit-cancel-ask"){ state.agendaEditCancelConfirm=true; }
+  else if(a==="agenda-edit-cancel-cancel"){ state.agendaEditCancelConfirm=false; }
+  else if(a==="agenda-edit-cancel-confirm"){
+    const ev=findAgendaEditEvent(state.agendaEdit); if(!ev) return;
+    if(ev.kind==="puntual") applyCancelacion(ev.studentId, ev.sourceId);
+    else cancelHorarioOccurrence(ev.studentId, ev.sourceId, ev.origDate);
+    state.agendaEdit=null; state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
+    toast("Clase cancelada");
+  }
+  else if(a==="agenda-edit-delete-ask"){ state.agendaEditDeleteConfirm=true; }
+  else if(a==="agenda-edit-delete-cancel"){ state.agendaEditDeleteConfirm=false; }
+  else if(a==="agenda-edit-delete-confirm"){
+    const ev=findAgendaEditEvent(state.agendaEdit); if(!ev) return;
+    const st=state.students.find(x=>x.id===ev.studentId); if(!st) return;
+    state.agendaEdit=null; state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
+    if(ev.kind==="puntual"){
+      const removed=(st.clasesPuntuales||[]).find(x=>x.id===ev.sourceId);
+      update(st.id,{clasesPuntuales:(st.clasesPuntuales||[]).filter(x=>x.id!==ev.sourceId)});
+      toast("Clase puntual eliminada", "ok", ()=>{
+        const st2=state.students.find(x=>x.id===st.id); if(!st2 || !removed) return;
+        update(st.id,{clasesPuntuales:[...(st2.clasesPuntuales||[]), removed]});
+        toast("Clase puntual restaurada");
+      });
+    }else{
+      const removed=(st.horarios||[]).find(x=>x.id===ev.sourceId);
+      update(st.id,{horarios:(st.horarios||[]).filter(x=>x.id!==ev.sourceId)});
+      toast("Horario eliminado", "ok", ()=>{
+        const st2=state.students.find(x=>x.id===st.id); if(!st2 || !removed) return;
+        update(st.id,{horarios:[...(st2.horarios||[]), removed]});
+        toast("Horario restaurado");
+      });
+    }
+  }
   else if(a==="export-agenda-ics"){
     const {events,label}=agendaIcsRangeForView();
     const blob=new Blob([buildAgendaIcs(events)],{type:"text/calendar;charset=utf-8"});
@@ -1396,7 +1463,7 @@ function trapFocus(e){
   else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
 }
 document.addEventListener("keydown",(e)=>{
-  if(e.key==="Tab" && (state.searchOpen || state.showNew)) trapFocus(e);
+  if(e.key==="Tab" && (state.searchOpen || state.showNew || state.agendaEdit)) trapFocus(e);
 });
 
 // Atajos de teclado en escritorio (paso 75): "/" busca, "n" nuevo alumno, "c" nueva clase
@@ -1417,6 +1484,10 @@ document.addEventListener("keydown",(e)=>{
     if(e.key==="Escape" && state.fabPick){ state.fabPick=null; render(); return; }
     if(e.key==="Escape" && state.fabOpen){ state.fabOpen=false; render(); return; }
     if(e.key==="Escape" && state.helpOpen){ state.helpOpen=null; render(); }
+    if(e.key==="Escape" && state.agendaEdit){
+      state.agendaEdit=null; state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
+      render(); return;
+    }
     return;
   }
   if(e.key==="Escape"){ e.preventDefault(); state.searchOpen=false; render(); return; }
@@ -1484,6 +1555,21 @@ function handleFormChange(e){
   const mu=e.target.closest("[data-matunit]");
   if(mu){ setMaterialUnit(mu.dataset.id, mu.dataset.name, mu.value); render(); return; }
   const cf=e.target.closest("[data-cf]");
+  // Popover de edición desde la agenda (paso 135): el alumno dueño de la clase no es
+  // necesariamente state.selId (se puede abrir desde cualquier vista de Agenda sin haber entrado
+  // a ninguna ficha), así que estos campos resuelven el estudiante desde state.agendaEdit en vez
+  // de sel(). Fecha/hora/duración/link de un horario habitual quedan en un "pending" a la espera
+  // de elegir alcance (sólo esta clase o todas) — ver agenda-edit-scope-* en el switch de arriba;
+  // tema previsto no admite alcance (los horarios no tienen tema propio) así que se aplica directo.
+  if(cf && (cf.dataset.cf==="agenda-edit-date" || cf.dataset.cf==="agenda-edit-time" || cf.dataset.cf==="agenda-edit-duration" || cf.dataset.cf==="agenda-edit-link" || cf.dataset.cf==="agenda-edit-topic")){
+    const ev=findAgendaEditEvent(state.agendaEdit); if(!ev) return;
+    const field=cf.dataset.cf.slice("agenda-edit-".length);
+    const value=field==="duration" ? (parseInt(cf.value,10)||60) : cf.value;
+    if(ev.kind==="puntual"){ editPuntualClase(ev.studentId, ev.sourceId, {[field]:value}); render(); return; }
+    if(field==="topic"){ applyHorarioEdit(ev.studentId, ev.sourceId, ev.origDate, {topic:value}, "solo"); render(); return; }
+    state.agendaEditPending={...(state.agendaEditPending||{}), [field]:value};
+    render(); return;
+  }
   if(cf && cf.dataset.cf==="subj-name"){
     const m=subjById(state.editSubjectId); if(!m) return;
     const v=cf.value.trim(); if(!v) return;
@@ -1660,6 +1746,7 @@ function activeOverlayName(){
   if(state.searchOpen) return "search";
   if(state.fabPick) return "fabPick";
   if(state.qrOverlay) return "qr";
+  if(state.agendaEdit) return "agendaEdit";
   return null;
 }
 function navSnapshot(){
@@ -1667,6 +1754,7 @@ function navSnapshot(){
   let mx = null;
   if(m==="fabPick") mx = {target: state.fabPick.target||"resumen"};
   else if(m==="qr") mx = {url: state.qrOverlay.url, title: state.qrOverlay.title||""};
+  else if(m==="agendaEdit") mx = {...state.agendaEdit};
   return {
     v: state.view,
     id: state.selId || null,
@@ -1694,6 +1782,8 @@ function applyNavSnapshot(snap){
   state.searchOpen = snap.m==="search";
   state.fabPick = snap.m==="fabPick" ? (snap.mx || {target:"resumen"}) : null;
   state.qrOverlay = snap.m==="qr" ? snap.mx : null;
+  state.agendaEdit = snap.m==="agendaEdit" ? snap.mx : null;
+  state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
   if((state.view==="detalle"||state.view==="informe"||state.view==="contrato") && !sel()){
     state.view="tablero"; state.selId=null;
   }
