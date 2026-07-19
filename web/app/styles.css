@@ -78,14 +78,12 @@
     --row-pad:11px 14px; --row-mb:7px;
     --log-pad:9px 12px; --log-mb:6px;
     --agenda-event-pad:7px 9px; --agenda-event-mb:6px;
-    --agenda-day-pad:10px; --agenda-day-minh:64px;
     --cal-cell-pad:6px 4px; --cal-cell-minh:52px;
   }
   body.density-compact{
     --row-pad:6px 10px; --row-mb:4px;
     --log-pad:5px 10px; --log-mb:4px;
     --agenda-event-pad:4px 7px; --agenda-event-mb:3px;
-    --agenda-day-pad:6px; --agenda-day-minh:46px;
     --cal-cell-pad:4px 3px; --cal-cell-minh:38px;
   }
   @media (prefers-color-scheme:dark){
@@ -247,14 +245,40 @@
   .wa-quick svg{width:16px;height:16px}
   .examresult{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--amber);
               border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:14px}
-  .agenda-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-  .agenda-day{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:var(--agenda-day-pad);min-height:var(--agenda-day-minh)}
-  .agenda-day.today{border-color:var(--accent);border-width:2px}
-  .agenda-daylabel{font-weight:700;font-size:12.5px;margin-bottom:8px;display:flex;justify-content:space-between;gap:6px}
   .agenda-event{background:var(--soft);border-radius:8px;padding:var(--agenda-event-pad);margin-bottom:var(--agenda-event-mb);font-size:12.5px}
   .agenda-event.overlap{background:var(--redbg);border:1px solid var(--redline2)}
   .agenda-time{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
   .agenda-who{margin-top:2px}
+
+  /* ============ agenda semanal: grilla horaria completa, 7 días × bloques 08-22 (paso 134) —
+     gap:1px + fondo var(--line) en el contenedor dibuja las líneas de la grilla sin bordes por
+     celda; scroll horizontal propio (.week-scroll) para que en mobile los 7 días sigan estando
+     todos ahí (a diferencia de la mensual, que sí oculta días fuera de mes). Reusa vAgendaEvent()
+     tal cual dentro de cada celda — mismo criterio de "lado a lado" que la vista de un día
+     (paso 90, .agenda-hour-slot): flex-wrap con min-width, así que con varias clases a la misma
+     hora conviven si entran o se apilan si no. */
+  .week-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--line)}
+  .week-grid{display:grid;grid-template-columns:52px repeat(7,minmax(120px,1fr));gap:1px;
+    background:var(--line);min-width:892px}
+  .week-corner{background:var(--card);position:sticky;left:0;z-index:2}
+  .week-head{background:var(--card);padding:7px 4px;text-align:center;font-size:11.5px;font-weight:700;color:var(--muted)}
+  .week-head.today{background:var(--accent-soft);color:var(--accent-dark)}
+  .week-head .week-headdate{display:block;font-weight:400;font-size:10px;color:var(--faint);margin-top:1px}
+  .week-head.today .week-headdate{color:var(--accent-dark)}
+  .week-hourlabel{background:var(--bg);padding:4px 6px;font-family:var(--mono);font-size:10px;
+    color:var(--faint);text-align:right;position:sticky;left:0;z-index:1}
+  .week-cell{background:var(--card);padding:4px;min-height:38px;display:flex;flex-wrap:wrap;
+    gap:6px;align-items:flex-start;position:relative}
+  .week-cell.today{box-shadow:inset 0 0 0 1px var(--accent)}
+  .week-cell.empty{cursor:pointer}
+  .week-cell.empty:hover{background:var(--soft)}
+  .week-cell .agenda-event{flex:1 1 130px;min-width:110px;margin-bottom:0;font-size:11.5px}
+  .week-now{position:absolute;left:0;right:0;height:2px;background:var(--accent);border-radius:1px;pointer-events:none}
+  @media (max-width:480px){
+    .week-grid{grid-template-columns:44px repeat(7,minmax(96px,1fr));min-width:716px}
+    .week-hourlabel{font-size:9px;padding:4px 3px}
+    .week-cell .agenda-event{flex-basis:100%}
+  }
 
   /* ============ agenda de un día: grilla vertical de bloques por hora (paso 90) ============ */
   .agenda-hours{max-height:65vh;overflow-y:auto;border:1px solid var(--line);border-radius:10px;
@@ -709,20 +733,20 @@
 
   @keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
   .view-enter .row,.view-enter .examcard,.view-enter .topic,.view-enter .hoy-row,.view-enter .desk,
-  .view-enter .ds-card,.view-enter .agenda-day,.view-enter .cal-cell{
+  .view-enter .ds-card,.view-enter .week-cell,.view-enter .cal-cell{
     animation:cardIn .3s cubic-bezier(.16,1,.3,1) backwards;
   }
-  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.agenda-day,.cal-cell):nth-child(1){animation-delay:0ms}
-  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.agenda-day,.cal-cell):nth-child(2){animation-delay:25ms}
-  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.agenda-day,.cal-cell):nth-child(3){animation-delay:50ms}
-  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.agenda-day,.cal-cell):nth-child(4){animation-delay:75ms}
-  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.agenda-day,.cal-cell):nth-child(5){animation-delay:100ms}
-  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.agenda-day,.cal-cell):nth-child(6){animation-delay:125ms}
-  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.agenda-day,.cal-cell):nth-child(7){animation-delay:150ms}
-  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.agenda-day,.cal-cell):nth-child(n+8){animation-delay:175ms}
+  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.week-cell,.cal-cell):nth-child(1){animation-delay:0ms}
+  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.week-cell,.cal-cell):nth-child(2){animation-delay:25ms}
+  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.week-cell,.cal-cell):nth-child(3){animation-delay:50ms}
+  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.week-cell,.cal-cell):nth-child(4){animation-delay:75ms}
+  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.week-cell,.cal-cell):nth-child(5){animation-delay:100ms}
+  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.week-cell,.cal-cell):nth-child(6){animation-delay:125ms}
+  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.week-cell,.cal-cell):nth-child(7){animation-delay:150ms}
+  .view-enter :is(.row,.examcard,.topic,.hoy-row,.desk,.ds-card,.week-cell,.cal-cell):nth-child(n+8){animation-delay:175ms}
   @media (prefers-reduced-motion:reduce){
     .view-fade,.appmain.view-enter,.view-enter .row,.view-enter .examcard,.view-enter .topic,
-    .view-enter .hoy-row,.view-enter .desk,.view-enter .ds-card,.view-enter .agenda-day,.view-enter .cal-cell{animation:none}
+    .view-enter .hoy-row,.view-enter .desk,.view-enter .ds-card,.view-enter .week-cell,.view-enter .cal-cell{animation:none}
   }
 
   /* barras/gráficos que crecen al entrar en pantalla (IntersectionObserver, ver observeGrowBars()

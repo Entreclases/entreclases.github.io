@@ -121,6 +121,7 @@ let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPac
               informePeriod:"3m", informeImgBusy:false,
               agendaWeekOffset:0, sessionPrefillDate:"",
               agendaViewMode:"semana", agendaMonthOffset:0, agendaSelectedDay:null, agendaQuickAddOpen:false,
+              agendaGridQuick:null,
               puntualCancelAskId:null, cobrosBannerOpen:false, registrarClaseTipo:null,
               portal:null, portalLoaded:false, portalError:"",
               portalSaving:false, portalSaveMsg:"", portalCopyMsg:"",

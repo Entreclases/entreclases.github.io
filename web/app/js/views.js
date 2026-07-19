@@ -1288,15 +1288,32 @@ function vAgendaSemana(){
     </div>
   </div>`;
 
-  const events = markOverlaps(agendaWeekEvents(weekStart));
-  if(events.length===0){
-    h += emptyState(ICON_CALENDAR, "Sin clases agendadas esta semana",
+  if(alive().filter(s=>s.status==="activo").length===0){
+    h += emptyState(ICON_CALENDAR, "Sin alumnos activos",
       "Cargá horarios habituales o agendá una próxima clase desde la ficha de cada alumno (pestaña «Clases»).",
       `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`);
     return h;
   }
-  h += vExportIcsHint();
 
+  const events = markOverlaps(agendaWeekEvents(weekStart));
+  if(events.length===0){
+    h += `<div class="hint" style="margin-bottom:10px">Sin clases agendadas esta semana — clickeá un bloque de la grilla para programar una.</div>`;
+  }else{
+    h += vExportIcsHint();
+  }
+
+  h += vAgendaWeekGrid(weekStart, events);
+  if(state.agendaGridQuick) h += vAgendaGridQuickForm();
+  return h;
+}
+// grilla horaria semanal (paso 134): 7 columnas (una por día, siempre las 7 visibles — ver
+// .week-scroll en styles.css para el scroll horizontal en mobile) × filas de una hora, 08-22
+// por defecto y extendida ese día puntual si hay una clase fuera de rango. Cada celda agrupa
+// las clases que empiezan en esa hora con el mismo criterio de "lado a lado" que la vista de
+// un día (paso 90, vAgendaDayHours) — mismo componente vAgendaEvent(), sólo más chico. Las
+// celdas vacías son clickeables: abren vAgendaGridQuickForm() con día y hora precargados.
+function vAgendaWeekGrid(weekStart, events){
+  const days = Array.from({length:7},(_,i)=>addDays(weekStart,i));
   const byDay = Array.from({length:7},()=>[]);
   events.forEach(e=>{
     const idx = Math.round((new Date(e.date+"T12:00:00")-new Date(weekStart+"T12:00:00"))/86400000);
@@ -1304,15 +1321,52 @@ function vAgendaSemana(){
   });
   byDay.forEach(list=>list.sort((a,b)=>a.time.localeCompare(b.time)));
 
-  h += `<div class="agenda-grid">` + DIAS_SEMANA.map((label,i)=>{
-    const date = addDays(weekStart,i);
-    const list = byDay[i];
-    return `<div class="agenda-day ${date===today()?"today":""}">
-      <div class="agenda-daylabel">${esc(label)} <span class="hint">${esc(fmtDate(date))}</span></div>
-      ${list.length===0 ? `<div class="hint">Sin clases</div>` : list.map(e=>vAgendaEvent(e,date)).join("")}
-    </div>`;
-  }).join("") + `</div>`;
+  const startHour = events.length ? Math.min(8, ...events.map(e=>Math.floor(e.startMin/60))) : 8;
+  const endHour = events.length ? Math.max(22, ...events.map(e=>Math.ceil(e.endMin/60))) : 22;
+  const now = new Date();
+  const nowMin = now.getHours()*60+now.getMinutes();
+
+  let h = `<div class="week-scroll"><div class="week-grid">`;
+  h += `<div class="week-corner"></div>`;
+  h += days.map((d,i)=>`<div class="week-head ${d===today()?"today":""}">${esc(DIAS_SEMANA[i].slice(0,3))}<span class="week-headdate">${esc(fmtDate(d))}</span></div>`).join("");
+
+  for(let hr=startHour; hr<endHour; hr++){
+    const label = String(hr).padStart(2,"0")+":00";
+    h += `<div class="week-hourlabel">${label}</div>`;
+    h += days.map((d,i)=>{
+      const isToday = d===today();
+      const list = byDay[i].filter(e=>Math.floor(e.startMin/60)===hr);
+      const nowLine = isToday && nowMin>=hr*60 && nowMin<(hr+1)*60
+        ? `<div class="week-now" style="top:${(((nowMin-hr*60)/60)*100).toFixed(1)}%"></div>` : "";
+      if(list.length===0){
+        return `<div class="week-cell empty ${isToday?"today":""}" data-a="agenda-grid-add" data-date="${d}" data-hour="${label}">${nowLine}</div>`;
+      }
+      return `<div class="week-cell ${isToday?"today":""}">${nowLine}${list.map(e=>vAgendaEvent(e,d)).join("")}</div>`;
+    }).join("");
+  }
+  h += `</div></div>`;
   return h;
+}
+// mini-formulario "Programar clase acá" (paso 132), disparado al clickear un hueco de la
+// grilla semanal — mismos tres campos y misma addPuntualClase() que "Programar clase acá" en
+// la agenda mensual, sólo que acá la fecha y la hora ya vienen precargadas del bloque clickeado.
+function vAgendaGridQuickForm(){
+  const q = state.agendaGridQuick;
+  const activos = alive().filter(s=>s.status==="activo").sort((a,b)=>a.name.localeCompare(b.name));
+  let h = `<div class="formcard" style="margin-top:12px">
+    <div class="ftitle">Programar clase — ${esc(fmtDate(q.date))} ${esc(q.time)}</div>`;
+  h += activos.length===0
+    ? `<div class="hint">No hay alumnos activos para programarles una clase.</div>`
+    : `<div class="frow" style="align-items:flex-end">
+        <div class="field"><div class="flabel">Alumno</div><select id="wq-student">
+          ${activos.map(s=>`<option value="${s.id}">${esc(s.name)}${s.subject?" · "+esc(s.subject):""}</option>`).join("")}
+        </select></div>
+        <div class="field"><div class="flabel">Hora</div><input type="time" id="wq-time" value="${esc(q.time)}"></div>
+        <div class="field" style="max-width:120px"><div class="flabel">Duración (min)</div><input type="number" id="wq-duration" value="60" min="15" step="15"></div>
+        <button class="chip" data-a="agenda-grid-quick-add" style="margin-bottom:2px">+ Programar</button>
+        <button class="chip" data-a="agenda-grid-quick-cancel" style="margin-bottom:2px">Cancelar</button>
+      </div>`;
+  return h + `</div>`;
 }
 /* ============ vista "Agenda" → Mes: grilla del mes con mini-marcas por día ============ */
 function vAgendaMes(){
@@ -4145,6 +4199,14 @@ function render(){
   document.getElementById("app").innerHTML = navShell(isAdmin) + fabHtml() + `<main class="appmain${viewChanged?" view-enter":""}">${m}</main>` + toastWrap();
   if(typeof observeGrowBars==="function") observeGrowBars();
   if(viewChanged && typeof animateCounters==="function") animateCounters();
+  // grilla semanal (paso 134): al recién entrar a la vista, centra el scroll horizontal en la
+  // columna de hoy (mobile no entra en 360px con los 7 días, ver .week-scroll en styles.css) —
+  // sólo al abrir la vista, para no pelearle el scroll al usuario en cada re-render.
+  if(viewChanged && state.view==="agenda" && (state.agendaViewMode||"semana")==="semana"){
+    const wrap = document.querySelector(".week-scroll");
+    const todayCol = wrap && wrap.querySelector(".week-head.today");
+    if(wrap && todayCol) wrap.scrollLeft = todayCol.offsetLeft - (wrap.clientWidth/2) + (todayCol.clientWidth/2);
+  }
   if(typeof syncHistory==="function") syncHistory();
   const fi = document.getElementById("importFile");
   if(fi) fi.addEventListener("change", e=>{

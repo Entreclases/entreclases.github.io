@@ -190,10 +190,10 @@ document.addEventListener("click", (e)=>{
     setSes(null); state.view="tablero"; _navSnapshot=null; render(); return;
   }
   else if(a==="agenda-view-semana"){ state.agendaViewMode="semana"; }
-  else if(a==="agenda-view-mes"){ state.agendaViewMode="mes"; }
-  else if(a==="agenda-prev"){ state.agendaWeekOffset=(state.agendaWeekOffset||0)-1; }
-  else if(a==="agenda-next"){ state.agendaWeekOffset=(state.agendaWeekOffset||0)+1; }
-  else if(a==="agenda-today"){ state.agendaWeekOffset=0; }
+  else if(a==="agenda-view-mes"){ state.agendaViewMode="mes"; state.agendaGridQuick=null; }
+  else if(a==="agenda-prev"){ state.agendaWeekOffset=(state.agendaWeekOffset||0)-1; state.agendaGridQuick=null; }
+  else if(a==="agenda-next"){ state.agendaWeekOffset=(state.agendaWeekOffset||0)+1; state.agendaGridQuick=null; }
+  else if(a==="agenda-today"){ state.agendaWeekOffset=0; state.agendaGridQuick=null; }
   else if(a==="agenda-month-prev"){ state.agendaMonthOffset=(state.agendaMonthOffset||0)-1; state.agendaSelectedDay=null; state.agendaQuickAddOpen=false; }
   else if(a==="agenda-month-next"){ state.agendaMonthOffset=(state.agendaMonthOffset||0)+1; state.agendaSelectedDay=null; state.agendaQuickAddOpen=false; }
   else if(a==="agenda-month-today"){ state.agendaMonthOffset=0; state.agendaSelectedDay=null; state.agendaQuickAddOpen=false; }
@@ -211,6 +211,19 @@ document.addEventListener("click", (e)=>{
     state.agendaQuickAddOpen=false;
     const {warning}=addPuntualClase(studentEl.value, date, time, duration);
     if(warning) alert(warning);
+    return;
+  }
+  else if(a==="agenda-grid-add"){ state.agendaGridQuick={date:el.dataset.date, time:el.dataset.hour}; }
+  else if(a==="agenda-grid-quick-cancel"){ state.agendaGridQuick=null; }
+  else if(a==="agenda-grid-quick-add"){
+    const studentEl=document.getElementById("wq-student"); if(!studentEl) return;
+    const q=state.agendaGridQuick; if(!q) return;
+    const time=document.getElementById("wq-time").value; if(!time) return;
+    const duration=parseInt(document.getElementById("wq-duration").value,10)||60;
+    state.agendaGridQuick=null;
+    const {warning}=addPuntualClase(studentEl.value, q.date, time, duration);
+    if(warning) alert(warning);
+    else toast("Próxima clase agendada");
     return;
   }
   else if(a==="agenda-log"){
