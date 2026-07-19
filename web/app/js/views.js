@@ -70,6 +70,16 @@ function themeNavBtn(){
 function logoutNavBtn(){
   return `<button class="navitem" data-a="nav-logout" title="Cerrar sesión">${ICON_LOGOUT}<span class="navitem-label">Salir</span></button>`;
 }
+// Foto del docente en la barra lateral (paso 137, sólo escritorio — .appnav-brand/.docente-mini
+// están ocultos en mobile, ver styles.css): sólo lectura acá, se edita desde Cuenta. En modo demo
+// avatarHtml ya cae solo en iniciales (avatarUrlFor corta con IS_DEMO), nunca inventa una foto.
+function docenteMiniHtml(){
+  const doc=docenteFor();
+  return `<button class="docente-mini" data-a="nav-cuenta" title="Cuenta">
+    ${avatarHtml("docente", doc.nombre||"Docente", doc.foto, 28)}
+    <span class="navitem-label">${esc(doc.nombre||"Tu cuenta")}</span>
+  </button>`;
+}
 function navShell(isAdmin){
   const items = isAdmin ? [...NAV_ITEMS,{view:"panel",action:"nav-panel",label:"Panel",icon:ICON_SHIELD}] : NAV_ITEMS;
   const isOn = (it) => state.view===it.view || (it.altViews||[]).includes(state.view);
@@ -80,7 +90,7 @@ function navShell(isAdmin){
     <button class="appnav-brand" data-a="nav-tablero" aria-label="Ir al tablero"><span class="logo-mark">${ICON_CHECK}</span>Entreclases</button>
     <button class="navitem navitem-search" data-a="open-search" title="Buscar (atajo: /)">${ICON_SEARCH}<span class="navitem-label">Buscar</span></button>
     <div class="appnav-list">${itemsHtml}</div>
-    <div class="appnav-foot">${syncChip()}${themeNavBtn()}${logoutNavBtn()}</div>
+    <div class="appnav-foot">${docenteMiniHtml()}${syncChip()}${themeNavBtn()}${logoutNavBtn()}</div>
   </nav>`;
 }
 
@@ -612,6 +622,7 @@ function vAlumnoRow(s){
       : `<span style="color:var(--faint)">${s.examDate?fmtDate(s.examDate):"sin fecha"}</span>`;
   return `<div class="row">
     <button class="row-click" data-a="open" data-id="${s.id}">
+      ${avatarHtml(s.id, s.name, s.foto, 36, "flex-shrink:0")}
       <div class="main"><div class="name">${esc(s.name)} ${semDot(s.semaforo,13,false)} ${pill(s.status)} ${examplePill(s)}
         ${na?`<span class="mini-alert">${na} alerta${na>1?"s":""}</span>`:""}
         ${deuda>0?`<span class="pill" style="color:var(--status-desaprobo-fg);background:var(--redbg)">debe ${fmtMoney(deuda)}</span>`:""}</div>
@@ -706,6 +717,7 @@ function vDetalle(){
   const alerts = studentAlerts(s);
   let h = `<button class="back" data-a="back">← Volver a la lista</button>
   <div class="dethead">
+    ${avatarHtml(s.id, s.name, s.foto, 52, "flex-shrink:0")}
     <div style="flex:1;min-width:220px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <h2>${esc(s.name)}</h2>${semDot(s.semaforo,16,true)}${pill(s.status)}${examplePill(s)}</div>
@@ -786,6 +798,34 @@ function vFichaResumenGlance(s){
   </div>`;
 }
 
+// Editor de foto de perfil (paso 137), reusado para el docente (Cuenta) y cada alumno (ficha) —
+// mismo patrón de subida que "+ Subir" de Materiales (vMaterialUploadRow), sólo que acá no hay
+// selector de materia/unidad: sólo el archivo y la key ("docente" o "alumno-{id}", ver
+// avatarKeyForStudent/AVATAR_KEY_DOCENTE en sync.js). El resize a cuadrado/256px/WebP pasa en el
+// navegador (resizeImageToAvatar, helpers.js) recién al tocar "Subir", nunca antes.
+function vAvatarEditor(key, name, foto, sizePx){
+  if(IS_DEMO) return `<div style="display:flex;align-items:center;gap:12px">${avatarHtml(key, name, foto, sizePx||64)}<span class="hint">En modo demostración no se pueden subir fotos.</span></div>`;
+  const inputId = "avatar-file-"+key.replace(/[^a-zA-Z0-9_-]/g,"");
+  const uploading = state.avatarUploading;
+  const confirming = state.avatarDeleteConfirmKey===key;
+  const offline = !navigator.onLine;
+  return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    ${avatarHtml(key, name, foto, sizePx||64)}
+    <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:220px">
+      ${offline ? `<div class="hint">Necesitás conexión a internet para subir o cambiar la foto.</div>` : `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input type="file" accept="image/*" id="${inputId}" style="max-width:220px" ${uploading?"disabled":""}>
+        <button class="chip" data-a="avatar-upload" data-key="${key}" data-input="${inputId}" ${uploading?"disabled":""}>${uploading?"Subiendo…":(foto?"Cambiar foto":"+ Subir foto")}</button>
+        ${foto && !confirming ? `<button class="chip" data-a="avatar-delete-ask" data-key="${key}">Borrar foto</button>` : ""}
+        ${confirming ? `<span style="font-size:12px;color:var(--status-desaprobo-fg)">¿Borrar la foto?</span>
+          <button class="danger" data-a="avatar-delete-confirm" data-key="${key}">Sí, borrar</button>
+          <button class="chip" data-a="avatar-delete-cancel">Cancelar</button>` : ""}
+      </div>`}
+      ${state.avatarUploadError ? `<div class="hint" style="color:var(--status-desaprobo-fg)">${esc(state.avatarUploadError==="offline"?"Necesitás conexión a internet para subir la foto.":state.avatarUploadError)}</div>` : ""}
+      <div class="hint">Opcional — se recorta cuadrada y se achica automáticamente antes de subir.</div>
+    </div>
+  </div>`;
+}
+
 /* ============ ficha → Resumen: vistazo rápido, avance por unidades, datos de contacto,
    informe/contrato y borrar alumno — todo lo que no tiene pestaña propia ============ */
 function vFichaResumen(s){
@@ -816,6 +856,7 @@ function vFichaResumen(s){
     <div><div class="ftitle" style="margin-bottom:2px">Contrato de servicio</div>
       <div class="hint">Modelo precargado con los datos de esta ficha, listo para completar y firmar.</div></div>
     <button class="chip" data-a="open-contrato">Generar contrato</button></div>`;
+  h += `<div class="formcard"><div class="ftitle">Foto de perfil</div>${vAvatarEditor(avatarKeyForStudent(s.id), s.name, s.foto, 64)}</div>`;
   if(state.fichaError) h += `<div class="saveerr">${esc(state.fichaError)}</div>`;
   h += `<div class="formcard">
     <div class="frow">
@@ -1470,7 +1511,7 @@ function vAgendaEvent(e, date){
   return `<div class="agenda-event ${e.overlap?"overlap":""}" style="border-left:3px solid ${borderColor};cursor:pointer"
     data-a="agenda-event-open" data-student-id="${e.studentId}" data-kind="${e.kind}" data-source-id="${e.sourceId}" data-orig-date="${e.origDate||e.date}">
     <div class="agenda-time">${esc(e.time)} <span class="hint">${e.duration}min</span></div>
-    <div class="agenda-who">${e.subjectId?subjectDot(e.subjectId):""} <b>${esc(e.studentName)}</b>${e.subject?` <span class="hint">· ${esc(e.subject)}</span>`:""}</div>
+    <div class="agenda-who" style="display:flex;align-items:center;gap:5px">${avatarHtml(e.studentId, e.studentName, studentFotoFor(e.studentId), 18)}${e.subjectId?subjectDot(e.subjectId):""} <b>${esc(e.studentName)}</b>${e.subject?` <span class="hint">· ${esc(e.subject)}</span>`:""}</div>
     ${e.seniaEstado?`<span class="chip" style="margin-top:4px;color:${SENIA_ESTADO_META[e.seniaEstado].fg};border-color:${SENIA_ESTADO_META[e.seniaEstado].fg}">Seña ${SENIA_ESTADO_META[e.seniaEstado].label.toLowerCase()}</span>`:""}
     ${e.overlap?`<div class="hint" style="color:var(--status-desaprobo-fg);display:flex;align-items:center;gap:4px"><span class="icon-inline" style="width:12px;height:12px">${ICON_WARNING}</span> se superpone con otra clase</div>`:""}
     ${past && already ? `<div class="hint" style="color:var(--status-activo-fg)">Ya registrada</div>` : ""}
@@ -2580,7 +2621,8 @@ function vCuenta(){
   return pageHead("Cuenta","Tu cuenta y preferencias") + `
   <div class="formcard"><div class="ftitle">Datos del docente</div>
     <div class="hint" style="margin-bottom:10px">Se cargan una sola vez acá y se reutilizan donde haga falta (por ahora, el generador de contratos de servicio, en la ficha de cada alumno).</div>
-    <div class="frow">
+    ${vAvatarEditor(AVATAR_KEY_DOCENTE, doc.nombre||"Docente", doc.foto, 64)}
+    <div class="frow" style="margin-top:14px">
       <div class="field"><div class="flabel">Nombre completo</div><input data-cf="docente-nombre" value="${esc(doc.nombre||"")}"></div>
       <div class="field"><div class="flabel">Teléfono</div><input data-cf="docente-telefono" value="${esc(doc.telefono||"")}"></div>
       <div class="field"><div class="flabel">DNI / CUIT (opcional)</div><input data-cf="docente-dni" value="${esc(doc.dni||"")}"></div>

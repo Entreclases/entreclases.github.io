@@ -555,6 +555,19 @@ document.addEventListener("click", (e)=>{
     state.newPackName=""; state.newPackSubjects=[]; state.newPackError="";
     touchCatalog(); return;
   }
+  else if(a==="avatar-upload"){
+    const input=document.getElementById(el.dataset.input);
+    const file=input && input.files && input.files[0];
+    if(!file) return;
+    if(!/^image\//.test(file.type)){ state.avatarUploadError="Elegí un archivo de imagen."; render(); return; }
+    uploadAvatar(el.dataset.key, file); return;
+  }
+  else if(a==="avatar-delete-ask"){ state.avatarDeleteConfirmKey=el.dataset.key; }
+  else if(a==="avatar-delete-cancel"){ state.avatarDeleteConfirmKey=null; }
+  else if(a==="avatar-delete-confirm"){
+    const key=el.dataset.key; state.avatarDeleteConfirmKey=null;
+    deleteAvatar(key); return;
+  }
   else if(a==="mat-reload"){ loadMateriales(el.dataset.id); return; }
   else if(a==="mat-upload"){
     const input=document.getElementById(el.dataset.input||"mat-file");

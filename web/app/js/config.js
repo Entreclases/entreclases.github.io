@@ -105,6 +105,12 @@ const MATERIALES_BUCKET = "materiales";
 const MATERIAL_MAX_BYTES = 10*1024*1024;
 const MATERIAL_MAX_COUNT = 100;
 const MATERIAL_MAX_TOTAL_BYTES = 50*1024*1024; // por usuario, sumando materiales de todas sus materias
+// Fotos de perfil opcionales (paso 137): docente y alumnos, mismo bucket privado "materiales" que
+// ya usan los archivos por materia — bajo la carpeta propia del usuario ({uid}/avatars/...) para
+// reusar la misma política RLS existente (scoped a {uid}/...) sin necesitar una migración nueva.
+// Cuentan contra el mismo MATERIAL_MAX_TOTAL_BYTES de arriba (ver materialesTotalBytes en sync.js).
+const AVATAR_SIZE_PX = 256;
+const AVATAR_TARGET_BYTES = 60*1024; // objetivo tras el resize — no un tope duro, ver resizeImageToAvatar
 // Recordatorio push de las clases del día (paso 108): clave pública VAPID, apta para exponerse
 // en el cliente por diseño (no es secreta) — el par se generó una sola vez con
 // `npx web-push generate-vapid-keys`; la privada vive sólo como secreto de la Edge Function

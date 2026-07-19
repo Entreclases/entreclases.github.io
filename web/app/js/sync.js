@@ -756,7 +756,15 @@ async function publicarPortal(){
       const bloque=buildGrupoBlock(mid, entry?entry.alumnos:[], bibMateria);
       if(bloque) grupos[mid]=bloque;
     });
-    const publicado={...state.portal.publicado, nombre:(state.portal.draftNombre||"").trim(), biblioteca, alumnos, grupos};
+    // Foto del docente (paso 137): mismo criterio que la biblioteca — se firma acá (mientras hay
+    // sesión) y el portal público sólo consume la URL ya firmada, nunca pide nada al bucket
+    // privado por su cuenta. Si el docente no cargó foto, fotoDocente queda null y el portal cae
+    // en su propio fallback (iniciales), sin pedir nada a Storage.
+    const doc=docenteFor();
+    const fotoDocente = doc.foto
+      ? {url:await signMaterialUrl(s, doc.foto.path, PORTAL_LINK_TTL_DAYS*86400), firmadoAt:Date.now()}
+      : null;
+    const publicado={...state.portal.publicado, nombre:(state.portal.draftNombre||"").trim(), biblioteca, alumnos, grupos, fotoDocente};
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
     await patchPortalRow(uid_, h, {publicado});
     state.portal.publicado=publicado;
@@ -790,7 +798,18 @@ async function maybeRenewPortalLibrary(uid_, s){
     const markStale=(it)=>{ if((!it.firmadoAt || it.firmadoAt<staleCutoff) && !stale.has(it.path)) stale.set(it.path, it); };
     biblioteca.forEach(markStale);
     Object.values(grupos).forEach(g=>(g.biblioteca||[]).forEach(markStale));
-    if(!stale.size) return;
+    // Foto del docente (paso 137): mismo chequeo de vencimiento, sobre su propio path — no
+    // comparte "stale" con la biblioteca (no es un material), así que si sólo ella venció no hay
+    // que frenar acá por `!stale.size`.
+    const fotoDocenteActual=(row.publicado&&row.publicado.fotoDocente)||null;
+    const docFoto=docenteFor().foto;
+    const fotoDocenteStale = docFoto && (!fotoDocenteActual || !fotoDocenteActual.firmadoAt || fotoDocenteActual.firmadoAt<staleCutoff);
+    if(!stale.size && !fotoDocenteStale) return;
+    let fotoDocente=fotoDocenteActual;
+    if(fotoDocenteStale){
+      try{ fotoDocente={url:await signMaterialUrl(s, docFoto.path, PORTAL_LINK_TTL_DAYS*86400), firmadoAt:Date.now()}; }
+      catch(e){ /* best-effort, igual que el resto de la biblioteca */ }
+    }
     const renewed=await Promise.all([...stale.values()].map(async it=>{
       try{ return [it.path, {url:await signMaterialUrl(s, it.path, PORTAL_LINK_TTL_DAYS*86400), firmadoAt:Date.now()}]; }
       catch(e){ return [it.path, null]; } // best-effort: un archivo puntual borrado/renombrado no frena a los demás
@@ -800,7 +819,7 @@ async function maybeRenewPortalLibrary(uid_, s){
     const mergedBiblioteca=biblioteca.map(mergeItem);
     const mergedGrupos={};
     Object.entries(grupos).forEach(([mid,g])=>{ mergedGrupos[mid]={...g, biblioteca:(g.biblioteca||[]).map(mergeItem)}; });
-    const publicado={...row.publicado, biblioteca:mergedBiblioteca, grupos:mergedGrupos};
+    const publicado={...row.publicado, biblioteca:mergedBiblioteca, grupos:mergedGrupos, fotoDocente};
     await patchPortalRow(uid_, h, {publicado});
     if(state.portal){ state.portal.publicado=publicado; render(); }
   }catch(e){ /* silencioso: se reintenta al otro día */ }
@@ -1032,6 +1051,89 @@ function materialObjectUrl(path){
   return SUPA_URL+"/storage/v1/object/"+MATERIALES_BUCKET+"/"+path.split("/").map(encodeURIComponent).join("/");
 }
 
+/* ============ fotos de perfil: subida/borrado (paso 137) ============
+   Misma ruta con "x-upsert" (en vez de un nombre único como los materiales, ver materialPath):
+   la foto de un mismo alumno/docente siempre pisa el mismo objeto, así que no hay que borrar la
+   vieja antes de subir la nueva ni acumular basura en el bucket. "key" es "docente" o
+   "alumno-{studentId}" — AVATAR_KEY_DOCENTE/avatarKeyForStudent más abajo son las únicas dos
+   formas de construirla, para no repetir el string a mano en cada lugar que la usa. */
+const AVATAR_KEY_DOCENTE = "docente";
+function avatarKeyForStudent(studentId){ return "alumno-"+studentId; }
+function avatarPath(uid_, key){ return `${uid_}/avatars/${key}.webp`; }
+function avatarBytesFor(key){
+  if(key===AVATAR_KEY_DOCENTE) return Number(docenteFor().foto && docenteFor().foto.bytes)||0;
+  const st=state.students.find(x=>x.id===key.slice("alumno-".length));
+  return Number(st && st.foto && st.foto.bytes)||0;
+}
+function setAvatarField(key, foto){
+  if(key===AVATAR_KEY_DOCENTE){ state.catalog.docente={...docenteFor(), foto}; touchCatalog(); return; }
+  update(key.slice("alumno-".length), {foto});
+}
+async function loadAvatarDataUrl(foto){
+  if(!foto || !foto.path) return;
+  const cacheKey=foto.path+"|"+(foto.updatedAt||0);
+  if(_avatarDataUrlCache.has(cacheKey) || _avatarLoading.has(cacheKey)) return;
+  _avatarLoading.add(cacheKey);
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+    const r=await fetch(materialObjectUrl(foto.path), {headers:h});
+    if(!r.ok) throw new Error("error "+r.status);
+    const blob=await r.blob();
+    const dataUrl=await new Promise((resolve,reject)=>{
+      const fr=new FileReader(); fr.onload=()=>resolve(fr.result); fr.onerror=reject; fr.readAsDataURL(blob);
+    });
+    _avatarDataUrlCache.set(cacheKey, dataUrl);
+    render();
+  }catch(e){ /* se reintenta solo en el próximo render (no queda cacheado el fallo) */ }
+  finally{ _avatarLoading.delete(cacheKey); }
+}
+async function uploadAvatar(key, file){
+  if(!navigator.onLine){ state.avatarUploadError="offline"; render(); return; }
+  state.avatarUploading=true; state.avatarUploadError=""; render();
+  try{
+    const blob=await resizeImageToAvatar(file);
+    if(!blob) throw new Error("no se pudo procesar la imagen");
+    const usedBytes=materialesTotalBytes()-avatarBytesFor(key); // sin contar la foto vieja de esta misma key
+    if(usedBytes+blob.size > MATERIAL_MAX_TOTAL_BYTES){
+      state.avatarUploading=false;
+      state.avatarUploadError="No entra en tu espacio de materiales (50 MB en total, entre archivos y fotos).";
+      render(); return;
+    }
+    if(IS_DEMO){
+      state.avatarUploading=false;
+      state.avatarUploadError="En modo demostración no se pueden subir fotos — quedan las iniciales.";
+      render(); return;
+    }
+    const s=await ensureToken();
+    const uid_=jwtSub(s.access);
+    const path=avatarPath(uid_, key);
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"image/webp", "x-upsert":"true"};
+    const r=await fetch(materialObjectUrl(path), {method:"POST", headers:h, body:blob});
+    if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.error||("error "+r.status)); }
+    setAvatarField(key, {path, bytes:blob.size, updatedAt:Date.now()});
+    state.avatarUploading=false;
+    toast("Foto actualizada");
+  }catch(e){
+    state.avatarUploading=false;
+    state.avatarUploadError = !navigator.onLine ? "offline" : "No se pudo subir la foto.";
+    render();
+  }
+}
+async function deleteAvatar(key){
+  if(!navigator.onLine){ state.avatarUploadError="offline"; render(); return; }
+  if(!IS_DEMO){
+    try{
+      const s=await ensureToken();
+      const uid_=jwtSub(s.access);
+      const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+      await fetch(materialObjectUrl(avatarPath(uid_, key)), {method:"DELETE", headers:h});
+    }catch(e){ /* si falla el borrado en Storage, igual se saca de la ficha/cuenta — no bloquea al profesor */ }
+  }
+  setAvatarField(key, null);
+  toast("Foto eliminada");
+}
+
 // Índice liviano de materiales (nombre, bytes, fecha) guardado dentro de state.catalog, por
 // materia — así uploadMaterial puede chequear el total de MATERIAL_MAX_TOTAL_BYTES sin listar Storage en cada
 // subida. Es un espejo del list() real de Storage, así que puede desincronizarse (borrados desde
@@ -1045,8 +1147,13 @@ function materialIndexEntry(subjectId, name){
   return materialesIndexFor(subjectId).find(m=>m.name===name) || null;
 }
 function materialesTotalBytes(){
-  return (state.catalog.subjects||[]).reduce((sum,s)=>
+  let total=(state.catalog.subjects||[]).reduce((sum,s)=>
     sum+((s.materiales||[]).reduce((a,m)=>a+(Number(m.bytes)||0),0)), 0);
+  // Fotos de perfil (paso 137): cuentan contra el mismo total de 50 MB, aunque a ~60 KB cada una
+  // sean despreciables frente a los materiales.
+  total += Number(docenteFor().foto && docenteFor().foto.bytes)||0;
+  total += (state.students||[]).reduce((a,s)=>a+(Number(s.foto&&s.foto.bytes)||0),0);
+  return total;
 }
 function materialesIndexMatches(subjectId, storageList){
   const idx=materialesIndexFor(subjectId);

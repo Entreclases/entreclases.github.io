@@ -152,6 +152,67 @@ function nextSubjectColor(){
   state.catalog.subjects.forEach(m=>{ const k=subjectColorKey(m); counts[k]=(counts[k]||0)+1; });
   return SUBJECT_COLOR_KEYS.reduce((best,k)=>counts[k]<counts[best]?k:best, SUBJECT_COLOR_KEYS[0]);
 }
+/* ============ fotos de perfil opcionales (paso 137): docente y alumnos ============
+   s.foto / docente.foto = {path, bytes, updatedAt} | null|undefined. La miniatura (WebP, ver
+   resizeImageToAvatar) vive en el bucket privado "materiales" — como cualquier objeto privado de
+   Storage, mostrarla requiere pedirla con el token de sesión (no un <img src> directo a la URL de
+   Supabase), así que se resuelve una sola vez a una data: URL y se cachea en memoria (nunca en
+   state: no hace falta persistirla, y una data: URL no sobrevive un JSON.stringify legible). Sin
+   foto (o en modo demo, donde jamás se inventa una imagen) cae en iniciales con color estable por
+   id, misma idea que subjectColorKey() pero contra el id del alumno/"docente" en vez de la materia. */
+const _avatarDataUrlCache = new Map(); // "path|updatedAt" -> data: URL ya resuelta
+const _avatarLoading = new Set();
+function avatarColorKey(id){
+  let h=0; const s=id||""; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0;
+  return SUBJECT_COLOR_KEYS[Math.abs(h)%SUBJECT_COLOR_KEYS.length];
+}
+function initialsFor(name){
+  const parts=(name||"").trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return "?";
+  return (parts[0][0]+(parts[1]?parts[1][0]:"")).toUpperCase();
+}
+// Devuelve la data: URL ya resuelta, o null mientras se resuelve (dispara loadAvatarDataUrl en
+// sync.js, que al terminar cachea y llama a render() para que el próximo avatarUrlFor la encuentre).
+function avatarUrlFor(foto){
+  if(!foto || !foto.path || IS_DEMO) return null;
+  const cacheKey=foto.path+"|"+(foto.updatedAt||0);
+  if(_avatarDataUrlCache.has(cacheKey)) return _avatarDataUrlCache.get(cacheKey);
+  loadAvatarDataUrl(foto);
+  return null;
+}
+function avatarHtml(id, name, foto, sizePx, extraStyle){
+  const url=avatarUrlFor(foto);
+  const style=`width:${sizePx}px;height:${sizePx}px;${extraStyle||""}`;
+  if(url) return `<img class="avatar" style="${style}" src="${url}" alt="">`;
+  const k=avatarColorKey(id);
+  return `<div class="avatar avatar-fallback" style="${style}font-size:${Math.round(sizePx*0.4)}px;background:var(--subj-${k}-bg);color:var(--subj-${k}-fg)">${esc(initialsFor(name))}</div>`;
+}
+// Recorte cuadrado centrado + resize a AVATAR_SIZE_PX + WebP, bajando la calidad de a pasos hasta
+// entrar en AVATAR_TARGET_BYTES (o hasta 0.5, lo que pase primero — igual se sube, sólo pesará un
+// poco más del objetivo) — nunca se sube el archivo original. Se lee con FileReader (data: URL) en
+// vez de URL.createObjectURL para no necesitar blob: en la CSP, sólo data: (ya permitido para
+// mostrar avatares, ver el <meta> de CSP en index.html/portal.html).
+async function resizeImageToAvatar(file){
+  const dataUrl = await new Promise((resolve,reject)=>{
+    const fr=new FileReader(); fr.onload=()=>resolve(fr.result); fr.onerror=reject; fr.readAsDataURL(file);
+  });
+  const img = await new Promise((resolve,reject)=>{
+    const im=new Image(); im.onload=()=>resolve(im); im.onerror=reject; im.src=dataUrl;
+  });
+  const side=Math.min(img.width, img.height);
+  const sx=(img.width-side)/2, sy=(img.height-side)/2;
+  const canvas=document.createElement("canvas");
+  canvas.width=AVATAR_SIZE_PX; canvas.height=AVATAR_SIZE_PX;
+  canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, AVATAR_SIZE_PX, AVATAR_SIZE_PX);
+  let quality=0.8, blob=null;
+  for(let i=0;i<4;i++){
+    blob = await new Promise(res=>canvas.toBlob(res, "image/webp", quality));
+    if(!blob || blob.size<=AVATAR_TARGET_BYTES || quality<=0.5) break;
+    quality -= 0.1;
+  }
+  return blob;
+}
+
 function subjectDot(subjectOrId){
   const k = subjectColorKey(subjectOrId);
   return `<span class="subj-dot" style="background:var(--subj-${k}-fg)"></span>`;
@@ -1011,6 +1072,12 @@ function studentFirstName(s){ return (s.name||"").trim().split(/\s+/)[0] || s.na
 function studentHasSessionOnDate(studentId, date){
   const s = state.students.find(x=>x.id===studentId);
   return !!(s && (s.sessions||[]).some(x=>x.date===date));
+}
+// Foto de un alumno a partir de su id (paso 137) — los eventos de agenda (agendaRangeEvents) son
+// objetos sintéticos sin s.foto propio, así que el mini-avatar de vAgendaEvent lo busca acá.
+function studentFotoFor(studentId){
+  const s = state.students.find(x=>x.id===studentId);
+  return s ? s.foto : null;
 }
 // ¿tiene alguna clase (habitual o puntual) prevista entre hoy y la fecha de examen, inclusive?
 function hasScheduledBeforeExam(s){

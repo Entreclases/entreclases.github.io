@@ -182,6 +182,7 @@
   .navitem svg{width:20px;height:20px;flex-shrink:0}
   .navitem.on{color:var(--accent-dark);background:var(--accent-soft)}
   .navitem-label{max-width:60px;overflow:hidden;text-overflow:ellipsis}
+  .docente-mini{display:none}
   @media (min-width:860px){
     .appnav{top:0;left:0;bottom:0;right:auto;width:220px;flex-direction:column;
       border-top:none;border-right:1px solid var(--line);padding:22px 14px;overflow-x:visible}
@@ -196,7 +197,18 @@
       font-size:13.5px;flex:none;width:100%}
     .navitem svg{width:18px;height:18px}
     .navitem-label{max-width:none}
+    .docente-mini{display:flex;align-items:center;gap:9px;padding:8px 12px;border:none;
+      background:none;color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:600;
+      text-align:left;cursor:pointer;border-radius:10px;width:100%}
+    .docente-mini:hover{background:var(--soft)}
+    .docente-mini .navitem-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   }
+
+  /* ============ foto de perfil opcional: docente y alumnos (paso 137) — sin foto cae en
+     iniciales con color estable por id (avatarColorKey en helpers.js) ============ */
+  .avatar{border-radius:50%;object-fit:cover;flex-shrink:0}
+  .avatar-fallback{display:inline-flex;align-items:center;justify-content:center;
+    font-weight:700;font-family:var(--display)}
 
   /* ============ encabezado de sección por vista: eyebrow + título + acción principal ============ */
   .pagehead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;

@@ -7,7 +7,7 @@
      sin conexión no tiene nada guardado para mostrar. CSS propio, sin depender de styles.css,
      mismo criterio que la landing (web/index.html): cada archivo standalone de este repo
      duplica sus estilos en vez de compartir hoja. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://*.supabase.co; font-src 'self'; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Portal — Entreclases</title>
 <style>
@@ -55,6 +55,7 @@
   .brandhead b{font-family:var(--display);font-weight:700;font-size:14px}
   .eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
   h1{font-family:var(--display);font-weight:700;font-size:22px;margin:0 0 18px;letter-spacing:-.01em}
+  .docente-foto{width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px}
   .ctitle{font-weight:600;font-size:14.5px;margin-bottom:6px}
   .empty{color:var(--faint);font-size:14px}

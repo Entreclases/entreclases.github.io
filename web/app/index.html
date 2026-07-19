@@ -6,7 +6,7 @@
      frame-ancestors/sandbox/report-uri no valen acá (el spec los ignora en <meta>), por eso no
      están. ipc: / http://ipc.localhost es lo que pide Tauri v2 para su IPC interno cuando la
      CSP se escribe a mano en vez de vía tauri.conf.json (que auto-inyecta nonces propios). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src https://*.supabase.co https://api.github.com ipc: http://ipc.localhost; base-uri 'none'; form-action 'self'; object-src 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src https://*.supabase.co https://api.github.com ipc: http://ipc.localhost; base-uri 'none'; form-action 'self'; object-src 'none';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Entreclases</title>
 <link rel="manifest" href="manifest.webmanifest">

@@ -201,7 +201,13 @@ function showPortal(res){
     : ((res.data && Array.isArray(res.data.biblioteca)) ? res.data.biblioteca : []);
   const avisos = esGrupo ? (res.grupo.avisos||[])
     : (res.tipo==="alumno" ? ((res.alumno&&res.alumno.avisos)||[]) : ((res.data&&res.data.avisos)||[]));
-  let h = `<h1>${esc(titulo)}</h1>`;
+  // Foto del docente (paso 137, opcional): ya viene firmada desde publicarPortal() en el JSON
+  // "publicado" — el portal público nunca pide nada al bucket privado por su cuenta, sólo muestra
+  // la URL que el docente firmó mientras tenía sesión. Sin foto, no se muestra nada (el portal es
+  // standalone y no tiene la paleta de colores/iniciales de la app principal para armar un
+  // fallback consistente).
+  const fotoDocente = res.data && res.data.fotoDocente && res.data.fotoDocente.url;
+  let h = `<h1 style="display:flex;align-items:center;gap:10px">${fotoDocente?`<img src="${esc(fotoDocente)}" alt="" class="docente-foto">`:""}<span>${esc(titulo)}</span></h1>`;
   h += avisosHtml(avisos);
   // Llave de alumno: su bloque personal va primero, arriba de lo general (biblioteca/links) —
   // es lo que más le importa a él en particular.
