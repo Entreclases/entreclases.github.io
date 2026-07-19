@@ -1570,8 +1570,11 @@ function setSes(v){
   }
 }
 // rol cacheado en la propia sesión (ver storeSession/loadRole) para que ande offline;
-// sin rol conocido todavía se degrada a "profesor" — nunca admin por defecto.
-function sesIsAdmin(ses){ return !!(ses && ses.role==="admin"); }
+// sin rol conocido todavía se degrada a "profesor" — nunca admin por defecto. En modo demo
+// (IS_DEMO) esto siempre da false, aunque el visitante tenga una sesión de admin real guardada
+// en el mismo navegador (getSes() lee la cookie tal cual): el modo demo manda siempre, nunca
+// muestra el panel admin ni el rótulo de administrador (paso 145).
+function sesIsAdmin(ses){ return !IS_DEMO && !!(ses && ses.role==="admin"); }
 function getRememberedEmails(){
   try{ const a=JSON.parse(localStorage.getItem(EMAILS_KEY)); return Array.isArray(a)?a:[]; }
   catch(e){ return []; }
@@ -1639,19 +1642,25 @@ function openSearchResult(item){
   }
 }
 
-/* ============ modo demo (paso 95, sobre el paso 82): ?demo=1 carga este cuaderno ficticio en
-   memoria — nunca toca localStorage ni el backend (ver IS_DEMO en config.js, el guard de save()
-   acá abajo, el de ensureToken() en auth.js y los guards IS_DEMO de loadPortal()/loadMateriales()
-   y compañía en sync.js). Se reconstruye entera en CADA carga de la página (load() llama a esto
-   de nuevo siempre) y todas las fechas son relativas a hoy (addDays/today/Date.now) para que se
-   vea siempre vigente, nunca vieja, sin importar cuándo se abra. Pensada para que quien la
-   recorra vea al toque casi todo lo que la app sabe hacer: variedad de materias/alumnos/estados,
-   agenda de la semana con clases superpuestas, pagos/señas/mensualidades con deuda real, costos
-   cargados (rentabilidad con números), contratos y recibos, materiales y portal (llaves
-   individuales y grupal) ya activados, un ítem en la papelera, y varios meses de historial para
-   que Estadísticas y Retención no se vean vacías. Los materiales son sólo la entrada liviana que
-   ya vive en catalog.subjects[].materiales — nunca se sube ni se lista nada de Storage real (ver
-   materialesIndexFor() en sync.js: lee ese mismo array local). ============ */
+/* ============ modo demo (paso 95, sobre el paso 82; ampliado a vidriera total en el paso 145):
+   ?demo=1 carga este cuaderno ficticio en memoria — nunca toca localStorage ni el backend (ver
+   IS_DEMO en config.js, el guard de save() acá abajo, el de ensureToken() en auth.js y los guards
+   IS_DEMO de loadPortal()/loadMateriales() y compañía en sync.js). Se reconstruye entera en CADA
+   carga de la página (load() llama a esto de nuevo siempre) y todas las fechas son relativas a
+   hoy (addDays/today/Date.now) para que se vea siempre vigente, nunca vieja, sin importar cuándo
+   se abra. Pensada para que quien la recorra vea al toque casi todo lo que la app sabe hacer:
+   ~32 alumnos repartidos desigual entre 5 materias (Análisis Matemático I como la más numerosa,
+   para que "El aula" del paso 138 se vea bien poblada), carreras vinculadas a materias (paso
+   129), unidades con subunidades y material por unidad (paso 128), alumnos por hora/clase/
+   mensuales (paso 130), señas y deudas variadas, dos pausados, ausencias con motivo (paso 113),
+   un cumpleaños hoy, exámenes próximos, objetivos con racha, etiquetas (paso 103), interesados
+   (paso 119), agenda de la semana con clases superpuestas y una próxima clase agendada, medios
+   de cobro del docente (paso 141), papelera con dos entradas (un alumno y una materia) y varios
+   meses de historial para que Estadísticas y Retención no se vean vacías. Los materiales son
+   sólo la entrada liviana que ya vive en catalog.subjects[].materiales — nunca se sube ni se
+   lista nada de Storage real (ver materialesIndexFor() en sync.js: lee ese mismo array local).
+   La sesión demo nunca muestra el panel admin, sea cual sea la sesión real guardada en el mismo
+   navegador — ver sesIsAdmin() en este archivo, que siempre da false con IS_DEMO activo. ============ */
 function buildDemoData(){
   // Strings sin normalizar todavía (mismo formato que un cuaderno viejo) — normalizeUnits() más
   // abajo, en cada materia, es la única que las convierte a objetos {id,nombre,orden,subunidades}.
@@ -1660,23 +1669,42 @@ function buildDemoData(){
   const unitsOf = id => (SUBJECT_TEMPLATES.find(t=>t.id===id)||{units:[]}).units;
   const atDaysAgo = n => new Date(Date.now()-n*86400000).toISOString();
   const catalog = defaultCatalog();
-  catalog.careers = ["Ingeniería","Licenciatura","Arquitectura"];
+
+  // Carreras (paso 129): con id propio para poder vincularlas a materias (subject.careerIds) sin
+  // depender de que normalizeCatalogCareers() les invente uno más abajo.
+  const careerIng = {id:uid(), nombre:"Ingeniería"};
+  const careerLic = {id:uid(), nombre:"Licenciatura"};
+  const careerArq = {id:uid(), nombre:"Arquitectura"};
+  const careerIngresante = {id:uid(), nombre:"Ingresante"};
+  catalog.careers = [careerIng, careerLic, careerArq, careerIngresante];
+
+  // Unidades por materia, con id propio para poder sumarles subunidades (paso 127/128) y
+  // etiquetar materiales por unidad antes de armar catalog.subjects.
+  const am1Units = normalizeUnits(unitsOf("tpl-analisis-1"));
+  am1Units[2].subunidades = [{id:uid(),nombre:"Derivada de funciones básicas"},{id:uid(),nombre:"Regla de la cadena"}];
+  const algUnits = normalizeUnits(unitsOf("tpl-algebra"));
+  const ingUnits = normalizeUnits(unitsOf("tpl-matematica-ingreso"));
+  const fis1Units = normalizeUnits(unitsOf("tpl-fisica-1"));
+  fis1Units[0].subunidades = [{id:uid(),nombre:"MRU y MRUV"},{id:uid(),nombre:"Tiro oblicuo"}];
+  const quiUnits = normalizeUnits(unitsOf("tpl-quimica-general"));
+
   catalog.subjects = [
-    { id:"demo-am1", name:"Análisis Matemático I", units:normalizeUnits(unitsOf("tpl-analisis-1")), color:"teal",
+    { id:"demo-am1", name:"Análisis Matemático I", units:am1Units, color:"teal", careerIds:[careerIng.id,careerLic.id],
       materiales:[
-        {name:"guia3-Guía de ejercicios — Unidad 3.pdf", bytes:842000, compartido:true, at:atDaysAgo(30)},
-        {name:"resder-Resumen de derivadas.pdf", bytes:210000, compartido:true, at:atDaysAgo(12)},
+        {name:"guia3-Guía de ejercicios — Unidad 3.pdf", bytes:842000, compartido:true, at:atDaysAgo(30), unitId:am1Units[2].id},
+        {name:"resder-Resumen de derivadas.pdf", bytes:210000, compartido:true, at:atDaysAgo(12), unitId:am1Units[2].id},
+        {name:"guiaint-Guía de integrales.pdf", bytes:390000, compartido:true, at:atDaysAgo(6)},
       ] },
-    { id:"demo-alg", name:"Álgebra y Geometría Analítica", units:normalizeUnits(unitsOf("tpl-algebra")), color:"indigo",
+    { id:"demo-alg", name:"Álgebra y Geometría Analítica", units:algUnits, color:"indigo", careerIds:[careerIng.id],
       materiales:[
-        {name:"guiamat-Guía de matrices y determinantes.pdf", bytes:530000, compartido:true, at:atDaysAgo(18)},
+        {name:"guiamat-Guía de matrices y determinantes.pdf", bytes:530000, compartido:true, at:atDaysAgo(18), unitId:algUnits[2].id},
       ] },
-    { id:"demo-ing", name:"Matemática básica / ingreso", units:normalizeUnits(unitsOf("tpl-matematica-ingreso")), color:"slate", materiales:[] },
-    { id:"demo-fis1", name:"Física I", units:normalizeUnits(unitsOf("tpl-fisica-1")), color:"blue",
+    { id:"demo-ing", name:"Matemática básica / ingreso", units:ingUnits, color:"slate", careerIds:[careerIngresante.id], materiales:[] },
+    { id:"demo-fis1", name:"Física I", units:fis1Units, color:"blue", careerIds:[careerIng.id,careerArq.id],
       materiales:[
-        {name:"formcin-Fórmulas de cinemática.pdf", bytes:96000, compartido:false, at:atDaysAgo(5)},
+        {name:"formcin-Fórmulas de cinemática.pdf", bytes:96000, compartido:false, at:atDaysAgo(5), unitId:fis1Units[0].id},
       ] },
-    { id:"demo-qui", name:"Química General", units:normalizeUnits(unitsOf("tpl-quimica-general")), color:"amber", materiales:[] },
+    { id:"demo-qui", name:"Química General", units:quiUnits, color:"amber", careerIds:[careerIng.id], materiales:[] },
   ];
   catalog.docente = {nombre:"Prof. Demo", telefono:"11-5555-0100", dni:"30111222"};
   // Cobros (paso 141): con alias y link cargados para que se vea armado en Cuenta y en el portal
@@ -1702,14 +1730,29 @@ function buildDemoData(){
     deletedAt: Date.now()-2*86400000,
   }];
 
+  // Etiquetas libres (paso 103) — asignadas más abajo a algunos alumnos vía tagIds.
+  const tagBuenRitmo = {id:uid(), label:"Buen ritmo", color:"green"};
+  const tagRefuerzo = {id:uid(), label:"Requiere refuerzo", color:"rose"};
+  const tagRecomendado = {id:uid(), label:"Recomendado por otro alumno", color:"blue"};
+  catalog.tags = [tagBuenRitmo, tagRefuerzo, tagRecomendado];
+
+  // Interesados (paso 119): lista de espera aparte de state.students, con los cuatro estados del
+  // ciclo representados.
+  catalog.interesados = [
+    {id:uid(), nombre:"Camila Suárez", contacto:"11-4444-2201", materia:"Análisis Matemático I", nota:"Preguntó por videollamada, todavía no arrancó.", estado:"en_charla"},
+    {id:uid(), nombre:"Lautaro Ibáñez", contacto:"11-4444-2202", materia:"Física I", nota:"Recomendado por Valentina Ruiz.", estado:"consulto"},
+    {id:uid(), nombre:"Zoe Fernández", contacto:"11-4444-2203", materia:"Química General", nota:"Arranca la semana que viene.", estado:"arranca"},
+    {id:uid(), nombre:"Marcos Villa", contacto:"11-4444-2204", materia:"Álgebra y Geometría Analítica", nota:"Consultó precio, no volvió a escribir.", estado:"no_arranca"},
+  ];
+
   const students = [];
   const mk = (over) => ({
     id: uid(), career:"Ingeniería", chair:"", notes:"", informeComment:"", phone:"",
     tarifa:"", modalidad:"", pagos:[], recibos:[], examResults:[],
     horarios:[], clasesPuntuales:[], seniaActiva:false, seniaTipo:"monto", seniaValor:"",
     contratoResponsable:"", contratoDni:"", contratoFechaInicio:"", contratoClausulas:"",
-    startDate: addDays(today(),-60), status:"activo", semaforo:"sd", examDate:"",
-    topics:{}, sessions:[], simulacros:[], portalShare:null, updatedAt:Date.now(),
+    startDate: addDays(today(),-60), status:"activo", semaforo:"sd", examDate:"", birthDate:"",
+    topics:{}, sessions:[], simulacros:[], portalShare:null, tagIds:[], updatedAt:Date.now(),
     ...over,
   });
   const sess = (daysAgo, topic, tarea, cobrada, objetivo, objetivoResult) => ({
@@ -1717,6 +1760,9 @@ function buildDemoData(){
     duration:60, cobrada:!!cobrada,
     objetivo: objetivo||"", objetivoResult: objetivoResult||null,
   });
+  // Marca una clase ya creada como ausencia con motivo (paso 113) — se aplica sobre el objeto que
+  // devuelve sess(), no lo reemplaza, para no tener que repetir sus demás campos.
+  const ausente = (session, motivo, cobra) => { session.ausente={motivo,cobra}; return session; };
   // clases semanales espaciadas cada 7 días desde hace `startAt` días — para dar varios meses de
   // historial real (Estadísticas, Rentabilidad histórica, Retención) sin escribir docenas de
   // clases a mano; una de cada cinco queda sin cobrar, para que también haya algo pendiente.
@@ -1732,8 +1778,8 @@ function buildDemoData(){
 
   // 1) Lucía — al día, examen próximo, buen avance, contrato firmado, recibo emitido
   const lucia = mk({
-    name:"Lucía Fernández", subject:"Análisis Matemático I", subjectId:"demo-am1",
-    semaforo:"verde", examDate:addDays(today(),10), tarifa:8000, modalidad:"clase",
+    name:"Lucía Fernández", subject:"Análisis Matemático I", subjectId:"demo-am1", career:"Ingeniería",
+    semaforo:"verde", examDate:addDays(today(),10), tarifa:8000, modalidad:"clase", tagIds:[tagBuenRitmo.id],
     contratoResponsable:"Marisa Fernández", contratoDni:"28900111", contratoFechaInicio:addDays(today(),-60),
     topics:{[unitsOf("tpl-analisis-1")[0]]:"parcial",[unitsOf("tpl-analisis-1")[1]]:"parcial",
       [unitsOf("tpl-analisis-1")[2]]:"practica",[unitsOf("tpl-analisis-1")[3]]:"visto"},
@@ -1753,7 +1799,7 @@ function buildDemoData(){
 
   // 2) Martín — debe la mensualidad, en riesgo, con dos meses de historial de pagos
   const martin = mk({
-    name:"Martín Gómez", subject:"Física I", subjectId:"demo-fis1",
+    name:"Martín Gómez", subject:"Física I", subjectId:"demo-fis1", career:"Ingeniería",
     semaforo:"amarillo", examDate:addDays(today(),20), tarifa:35000, modalidad:"mensual",
     pagos:[
       {id:uid(), date:addDays(today(),-65), amount:35000},
@@ -1946,6 +1992,171 @@ function buildDemoData(){
     name:"Alumno de prueba", subject:"Análisis Matemático I", subjectId:"demo-am1",
     sessions:[ sess(40,"Números reales y funciones","hecha",true) ],
   }), deleted:true, deletedAt: Date.now()-3*86400000});
+
+  // ============ paso 145: vidriera total — alumnos nuevos para llegar a ~32 y cubrir todo lo
+  // que todavía no tenía ejemplo (ausencias con motivo, cumpleaños hoy, segundo pausado, segunda
+  // papelera, más etiquetas, más historial y una agenda más poblada). ============
+
+  // 17) Milagros — Análisis I, faltó avisando con tiempo (no corresponde cobrarle)
+  students.push(mk({
+    name:"Milagros Funes", subject:"Análisis Matemático I", subjectId:"demo-am1", career:"Ingeniería",
+    semaforo:"amarillo", examDate:addDays(today(),18), tarifa:8000, modalidad:"clase", tagIds:[tagRefuerzo.id],
+    topics:{[unitsOf("tpl-analisis-1")[0]]:"parcial",[unitsOf("tpl-analisis-1")[1]]:"pendiente"},
+    sessions:[
+      sess(17,"Límites y continuidad","hecha",true),
+      ausente(sess(10,"Derivadas","sd",false),"aviso_tiempo",false),
+      sess(3,"Derivadas","intentada",true,"Repasar reglas de derivación",{estado:"medias",pct:50}),
+    ],
+  }));
+
+  // 18) Franco — Análisis I, cumple hoy (para el efecto "wow" del tablero)
+  students.push(mk({
+    name:"Franco Benítez", subject:"Análisis Matemático I", subjectId:"demo-am1", career:"Licenciatura",
+    semaforo:"verde", examDate:addDays(today(),22), tarifa:8000, modalidad:"clase", birthDate:"2003-"+today().slice(5),
+    topics:{[unitsOf("tpl-analisis-1")[0]]:"visto"},
+    sessions:[ sess(6,"Números reales y funciones","hecha",true), sess(0,"Límites y continuidad","hecha",true) ],
+  }));
+
+  // 19) Rocío — Análisis I, en riesgo, horario habitual mañana a la tarde
+  students.push(mk({
+    name:"Rocío Cabrera", subject:"Análisis Matemático I", subjectId:"demo-am1", career:"Ingeniería",
+    semaforo:"amarillo", examDate:addDays(today(),15), tarifa:8000, modalidad:"clase",
+    horarios:[{id:uid(), day:weekdayIdx(addDays(today(),1)), time:"16:00", duration:60}],
+    topics:{[unitsOf("tpl-analisis-1")[0]]:"parcial",[unitsOf("tpl-analisis-1")[1]]:"pendiente"},
+    sessions: weekly(8,"Límites y continuidad",15),
+  }));
+
+  // 20) Santiago — Análisis I, complicado y con deuda de dos clases
+  students.push(mk({
+    name:"Santiago Ojeda", subject:"Análisis Matemático I", subjectId:"demo-am1", career:"Ingeniería",
+    semaforo:"rojo", examDate:addDays(today(),8), tarifa:8000, modalidad:"clase",
+    sessions:[
+      sess(19,"Números reales y funciones","intentada",false),
+      sess(12,"Límites y continuidad","no",false),
+    ],
+  }));
+
+  // 21) Abril — Análisis I, mensual, buena racha de objetivos
+  students.push(mk({
+    name:"Abril Medina", subject:"Análisis Matemático I", subjectId:"demo-am1", career:"Licenciatura",
+    semaforo:"verde", tarifa:34000, modalidad:"mensual",
+    pagos:[
+      {id:uid(), date:addDays(today(),-63), amount:34000},
+      {id:uid(), date:addDays(today(),-33), amount:34000},
+      {id:uid(), date:addDays(today(),-3), amount:34000},
+    ],
+    topics:{[unitsOf("tpl-analisis-1")[0]]:"parcial",[unitsOf("tpl-analisis-1")[1]]:"parcial"},
+    sessions:[
+      ...weekly(4,"Límites y continuidad",45),
+      sess(9,"Derivadas","hecha",true,"Reglas básicas de derivación",{estado:"si",pct:100}),
+      sess(2,"Derivadas","hecha",true,"Derivada de un producto",{estado:"si",pct:100}),
+    ],
+  }));
+
+  // 22) Federico — Análisis I, recomendado por otro alumno, al día
+  students.push(mk({
+    name:"Federico Alonso", subject:"Análisis Matemático I", subjectId:"demo-am1", career:"Ingeniería",
+    semaforo:"verde", examDate:addDays(today(),35), tarifa:8000, modalidad:"clase", tagIds:[tagRecomendado.id],
+    topics:{[unitsOf("tpl-analisis-1")[0]]:"visto"},
+    sessions: weekly(5,"Números reales y funciones",30),
+  }));
+
+  // 23) Pilar — Física I, pausada (segundo pausado de la demo)
+  students.push(mk({
+    name:"Pilar Duarte", subject:"Física I", subjectId:"demo-fis1", career:"Arquitectura",
+    status:"pausado", semaforo:"sd",
+    sessions:[ sess(50,"Cinemática","hecha",true) ],
+  }));
+
+  // 24) Joaquín — Física I, faltó sin avisar (corresponde cobrarle) y debe la última clase
+  students.push(mk({
+    name:"Joaquín Silva", subject:"Física I", subjectId:"demo-fis1", career:"Ingeniería",
+    semaforo:"rojo", examDate:addDays(today(),12), tarifa:9500, modalidad:"clase",
+    sessions:[
+      sess(14,"Cinemática","hecha",true),
+      ausente(sess(7,"Leyes de Newton","sd",true),"no_aviso",true),
+      sess(1,"Leyes de Newton","intentada",false),
+    ],
+  }));
+
+  // 25) Catalina — Física I, examen próximo, buena racha
+  students.push(mk({
+    name:"Catalina Rey", subject:"Física I", subjectId:"demo-fis1", career:"Arquitectura",
+    semaforo:"verde", examDate:addDays(today(),9), tarifa:9500, modalidad:"clase",
+    horarios:[{id:uid(), day:weekdayIdx(addDays(today(),2)), time:"18:30", duration:60}],
+    topics:{[unitsOf("tpl-fisica-1")[0]]:"parcial",[unitsOf("tpl-fisica-1")[1]]:"practica"},
+    sessions:[
+      sess(13,"Cinemática","hecha",true,"Repasar tiro oblicuo",{estado:"si",pct:100}),
+      sess(6,"Leyes de Newton","hecha",true,"Diagramas de cuerpo libre",{estado:"si",pct:100}),
+    ],
+  }));
+
+  // 26) Bautista — Química General, segunda entrada de la papelera
+  students.push({...mk({
+    name:"Bautista Correa", subject:"Química General", subjectId:"demo-qui", career:"Ingeniería",
+    sessions:[ sess(28,"Estructura atómica","hecha",true) ],
+  }), deleted:true, deletedAt: Date.now()-86400000});
+
+  // 27) Antonella — Química General, al día, sin sobresaltos
+  students.push(mk({
+    name:"Antonella Vega", subject:"Química General", subjectId:"demo-qui", career:"Ingeniería",
+    semaforo:"verde", examDate:addDays(today(),28), tarifa:9200, modalidad:"clase",
+    topics:{[unitsOf("tpl-quimica-general")[0]]:"visto",[unitsOf("tpl-quimica-general")[1]]:"parcial"},
+    sessions: weekly(6,"Tabla periódica y propiedades",40),
+  }));
+
+  // 28) Guadalupe — Álgebra, avance parejo
+  students.push(mk({
+    name:"Guadalupe Ríos", subject:"Álgebra y Geometría Analítica", subjectId:"demo-alg", career:"Ingeniería",
+    semaforo:"verde", examDate:addDays(today(),33), tarifa:8500, modalidad:"clase",
+    topics:{[unitsOf("tpl-algebra")[0]]:"visto",[unitsOf("tpl-algebra")[1]]:"parcial"},
+    sessions: weekly(7,"Vectores en el plano y el espacio",20),
+  }));
+
+  // 29) Thiago — Álgebra, atrasado con el cobro de dos clases
+  students.push(mk({
+    name:"Thiago Navarro", subject:"Álgebra y Geometría Analítica", subjectId:"demo-alg", career:"Ingeniería",
+    semaforo:"amarillo", tarifa:8500, modalidad:"clase",
+    sessions:[
+      sess(23,"Vectores en el plano y el espacio","hecha",false),
+      sess(16,"Rectas y planos","hecha",false),
+      sess(9,"Rectas y planos","intentada",true),
+    ],
+  }));
+
+  // 30) Constanza — Álgebra, avisó tarde una falta (corresponde cobrarle) y examen próximo
+  students.push(mk({
+    name:"Constanza Herrera", subject:"Álgebra y Geometría Analítica", subjectId:"demo-alg", career:"Ingeniería",
+    semaforo:"rojo", examDate:addDays(today(),7), tarifa:8500, modalidad:"clase",
+    sessions:[
+      sess(15,"Vectores en el plano y el espacio","hecha",true),
+      ausente(sess(8,"Rectas y planos","sd",true),"aviso_tarde",true),
+      sess(1,"Rectas y planos","intentada",true),
+    ],
+  }));
+
+  // 31) Benicio — ingreso, mensual, recién arrancando
+  students.push(mk({
+    name:"Benicio Torres", subject:"Matemática básica / ingreso", subjectId:"demo-ing", career:"Ingresante",
+    semaforo:"verde", tarifa:31000, modalidad:"mensual",
+    pagos:[ {id:uid(), date:addDays(today(),-25), amount:31000} ],
+    horarios:[{id:uid(), day:weekdayIdx(addDays(today(),5)), time:"19:00", duration:60}],
+    topics:{[unitsOf("tpl-matematica-ingreso")[0]]:"visto"},
+    sessions: weekly(4,"Conjuntos numéricos",20),
+  }));
+
+  // 32) Emilia — ingreso, faltó avisando con tiempo, no corresponde cobrarle
+  students.push(mk({
+    name:"Emilia Castro", subject:"Matemática básica / ingreso", subjectId:"demo-ing", career:"Ingresante",
+    semaforo:"amarillo", tarifa:30000, modalidad:"mensual",
+    pagos:[ {id:uid(), date:addDays(today(),-40), amount:30000} ],
+    topics:{[unitsOf("tpl-matematica-ingreso")[0]]:"parcial"},
+    sessions:[
+      sess(18,"Expresiones algebraicas","hecha",true),
+      ausente(sess(11,"Ecuaciones e inecuaciones","sd",false),"aviso_tiempo",false),
+      sess(4,"Ecuaciones e inecuaciones","hecha",true),
+    ],
+  }));
 
   // Portal ya activado (paso 95): llave general habilitada, llave individual para Lucía y
   // Valentina (ver portalShare de cada una más arriba) y una llave grupal para Análisis
