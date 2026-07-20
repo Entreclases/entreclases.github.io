@@ -1206,6 +1206,7 @@ function vFichaResumen(s){
       <div class="hint">Modelo precargado con los datos de esta ficha, listo para completar y firmar.</div></div>
     <button class="chip" data-a="open-contrato">Generar contrato</button></div>`;
   h += `<div class="formcard"><div class="ftitle">Foto de perfil</div>${vAvatarEditor(avatarKeyForStudent(s.id), s.name, s.foto, 64)}</div>`;
+  h += vVideollamadaMigracionCard(s);
   if(state.fichaError) h += `<div class="saveerr">${esc(state.fichaError)}</div>`;
   h += `<div class="formcard">
     <div class="frow">
@@ -1489,7 +1490,6 @@ function vFichaClases(s){
       ${cobraPorClase&&!c.packClaseId?`<button class="chip ${c.cobrada?"on":""}" data-a="toggle-cobrada" data-id="${c.id}">${c.cobrada?"Cobrada":"Pendiente"}</button>`:""}
       <button class="del" data-a="del-session" data-id="${c.id}" title="Borrar" aria-label="Borrar">×</button></div>`;
       }).join("");
-  h += vVideollamadaDefaultCard(s);
   h += vHorariosCard(s);
   h += vPuntualesCard(s);
   h += vSimTimer();
@@ -1769,14 +1769,15 @@ function vPortalAlumnoCard(s){
 }
 
 /* ============ agenda: horarios habituales + clases puntuales, dentro de la ficha ============ */
-// Link de videollamada (paso 116): por defecto del alumno (data-f="videollamadaLink", debajo)
-// o propio de un horario/clase puntual — el propio pisa al del alumno (linkVideollamadaFor en
-// helpers.js). Se muestra como botón "Entrar a la clase" en la agenda y el tablero Hoy, y al
-// alumno en su portal individual (sólo su próxima clase, ver buildAlumnoBlock en sync.js).
-function vVideollamadaDefaultCard(s){
-  return `<div class="formcard"><div class="ftitle">Link de videollamada (por defecto)</div>
-    <div class="hint" style="margin-bottom:8px">Para clases virtuales — Meet, Zoom, lo que uses. Se puede pisar en un horario o clase puntual si alguna vez usás otro link.</div>
-    <input data-f="videollamadaLink" placeholder="https://meet.google.com/…" value="${esc(s.videollamadaLink||"")}"></div>`;
+// Migración suave del link de videollamada fijo por alumno (paso 168: se sacó — cambia clase a
+// clase, no tenía sentido guardarlo una sola vez; linkVideollamadaFor() en helpers.js ya no lo usa).
+// A los alumnos que ya tenían uno cargado se les muestra una última vez acá (Datos) con la
+// posibilidad de descartarlo a mano (video-link-discard en events.js) — nunca se borra solo.
+function vVideollamadaMigracionCard(s){
+  if(!s.videollamadaLink) return "";
+  return `<div class="formcard"><div class="ftitle">Link de videollamada fijo (antes)</div>
+    <div class="hint" style="margin-bottom:8px">Esto se movió a cada clase: ahora el link se carga por horario o clase puntual, no una sola vez por alumno. El que tenías cargado era: <b>${esc(s.videollamadaLink)}</b></div>
+    <button class="chip" data-a="video-link-discard">Descartar</button></div>`;
 }
 function vHorariosCard(s){
   const list=[...(s.horarios||[])].sort((a,b)=>a.day-b.day||a.time.localeCompare(b.time));
@@ -5315,7 +5316,6 @@ function vModal(){
       <div class="frow">
         <div class="field"><div class="flabel">Cumpleaños (opcional)</div><input type="date" id="n-birth" data-enter="create"></div>
         <div class="field"><div class="flabel">Fecha de examen (si ya la sabe)</div><input type="date" id="n-exam" data-enter="create"></div></div>
-      <div class="field"><div class="flabel">Link de videollamada (opcional)</div><input id="n-video" placeholder="https://meet.google.com/…" data-enter="create"></div>
       <div class="field"><div class="flabel">Tags (separados por coma, opcional)</div><input id="n-tags" placeholder="Ej: ingreso, online" data-enter="create"></div>
       <div class="field"><div class="flabel">Notas iniciales (de dónde arranca, qué le cuesta)</div><textarea id="n-notes"></textarea></div>
       <div class="field"><div class="flabel">¿Cobrás seña?</div>

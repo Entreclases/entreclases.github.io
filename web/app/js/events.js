@@ -858,6 +858,11 @@ document.addEventListener("click", (e)=>{
     update(s.id,{recordatorioMail: !s.recordatorioMail});
     return;
   }
+  else if(a==="video-link-discard" && s){
+    update(s.id,{videollamadaLink:""});
+    toast("Link fijo descartado");
+    return;
+  }
   else if(a==="portal-alumno-share-toggle" && s){
     const key=el.dataset.key, cur=portalShareFor(s);
     update(s.id,{portalShare:{...cur, [key]: !cur[key]}});
@@ -1133,7 +1138,6 @@ document.addEventListener("click", (e)=>{
     const chair=document.getElementById("n-chair").value;
     const birthDate=document.getElementById("n-birth").value;
     const examDate=document.getElementById("n-exam").value;
-    const videollamadaLink=document.getElementById("n-video").value.trim();
     const notes=document.getElementById("n-notes").value;
     const tagsRaw=document.getElementById("n-tags").value.trim();
     const tagIds = tagsRaw ? tagsRaw.split(",").map(t=>t.trim()).filter(Boolean).map(t=>getOrCreateTag(t).id) : [];
@@ -1147,7 +1151,7 @@ document.addEventListener("click", (e)=>{
       st.subjectId=m?m.id:""; st.subject=m?m.name:"";
       st.topics=m?Object.fromEntries(m.units.map(u=>[u.nombre,"pendiente"])):{};
       st.email=email; st.chair=chair; st.birthDate=birthDate; st.examDate=examDate;
-      st.videollamadaLink=videollamadaLink; st.notes=notes; st.tagIds=tagIds;
+      st.notes=notes; st.tagIds=tagIds;
       if(seniaActiva){ st.seniaActiva=true; st.seniaTipo=seniaTipo; st.seniaValor=seniaValor; }
       return st;
     };
@@ -2274,8 +2278,7 @@ function handleFormChange(e){
   // Campos de "datos" de la ficha (Resumen/Pagos, paso 136): en vez de guardar al toque, quedan
   // en un borrador (state.fichaDraft) hasta confirmarlos con "Guardar cambios" — ver
   // applyFichaDraftField/draftFor en helpers.js y la barra fija en vDetalle (views.js). El resto
-  // de los data-f de la app (videollamadaLink, informe/contrato, etc.) sigue con el autosave de
-  // siempre, más abajo.
+  // de los data-f de la app sigue con el autosave de siempre, más abajo.
   if(FICHA_DRAFT_FIELDS.has(el.dataset.f)){ applyFichaDraftField(s, el.dataset.f, el.value); return; }
   update(s.id,{[el.dataset.f]:el.value});
 }

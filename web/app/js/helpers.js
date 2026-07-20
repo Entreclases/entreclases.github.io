@@ -1136,9 +1136,10 @@ function llaveAlumnoVenceDias(studentId){
 // Próxima clase de un alumno puntual (no importa el estado del alumno, a diferencia de
 // agendaRangeEvents que sólo mira activos): la más próxima entre sus clases puntuales futuras
 // no canceladas y la próxima ocurrencia de cada horario habitual dentro de los próximos 7 días.
-// Link de videollamada (paso 116) de un evento puntual/horario: el propio si lo cargó, si no el
-// del alumno (default por alumno, ficha → Clases). Nunca ambos combinados.
-function linkVideollamadaFor(s, ownLink){ return ownLink || s.videollamadaLink || ""; }
+// Link de videollamada: sólo el propio de cada horario/clase puntual (paso 168: se sacó el link
+// fijo por alumno — cambia clase a clase, no tenía sentido guardarlo una sola vez). El parámetro
+// s ya no se usa acá; queda por compatibilidad con los call-sites existentes.
+function linkVideollamadaFor(s, ownLink){ return ownLink || ""; }
 function nextClaseForStudent(s){
   const from=today();
   let best=null;
@@ -1219,6 +1220,14 @@ function cobrosAtrasadosSummary(diasAtraso){
    "Alertas" del tablero) — clases de hoy/ayer sin registrar, cobros vencidos, exámenes a <=3 días
    sin recordatorio marcado, la semana que viene sin ninguna clase agendada y respaldo muy viejo.
    Si esta lista vuelve vacía, ese día cuenta "al día" para la racha (ver checkRachaDiaria). */
+// Paso 168: una clase de HOY recién cuenta como "sin registrar" cuando ya terminó (hora_inicio +
+// duración ya pasó) — antes se pedía registrar clases que todavía no habían pasado. Las de ayer
+// siguen contando desde la mañana (ya terminaron hace rato, así que esta cuenta siempre da true).
+function eventoYaTermino(e){
+  const inicio=new Date(e.date+"T"+(e.time||"00:00")+":00");
+  const fin=new Date(inicio.getTime()+(Number(e.duration)||60)*60000);
+  return fin<=new Date();
+}
 function pendingTasksToday(){
   if(IS_DEMO){
     // Fijo y determinístico (paso 155: "dos tareas pendientes para que se vea"), usando alumnos
@@ -1233,6 +1242,7 @@ function pendingTasksToday(){
   const tasks = [];
   const t = today(), ayer = addDays(t,-1);
   agendaRangeEvents(ayer,t).forEach(e=>{
+    if(e.date===t && !eventoYaTermino(e)) return;
     if(!studentHasSessionOnDate(e.studentId,e.date))
       tasks.push({id:`clase-${e.studentId}-${e.date}`, text:`Registrar la clase de ${e.studentName} (${e.date===t?"hoy":"ayer"})`,
         a:"agenda-log", data:{id:e.studentId, date:e.date}});
