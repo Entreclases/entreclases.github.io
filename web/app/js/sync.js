@@ -34,7 +34,12 @@ function scheduleSync(){ clearTimeout(syncTimer); syncTimer=setTimeout(syncNow,4
 // abierta, sin cambios locales ni remotos). force=true (botón "Sincronizar ahora") se salta
 // ese atajo y siempre baja la data completa, igual que antes.
 async function syncNow(force){
-  if(!getSes()){ setStatus("idle"); return; }
+  const ses=getSes();
+  if(!ses){ setStatus("idle"); return; }
+  // Paso 177: una cuenta pendiente/rechazada no tiene nada que sincronizar todavía (RLS de
+  // cuaderno/portales/storage la bloquea igual, ver 027_cuentas_aprobadas.sql) — cortar acá
+  // evita pegarle a la red para nada y ensuciar el estado de sync con errores 403 confusos.
+  if(ses.estado==="pendiente"||ses.estado==="rechazado"){ setStatus("idle"); return; }
   if(!navigator.onLine){ setStatus("offline"); return; }
   if(syncing){ scheduleSync(); return; }
   syncing=true; setStatus("sync");
@@ -430,6 +435,27 @@ async function setUsuarioPlan(id, plan){
   }catch(e){
     delete state.usersPlanStatus[id];
     state.usersPlanError = !navigator.onLine ? "Sin conexión a internet." : (e.message||"No se pudo cambiar el plan.");
+  }
+  render();
+}
+// Aprueba o rechaza una cuenta pendiente (paso 177) — mismo patrón que setUsuarioPlan: RPC
+// porque perfiles.estado no es actualizable por el propio usuario vía PostgREST (ver
+// 027_cuentas_aprobadas.sql en cuaderno-supabase). Aprobar dispara el mail de bienvenida
+// server-side, dentro de la misma función SQL.
+async function setUsuarioEstado(id, estado){
+  state.usersEstadoStatus=state.usersEstadoStatus||{};
+  state.usersEstadoStatus[id]=(estado==="aprobado"?"aprobando":"rechazando");
+  state.usersEstadoError=""; render();
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+    const r=await fetch(SUPA_URL+"/rest/v1/rpc/admin_set_estado",{method:"POST", headers:h, body:JSON.stringify({objetivo:id, nuevo_estado:estado})});
+    if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.msg||("error "+r.status)); }
+    const u=(state.users||[]).find(x=>x.user_id===id); if(u) u.estado=estado;
+    delete state.usersEstadoStatus[id];
+  }catch(e){
+    delete state.usersEstadoStatus[id];
+    state.usersEstadoError = !navigator.onLine ? "Sin conexión a internet." : (e.message||"No se pudo actualizar la cuenta.");
   }
   render();
 }

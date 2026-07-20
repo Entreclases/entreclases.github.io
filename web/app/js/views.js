@@ -3507,6 +3507,27 @@ function vAuth(){
   </div>`;
 }
 
+// Paso 177: se muestra en vez de la app mientras perfiles.estado no sea 'aprobado' — nunca un
+// error crudo de RLS (cuaderno/portales/storage ya rechazan a una cuenta no aprobada, pero acá
+// ni siquiera se intenta: ver el gate en render() y el corte temprano en syncNow(), sync.js).
+function vCuentaEnRevision(estado){
+  const rechazado = estado==="rechazado";
+  return `<div style="max-width:360px;margin:64px auto 0">
+    <div style="text-align:center;margin-bottom:20px">
+      <div class="logo-mark" style="margin:0 auto 12px">${ICON_CHECK}</div>
+      <div class="eyebrow">Clases particulares</div>
+      <h1 style="font-size:22px">${rechazado?"Tu cuenta no fue aprobada":"Tu cuenta está en verificación"}</h1>
+    </div>
+    <div class="formcard">
+      ${rechazado
+        ? `<div style="font-size:13.5px;margin-bottom:10px">No pudimos aprobar tu cuenta en Entreclases. Si te parece que es un error, escribinos a <a href="mailto:manugandini53@gmail.com">manugandini53@gmail.com</a>.</div>`
+        : `<div style="font-size:13.5px;margin-bottom:10px">Ya recibimos tu registro. Falta que un administrador apruebe tu cuenta — normalmente el mismo día. Te avisamos por correo apenas esté lista.</div>`}
+      <button class="primary" style="width:100%;margin-left:0" data-a="estado-refrescar" ${state.estadoChecking?"disabled":""}>${state.estadoChecking?"Revisando…":"Ya me avisaron, revisar de nuevo"}</button>
+      <button class="chip" style="margin-top:10px;border:none;background:none;padding:2px 0;color:var(--muted)" data-a="auth-logout">Cerrar sesión</button>
+    </div>
+  </div>`;
+}
+
 function vConfirmEmail(){
   return `<div style="max-width:360px;margin:64px auto 0">
     <div style="text-align:center;margin-bottom:20px">
@@ -5266,8 +5287,29 @@ function vUsuarios(){
   if(state.orphanCleanError) h += `<div class="saveerr" style="margin-bottom:8px">${esc(state.orphanCleanError)}</div>`;
   if(state.usersPlanError) h += `<div class="saveerr" style="margin-bottom:8px">${esc(state.usersPlanError)}</div>`;
   if(state.usersError) return h + `<div class="saveerr">${esc(state.usersError)}</div>`;
+  if(state.usersEstadoError) h += `<div class="saveerr" style="margin-bottom:8px">${esc(state.usersEstadoError)}</div>`;
   if(!state.usersLoaded) return h + skeletonRows(5);
   const list = state.users||[];
+  const pendientes = list.filter(u=>u.estado==="pendiente");
+  if(pendientes.length){
+    const estadoSaving = id => (state.usersEstadoStatus||{})[id];
+    h += `<div class="formcard" style="margin-bottom:14px;border-color:var(--amber)">
+      <div class="ftitle">Pendientes de aprobación <span class="chip" style="pointer-events:none;margin-left:6px">${pendientes.length}</span></div>`;
+    h += pendientes.map(u=>{
+      const saving = estadoSaving(u.user_id);
+      return `<div class="log" style="align-items:flex-start;flex-wrap:wrap">
+        <div class="body">
+          <div style="font-weight:600">${esc(u.email||"—")}</div>
+          <div class="note">Se registró ${fmtDateTime(u.created_at)}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="chip" data-a="usuario-aprobar" data-id="${esc(u.user_id)}" ${saving?"disabled":""}>${saving==="aprobando"?"Aprobando…":"Aprobar"}</button>
+          <button class="chip" data-a="usuario-rechazar" data-id="${esc(u.user_id)}" ${saving?"disabled":""}>${saving==="rechazando"?"Rechazando…":"Rechazar"}</button>
+        </div>
+      </div>`;
+    }).join("");
+    h += `</div>`;
+  }
   const now = Date.now();
   const ONLINE_MS = 10*60*1000, WEEK_MS = 7*86400000, INACTIVE_MS = 30*86400000, FINAL_MS = 5*30*86400000;
   const lastSeenMs = u => u.last_seen_at ? now-new Date(u.last_seen_at).getTime() : null;
@@ -5322,9 +5364,14 @@ function vUsuarios(){
     const planSel = `<select data-cf="users-plan" data-id="${esc(u.user_id)}" ${planSaving?"disabled":""}>
       ${PLANES.map(p=>`<option value="${p}" ${(u.plan||"beta")===p?"selected":""}>${esc(PLAN_META[p].label)}</option>`).join("")}
     </select>`;
+    const estadoBadge = u.estado==="pendiente"
+      ? `<span class="chip" style="color:var(--amber);border-color:var(--amber);margin-left:6px;pointer-events:none">Pendiente</span>`
+      : u.estado==="rechazado"
+      ? `<span class="chip" style="color:var(--red);border-color:var(--red);margin-left:6px;pointer-events:none">Rechazada</span>`
+      : "";
     return `<div class="log" style="align-items:flex-start;flex-wrap:wrap">
       <div class="body">
-        <div style="font-weight:600">${esc(u.email||"—")} <span class="hint">· ${esc(u.rol||"—")}</span>${inactiveChip(u)}</div>
+        <div style="font-weight:600">${esc(u.email||"—")} <span class="hint">· ${esc(u.rol||"—")}</span>${estadoBadge}${inactiveChip(u)}</div>
         <div class="note">${seen} · ${esc(u.plataforma||"—")} · v${esc(u.version||"—")} · alta ${fmtDateTime(u.created_at)}</div>
         <div class="note" style="margin-top:4px">Plan: ${planSel}</div>
       </div>
@@ -5786,6 +5833,17 @@ function render(){
     document.getElementById("app").innerHTML = `<div class="view-fade">${vAuth()}</div>`;
     const em=document.getElementById("auth-email"); if(em) em.focus();
     return;
+  }
+  {
+    // Paso 177: gate de cuentas por aprobar/rechazadas — "estado" viaja cacheado en la sesión
+    // (loadRole(), auth.js). Ausente = sesión vieja de antes de este paso, se trata como
+    // aprobada (todas las cuentas existentes se backfillearon a 'aprobado' en la migración).
+    const _ses=getSes();
+    if(_ses && (_ses.estado==="pendiente"||_ses.estado==="rechazado")){
+      document.body.classList.remove("has-nav"); _prevViewKey=null;
+      document.getElementById("app").innerHTML = `<div class="view-fade">${vCuentaEnRevision(_ses.estado)}</div>`;
+      return;
+    }
   }
   if(state.view==="informe"){
     if(!sel()){ state.view="tablero"; }

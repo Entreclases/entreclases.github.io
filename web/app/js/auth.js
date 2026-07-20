@@ -43,22 +43,27 @@ function storeSession(j,email){
 // dentro de la sesión guardada, para que isAdmin ande offline con el último rol visto.
 // Si falla (sin internet, error puntual) se degrada en silencio al rol ya cacheado, o a
 // "profesor" si todavía no se leyó nunca — nunca bloquea ni rompe el resto de la app.
+// Desde el paso 177 también cachea "estado" (perfiles.estado: pendiente/aprobado/rechazado)
+// — es lo que usa render() para decidir si muestra la app o vCuentaEnRevision(). Los
+// llamadores de auth-login/auth-signup (events.js) esperan esta promesa antes de renderizar
+// para no dejar pasar ni un instante la app completa a una cuenta todavía no aprobada.
 async function loadRole(){
   try{
     const s=getSes(); if(!s) return;
     const uid_=jwtSub(s.access);
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
-    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=rol,plan,resumen_semanal,notif_clases_dia,recordatorio_clases_horas_antes&user_id=eq."+encodeURIComponent(uid_), {headers:h});
+    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=rol,plan,estado,resumen_semanal,notif_clases_dia,recordatorio_clases_horas_antes&user_id=eq."+encodeURIComponent(uid_), {headers:h});
     if(!r.ok) return;
     const rows=await r.json();
     const rol=rows[0]&&rows[0].rol;
     const plan=(rows[0]&&rows[0].plan)||"beta";
+    const estado=(rows[0]&&rows[0].estado)||"aprobado";
     const resumenSemanal=!!(rows[0]&&rows[0].resumen_semanal);
     const notifClasesDia=!!(rows[0]&&rows[0].notif_clases_dia);
     const recordatorioClasesHorasAntes=Number(rows[0]&&rows[0].recordatorio_clases_horas_antes)||14;
     if(rol){
       const cur=getSes();
-      if(cur && cur.email===s.email){ setSes({...cur, role:rol, plan, resumenSemanal, notifClasesDia, recordatorioClasesHorasAntes}); render(); }
+      if(cur && cur.email===s.email){ setSes({...cur, role:rol, plan, estado, resumenSemanal, notifClasesDia, recordatorioClasesHorasAntes}); render(); }
     }
   }catch(e){ /* silencioso: offline o falla puntual — sigue con lo ya cacheado */ }
 }

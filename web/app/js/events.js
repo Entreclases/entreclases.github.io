@@ -509,6 +509,8 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="refresh-inactividad"){ state.inactividadLoaded=false; state.inactividadError=""; loadInactividad(); }
   else if(a==="refresh-usuarios"){ state.usersLoaded=false; state.usersError=""; loadUsuarios(); }
+  else if(a==="usuario-aprobar"){ setUsuarioEstado(el.dataset.id, "aprobado"); return; }
+  else if(a==="usuario-rechazar"){ setUsuarioEstado(el.dataset.id, "rechazado"); return; }
   else if(a==="limpiar-huerfanos"){
     if(state.orphanCleanStatus==="cleaning") return;
     limpiarHuerfanos(); return;
@@ -785,7 +787,7 @@ document.addEventListener("click", (e)=>{
     state.authEmail=em;
     if(!em||!pw){ authMsgShow("Completá correo y contraseña."); return; }
     authMsgShow("Iniciando sesión…",true);
-    doLogin(em,pw).then(()=>{ resetLoginAttempts(); flushPendingTermsAccept(em); render(); syncNow(); })
+    doLogin(em,pw).then(()=>loadRole()).then(()=>{ resetLoginAttempts(); flushPendingTermsAccept(em); render(); syncNow(); })
       .catch(err=>{
         if(isEmailNotConfirmedError(err)){
           state.pendingConfirmEmail=em; state.confirmStatus="idle"; state.confirmError=""; render();
@@ -809,7 +811,7 @@ document.addEventListener("click", (e)=>{
     authMsgShow("Creando cuenta…",true);
     startFeedbackBannerWindow();
     doSignup(em,pw).then(ok=>{
-      if(ok){ registrarAceptacionTerminos(); render(); syncNow(); }
+      if(ok){ registrarAceptacionTerminos(); return loadRole().then(()=>{ render(); syncNow(); }); }
       else{
         try{ localStorage.setItem(PENDING_TERMS_KEY, em); }catch(e){}
         state.pendingConfirmEmail=em; state.confirmStatus="idle"; state.confirmError=""; render();
@@ -830,6 +832,11 @@ document.addEventListener("click", (e)=>{
   else if(a==="back-to-login"){
     state.pendingConfirmEmail=null; state.confirmStatus="idle"; state.confirmError=""; state.authMode="login";
     render(); return;
+  }
+  else if(a==="estado-refrescar"){
+    state.estadoChecking=true; render();
+    loadRole().finally(()=>{ state.estadoChecking=false; render(); });
+    return;
   }
   else if(a==="auth-forgot"){
     const em=(document.getElementById("auth-email").value||"").trim();
