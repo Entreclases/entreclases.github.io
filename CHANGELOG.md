@@ -24,7 +24,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
-- Paso 164 (terreno de planes): columna `perfiles.plan` (`beta`/`individual`/`equipo`/`academia`, default `beta`, ver `024_planes.sql` en `cuaderno-supabase`), sin ningún límite todavía — helper único `tienePlan(feature)` en `config.js` (con el mapeo `PLAN_FEATURES` feature→planes, hoy vacío) siempre devuelve `true` mientras dure la beta. `loadRole()` cachea el plan propio en la sesión, listo para cuando `tienePlan()` empiece a mirarlo. En el panel admin (Usuarios), un selector por cuenta para cambiar su plan a mano (`admin_set_plan`, misma protección de sólo-admin que `admin_eliminar_usuario`) — sin ninguna mención de precios ni planes de cara al usuario.
+
+## [2.4.0] - 2026-07-19
+- `APP_VERSION` a 2.4.0.
+- Paso 164 (terreno de planes): columna `perfiles.plan` (`beta`/`individual`/`equipo`/`academia`, default `beta`, ver `024_planes.sql` en `cuaderno-supabase`), sin ningún límite todavía — helper único `tienePlan(feature)` en `config.js` (con el mapeo `PLAN_FEATURES` feature→planes, hoy vacío) siempre devuelve `true` mientras dure la beta. `loadRole()` cachea el plan propio en la sesión, listo para cuando `tienePlan()` empiece a mirarlo. En el panel admin (Usuarios), un selector por cuenta para cambiar su plan a mano (`admin_set_plan`, misma protección de sólo-admin que `admin_eliminar_usuario`) — sin ninguna mención de precios ni planes de cara al usuario. Sube el caché del service worker (`web/app/js/config.js`, `sw.js`).
 
 ## [2.3.2] - 2026-07-19
 Mercado: grupales, packs, disponibilidad, pedir clase, recordatorios, resultados, cierre.
