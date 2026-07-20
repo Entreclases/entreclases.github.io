@@ -4856,6 +4856,7 @@ function vUsuarios(){
   if(state.usersDeleteMsg) h += `<div class="hint" style="color:var(--status-${state.usersDeleteWarning?"desaprobo":"activo"}-fg);margin-bottom:8px">${esc(state.usersDeleteMsg)}</div>`;
   if(state.orphanCleanMsg) h += `<div class="hint" style="color:var(--status-activo-fg);margin-bottom:8px">${esc(state.orphanCleanMsg)}</div>`;
   if(state.orphanCleanError) h += `<div class="saveerr" style="margin-bottom:8px">${esc(state.orphanCleanError)}</div>`;
+  if(state.usersPlanError) h += `<div class="saveerr" style="margin-bottom:8px">${esc(state.usersPlanError)}</div>`;
   if(state.usersError) return h + `<div class="saveerr">${esc(state.usersError)}</div>`;
   if(!state.usersLoaded) return h + skeletonRows(5);
   const list = state.users||[];
@@ -4909,10 +4910,15 @@ function vUsuarios(){
         </div>`;
       }
     }
+    const planSaving = (state.usersPlanStatus||{})[u.user_id]==="saving";
+    const planSel = `<select data-cf="users-plan" data-id="${esc(u.user_id)}" ${planSaving?"disabled":""}>
+      ${PLANES.map(p=>`<option value="${p}" ${(u.plan||"beta")===p?"selected":""}>${esc(PLAN_META[p].label)}</option>`).join("")}
+    </select>`;
     return `<div class="log" style="align-items:flex-start;flex-wrap:wrap">
       <div class="body">
         <div style="font-weight:600">${esc(u.email||"—")} <span class="hint">· ${esc(u.rol||"—")}</span>${inactiveChip(u)}</div>
         <div class="note">${seen} · ${esc(u.plataforma||"—")} · v${esc(u.version||"—")} · alta ${fmtDateTime(u.created_at)}</div>
+        <div class="note" style="margin-top:4px">Plan: ${planSel}</div>
       </div>
       ${delUi}
     </div>`;

@@ -148,6 +148,18 @@ const QR_TARGET_BYTES = 150*1024;
 // `npx web-push generate-vapid-keys`; la privada vive sólo como secreto de la Edge Function
 // enviar-push (cuaderno-supabase), nunca en este repo. Ver setNotifClasesDia() en sync.js.
 const VAPID_PUBLIC_KEY = "BGj8qOBjAkuPuXXqILsyhFC8sfSc1eJHCZi9-WcVbHlaM98LGPdPBnKdOZ0shIWjnLzvIvrpo1NlMBrz8ZDxsEE";
+// Planes futuros (paso 164, perfiles.plan — ver 024_planes.sql en cuaderno-supabase):
+// terreno preparado sin ningún límite todavía. Mientras dure la beta, TODAS las cuentas
+// ven todo sea cual sea su plan — nada de precios ni menciones de planes de cara al
+// usuario. PLAN_FEATURES es el único lugar donde, cuando llegue el momento, se declara
+// qué planes desbloquean cada feature (p.ej. featureX:["individual","equipo","academia"]);
+// hoy está vacío porque tienePlan() siempre devuelve true sin mirarlo.
+const PLANES = ["beta","individual","equipo","academia"];
+const PLAN_META = {
+  beta:{label:"Beta"}, individual:{label:"Individual"}, equipo:{label:"Equipo"}, academia:{label:"Academia"},
+};
+const PLAN_FEATURES = {};
+function tienePlan(feature){ return true; }
 const APP_VERSION = "2.3.2";
 // Modo demo (paso 82): ?demo=1 carga un cuaderno ficticio en memoria (ver buildDemoData() en
 // helpers.js), sin cuenta, sin sync y sin tocar localStorage ni el backend — ver el guard de

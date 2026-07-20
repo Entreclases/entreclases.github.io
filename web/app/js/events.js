@@ -2111,6 +2111,7 @@ function handleFormChange(e){
   const mu=e.target.closest("[data-matunit]");
   if(mu){ setMaterialUnit(mu.dataset.id, mu.dataset.name, mu.value); render(); return; }
   const cf=e.target.closest("[data-cf]");
+  if(cf && cf.dataset.cf==="users-plan"){ setUsuarioPlan(cf.dataset.id, cf.value); return; }
   // Popover de edición desde la agenda (paso 135): el alumno dueño de la clase no es
   // necesariamente state.selId (se puede abrir desde cualquier vista de Agenda sin haber entrado
   // a ninguna ficha), así que estos campos resuelven el estudiante desde state.agendaEdit en vez

@@ -415,6 +415,24 @@ async function loadUsuarios(){
   }
   render();
 }
+// Cambia el plan de una cuenta a mano (paso 164) — planes de regalo, corregir una carga,
+// etc. Mismo patrón que deleteUsuario: RPC porque perfiles.plan no es actualizable por el
+// propio usuario vía PostgREST (ver 024_planes.sql en cuaderno-supabase).
+async function setUsuarioPlan(id, plan){
+  state.usersPlanStatus=state.usersPlanStatus||{}; state.usersPlanStatus[id]="saving"; state.usersPlanError=""; render();
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
+    const r=await fetch(SUPA_URL+"/rest/v1/rpc/admin_set_plan",{method:"POST", headers:h, body:JSON.stringify({objetivo:id, nuevo_plan:plan})});
+    if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||j.msg||("error "+r.status)); }
+    const u=(state.users||[]).find(x=>x.user_id===id); if(u) u.plan=plan;
+    delete state.usersPlanStatus[id];
+  }catch(e){
+    delete state.usersPlanStatus[id];
+    state.usersPlanError = !navigator.onLine ? "Sin conexión a internet." : (e.message||"No se pudo cambiar el plan.");
+  }
+  render();
+}
 // Listado crudo de una "carpeta" del bucket materiales (mismo endpoint que loadMateriales,
 // generalizado a cualquier prefijo). Entradas sin "id" son subcarpetas, no archivos.
 async function listStorageFolder(prefix){

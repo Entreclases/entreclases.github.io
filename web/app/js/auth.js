@@ -48,16 +48,17 @@ async function loadRole(){
     const s=getSes(); if(!s) return;
     const uid_=jwtSub(s.access);
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
-    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=rol,resumen_semanal,notif_clases_dia,recordatorio_clases_horas_antes&user_id=eq."+encodeURIComponent(uid_), {headers:h});
+    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=rol,plan,resumen_semanal,notif_clases_dia,recordatorio_clases_horas_antes&user_id=eq."+encodeURIComponent(uid_), {headers:h});
     if(!r.ok) return;
     const rows=await r.json();
     const rol=rows[0]&&rows[0].rol;
+    const plan=(rows[0]&&rows[0].plan)||"beta";
     const resumenSemanal=!!(rows[0]&&rows[0].resumen_semanal);
     const notifClasesDia=!!(rows[0]&&rows[0].notif_clases_dia);
     const recordatorioClasesHorasAntes=Number(rows[0]&&rows[0].recordatorio_clases_horas_antes)||14;
     if(rol){
       const cur=getSes();
-      if(cur && cur.email===s.email){ setSes({...cur, role:rol, resumenSemanal, notifClasesDia, recordatorioClasesHorasAntes}); render(); }
+      if(cur && cur.email===s.email){ setSes({...cur, role:rol, plan, resumenSemanal, notifClasesDia, recordatorioClasesHorasAntes}); render(); }
     }
   }catch(e){ /* silencioso: offline o falla puntual — sigue con lo ya cacheado */ }
 }
