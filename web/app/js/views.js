@@ -5190,6 +5190,7 @@ function vRecursos(){
 
   h += usageBar("Uso de base de datos", data.db_bytes||0, SUPABASE_FREE_LIMIT_BYTES);
   h += usageBar("Uso de storage (materiales)", data.storage_bytes||0, SUPABASE_STORAGE_FREE_LIMIT_BYTES);
+  h += `<div class="hint" style="margin:-6px 0 14px">Son dos recursos separados del plan gratis de Supabase (500 MB de base de datos, 1 GB de storage) — se llenan de forma independiente, así que uno puede estar al tope sin afectar al otro.</div>`;
 
   const usuarios = [...(data.usuarios||[])].sort((a,b)=>
     ((b.cuaderno_bytes||0)+(b.respaldos_bytes||0)) - ((a.cuaderno_bytes||0)+(a.respaldos_bytes||0)));

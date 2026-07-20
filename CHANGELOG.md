@@ -24,6 +24,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
+- Paso 166 (auditoría de SQL y simulacros pendientes): en el panel admin → Recursos, hint junto a los dos medidores explicando que base de datos (500 MB) y storage (1 GB) son dos recursos separados del plan gratis de Supabase, medidos de forma independiente (`web/app/js/views.js`). Auditado contra `cuaderno-supabase`: sigue pendiente de pegar a mano en el SQL Editor todo lo de los pasos 149/160/161/164 (`021_admin_stats_storage.sql`, `022_solicitudes_clase.sql`, `023_recordatorio_clases_mail.sql`, `024_planes.sql`) y los ALTER sueltos de los pasos 144/147 (`perfiles.terminos_aceptados_at`, `reportes.tipo`/`reportes.vista`) — armado un bloque único idempotente con los seis, y detectado que al ALTER de `terminos_aceptados_at` del paso 144 le faltaba su `grant update` de columna (sin eso, `registrarAceptacionTerminos()` en `sync.js` falla en silencio). Cuatro motores de mail/push siguen en modo simulacro server-side (`config_inactividad`, `config_resumen_semanal`, `config_push_clases`, `config_recordatorio_clases`, todas con columna `simulacro boolean default true`) a la espera de que se activen a mano. Sube el caché del service worker.
 
 ## [2.4.0] - 2026-07-19
 - `APP_VERSION` a 2.4.0.
