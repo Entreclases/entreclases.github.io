@@ -55,7 +55,7 @@ const FEEDBACK_TIPOS = [
 // que no se puede confirmar server-side si ya se pidió antes desde otro dispositivo.
 const ACTIVE_TESTER_REQUESTED_KEY = "tutoria-active-tester-requested";
 const ACTIVE_TESTER_NOTE = "¿Querés ser Active Tester? Tras crear tu cuenta podrás solicitarlo desde Ajustes. Las primeras 20 plazas eligen: 50% permanente* o 3 meses gratis tras beta, a cambio de 3 reportes/mes.";
-const ACTIVE_TESTER_FINE_PRINT = "* El 50% de descuento es permanente mientras el servicio se mantenga operativo. No constituye garantía de continuidad; si el proyecto se discontinúa, el descuento pierde su objeto conforme a la sección 6 de las Condiciones de la Beta.";
+const ACTIVE_TESTER_FINE_PRINT = "* El 50% de descuento es permanente mientras el servicio se mantenga operativo. No constituye garantía de continuidad; si el proyecto se discontinúa, el descuento pierde su objeto conforme a la sección 7 de las Condiciones de la Beta.";
 // Biblioteca del portal (state.catalog.subjects[].materiales[].compartido + portales.publicado.biblioteca):
 // URLs firmadas de Storage con este vencimiento; se renuevan solas (ver maybeRenewPortalLibrary
 // en sync.js) cuando les queda menos de PORTAL_LINK_TTL_DAYS-PORTAL_LINK_RENEW_AFTER_DAYS de vida.
@@ -199,6 +199,29 @@ if(IS_BACKEND_DEV && document.body){
   badge.style.cssText = "position:fixed;bottom:10px;right:10px;z-index:9999;background:#F59E0B;color:#3D2B04;border-radius:8px;padding:4px 8px;font-size:11px;font-family:sans-serif;pointer-events:none";
   document.body.appendChild(badge);
 }
+// Aviso de cookies (paso 203): inyectado directo al DOM, fuera de #app, para que sobreviva a
+// cada render() (que reconstruye #app entero) sin volver a montarse en cada refresco. Por
+// dispositivo (localStorage, sin namespacear por uid: es una aceptación del navegador, no del
+// cuaderno) — no aparece en modo demo (nada que "recordar" en una sesión descartable) ni dentro
+// de un iframe (la vista previa del portal en Cuenta, ver views-cuenta.js).
+const COOKIES_OK_KEY = "tutoria-cookies-ok";
+function initCookieBar(){
+  if(IS_DEMO || window.self!==window.top) return;
+  if(localStorage.getItem(COOKIES_OK_KEY)==="1") return;
+  if(!document.body) return;
+  const bar = document.createElement("div");
+  bar.className = "cookiebar";
+  bar.innerHTML = `<div class="cookiebar-inner">
+    <div class="cookiebar-text">Usamos cookies propias y almacenamiento local solo para que Entreclases funcione (tu sesión y tus datos). Sin publicidad ni rastreo de terceros. <a href="../terminos.html#cookies" target="_blank" rel="noopener">Más info</a></div>
+    <div class="cookiebar-actions"><button type="button" class="cookiebar-ok">Entendido</button></div>
+  </div>`;
+  bar.querySelector(".cookiebar-ok").addEventListener("click", ()=>{
+    localStorage.setItem(COOKIES_OK_KEY, "1");
+    bar.remove();
+  });
+  document.body.appendChild(bar);
+}
+initCookieBar();
 // Materiales por materia: bucket privado de Storage, carpetas materiales/{uid}/{subjectId}/{archivo}.
 // El aislamiento entre usuarios lo dan las políticas RLS del bucket (ver cuaderno-supabase),
 // no el código de acá — el cliente nunca arma una ruta con un uid que no sea el propio.

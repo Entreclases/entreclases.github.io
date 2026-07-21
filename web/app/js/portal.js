@@ -641,3 +641,25 @@ async function init(){
   }
 }
 init();
+
+// Aviso de cookies (paso 203): única excepción a "nada de localStorage" de este archivo — sólo
+// guarda que el aviso ya se cerró en este dispositivo, nunca datos del alumno. No aparece cuando
+// el portal se abre dentro de un iframe (la vista previa desde Cuenta en la app, ver
+// views-cuenta.js) — ahí el aviso ya se muestra en la app "de afuera".
+function initCookieBar(){
+  const COOKIES_OK_KEY = "tutoria-cookies-ok";
+  if(window.self!==window.top) return;
+  if(localStorage.getItem(COOKIES_OK_KEY)==="1") return;
+  const bar = document.createElement("div");
+  bar.className = "cookiebar";
+  bar.innerHTML = `<div class="cookiebar-inner">
+    <div class="cookiebar-text">Usamos cookies propias y almacenamiento local solo para que Entreclases funcione (tu sesión y tus datos). Sin publicidad ni rastreo de terceros. <a href="../terminos.html#cookies" target="_blank" rel="noopener">Más info</a></div>
+    <button type="button" class="cookiebar-ok">Entendido</button>
+  </div>`;
+  bar.querySelector(".cookiebar-ok").addEventListener("click", ()=>{
+    localStorage.setItem(COOKIES_OK_KEY, "1");
+    bar.remove();
+  });
+  document.body.appendChild(bar);
+}
+initCookieBar();

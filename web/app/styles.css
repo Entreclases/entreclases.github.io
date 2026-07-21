@@ -788,6 +788,20 @@
   }
   @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 
+  /* ============ aviso de cookies (paso 203): barra chica y de una sola vez, se recuerda por
+     dispositivo (localStorage) — ver initCookieBar() en config.js. z-index por encima del
+     appnav (40) para que no quede tapada por la barra inferior en mobile hasta que se cierra. */
+  .cookiebar{position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;justify-content:center;
+    padding:12px calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))}
+  .cookiebar-inner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;max-width:640px;
+    background:var(--ink);color:var(--bg);border-radius:12px;padding:12px 16px;box-shadow:var(--shadow-lg)}
+  .cookiebar-text{flex:1;min-width:200px;font-size:12.5px;line-height:1.5}
+  .cookiebar-text a{color:inherit;text-decoration:underline;font-weight:600}
+  .cookiebar-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:auto}
+  .cookiebar-ok{background:var(--accent);color:var(--on-accent);border:none;border-radius:8px;
+    font-size:13px;font-weight:700;padding:8px 16px;cursor:pointer;flex-shrink:0}
+  @media (prefers-reduced-motion:reduce){.cookiebar{animation:none}}
+
   /* ============ FAB de acciones rápidas (paso 77): botón flotante siempre visible, arriba de
      la barra inferior en mobile / esquina inferior derecha en escritorio ============ */
   .fab-wrap{position:fixed;right:calc(16px + env(safe-area-inset-right));bottom:calc(90px + env(safe-area-inset-bottom));z-index:60;display:flex;flex-direction:column;

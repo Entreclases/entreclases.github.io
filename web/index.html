@@ -296,6 +296,18 @@
   .platform-grid-3 .btn{margin-top:14px}
   .platform-grid-3 .badge{margin-top:14px}
 
+  /* ============ aviso de cookies (paso 203): barra chica y de una sola vez, se recuerda por
+     dispositivo (localStorage) — mismo criterio y misma clave que en la app (COOKIES_OK_KEY,
+     ver config.js), aunque este archivo no comparte JS con ella. ============ */
+  .cookiebar{position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;justify-content:center;
+    padding:12px calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))}
+  .cookiebar-inner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;max-width:640px;
+    background:var(--ink);color:var(--bg);border-radius:12px;padding:12px 16px;box-shadow:0 20px 40px -20px var(--shadow-2)}
+  .cookiebar-text{flex:1;min-width:200px;font-size:12.5px;line-height:1.5}
+  .cookiebar-text a{color:inherit;text-decoration:underline;font-weight:600}
+  .cookiebar-ok{background:var(--accent-strong);color:#FFFFFF;border:none;border-radius:8px;
+    font-size:13px;font-weight:700;padding:8px 16px;cursor:pointer;flex-shrink:0;margin-left:auto}
+
   footer.site{padding:40px 20px;text-align:center;border-top:1px solid var(--border)}
   footer.site .brand{justify-content:center;margin-bottom:10px}
   footer.site p{color:var(--text-soft);font-size:13px}
@@ -586,6 +598,26 @@
       });
     }, {threshold:.15});
     document.querySelectorAll(".fade-up").forEach(function(el){ io.observe(el); });
+  })();
+</script>
+<script>
+  // Aviso de cookies (paso 203): mismo criterio que en la app (ver initCookieBar() en
+  // web/app/js/config.js) — misma clave de localStorage, no aparece dentro de un iframe.
+  (function(){
+    var COOKIES_OK_KEY = "tutoria-cookies-ok";
+    if(window.self!==window.top) return;
+    if(localStorage.getItem(COOKIES_OK_KEY)==="1") return;
+    var bar = document.createElement("div");
+    bar.className = "cookiebar";
+    bar.innerHTML = '<div class="cookiebar-inner">'
+      + '<div class="cookiebar-text">Usamos cookies propias y almacenamiento local solo para que Entreclases funcione (tu sesión y tus datos). Sin publicidad ni rastreo de terceros. <a href="./terminos.html#cookies" target="_blank" rel="noopener">Más info</a></div>'
+      + '<button type="button" class="cookiebar-ok">Entendido</button>'
+      + '</div>';
+    bar.querySelector(".cookiebar-ok").addEventListener("click", function(){
+      localStorage.setItem(COOKIES_OK_KEY, "1");
+      bar.remove();
+    });
+    document.body.appendChild(bar);
   })();
 </script>
 </body>
