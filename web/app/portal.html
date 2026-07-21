@@ -63,9 +63,12 @@
   a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-       font-size:15px;line-height:1.5;padding:24px 16px 48px}
+       font-size:15px;line-height:1.5;padding:24px 16px 48px;position:relative}
   /* Fondo decorativo (paso 178): siempre activo, más tenue que la app y la landing a propósito
-     (el portal es lo primero que ve un alumno externo — la textura tiene que ser casi invisible). */
+     (el portal es lo primero que ve un alumno externo — la textura tiene que ser casi invisible).
+     `position:relative` en body es imprescindible: sin stacking context propio, el ::before con
+     z-index:-1 queda tapado por el background opaco de body (bug detectado en QA: no se veía en
+     ningún tema). */
   body::before{
     content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background-image:var(--bg-pattern); background-repeat:repeat; background-size:220px 220px;

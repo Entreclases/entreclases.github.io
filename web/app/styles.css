@@ -164,11 +164,16 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-       font-size:14px;line-height:1.45;padding:18px 12px 44px}
+       font-size:14px;line-height:1.45;padding:18px 12px 44px;position:relative}
   /* Fondo decorativo (paso 178): capa fija detrás de todo el contenido (z-index negativo, no
      recibe clicks) — se apaga entera con body.bg-off (toggle "Fondo decorativo" en Cuenta →
      Preferencias, ver applyBg() en config.js). Opacidad bien baja a propósito: es una textura,
-     no tiene que competir con el contenido real. */
+     no tiene que competir con el contenido real. `position:relative` en body es necesario para
+     que este ::before (z-index:-1) forme su stacking context DENTRO de body — sin eso, el fondo
+     propio de body (arriba) lo tapa por completo, porque el pseudo-elemento queda en el stacking
+     context raíz en vez de en el de body (bug detectado en QA manual: el patrón no se veía en
+     ningún tema). No afecta a los `position:fixed` de nav/modales — eso requiere transform, no
+     `position:relative`. */
   body::before{
     content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background-image:var(--bg-pattern); background-repeat:repeat; background-size:220px 220px;

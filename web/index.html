@@ -156,9 +156,12 @@
      alcanza con que la regla dark de @media excluya :not(.theme-light) como hace arriba */
 
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:var(--sans);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+  body{font-family:var(--sans);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;position:relative}
   /* Fondo decorativo (paso 178): misma textura de cuaderno que la app, siempre activa acá (la
-     landing no tiene preferencias de usuario) — capa fija detrás de todo, sin recibir clicks. */
+     landing no tiene preferencias de usuario) — capa fija detrás de todo, sin recibir clicks.
+     `position:relative` en body es imprescindible: sin stacking context propio, el ::before con
+     z-index:-1 queda tapado por el background opaco de body (bug detectado en QA: no se veía en
+     ningún tema). */
   body::before{
     content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background-image:var(--bg-pattern); background-repeat:repeat; background-size:220px 220px;
