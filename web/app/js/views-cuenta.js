@@ -649,6 +649,17 @@ function vReservaModoCard(){
     <button class="chip ${modo==="confirmar"?"on":""}" data-a="reserva-modo-set" data-f="confirmar">Me piden y yo confirmo</button>
     <button class="chip ${modo==="directa"?"on":""}" data-a="reserva-modo-set" data-f="directa">Reservan directo (orden de llegada)</button>
   </div>`;
+  if(modo!=="apagado"){
+    const huecosModo = huecosModoFor();
+    h += `<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--soft)">
+      <div class="flabel" style="margin-bottom:8px">Qué horarios ven tus alumnos</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="chip ${huecosModo==="libres"?"on":""}" data-a="huecos-modo-set" data-f="libres">Solo horarios libres (sin clase asignada)</button>
+        <button class="chip ${huecosModo==="todaDisponibilidad"?"on":""}" data-a="huecos-modo-set" data-f="todaDisponibilidad">Toda mi disponibilidad declarada</button>
+      </div>
+      ${huecosModo==="todaDisponibilidad"?`<div class="hint" style="margin-top:8px">Tus alumnos van a ver horarios de tu disponibilidad aunque ya tengas una clase agendada ahí — vas a tener que acomodar vos los pedidos que se pisen.</div>`:""}
+    </div>`;
+  }
   return h + `</div>`;
 }
 

@@ -1778,6 +1778,18 @@ function disponibilidadFor(){ return state.catalog.disponibilidad || defaultDisp
 // mismo bucket horario que usa vAgendaWeekGrid para agrupar clases por fila (Math.floor(startMin/60)) —
 // "14:37" cae en la celda "14:00", igual que una clase que arranca a esa hora cae en esa fila.
 function horaCeldaDe(time){ return (time||"00:00").slice(0,2)+":00"; }
+// todas las celdas horarias que pisa una clase según su duración real (paso 198) — una clase de
+// 18:00 a 21:00 (duration:180) ocupa las celdas 18:00, 19:00 y 20:00, no sólo la de inicio.
+function celdasOcupadasPorEvento(time, duration){
+  const [h,m] = (time||"00:00").split(":").map(Number);
+  const startMin = h*60+(m||0);
+  const endMin = startMin + (Number(duration)||60);
+  const out = [];
+  for(let mm=Math.floor(startMin/60)*60; mm<endMin; mm+=60){
+    out.push(String(Math.floor(mm/60)).padStart(2,"0")+":00");
+  }
+  return out;
+}
 function esCeldaDisponible(day, hourLabel){ return disponibilidadFor().some(d=>d.day===day && d.hour===hourLabel); }
 function estaDentroDisponibilidad(date, time){
   const list = disponibilidadFor();
@@ -1827,26 +1839,42 @@ function resolveReservaModo(publicado){
 }
 function reservaModoFor(){ return resolveReservaModo(state.portal && state.portal.publicado); }
 
+/* ============ "Qué horarios ven tus alumnos" (paso 198) ============
+   Guardado en publicado.huecosModo: "libres" (default, ausente = libres) sólo ofrece celdas sin
+   clase asignada, o "todaDisponibilidad" ofrece toda la disponibilidad declarada tal cual, sin
+   cruzarla con la agenda — para el docente que prefiere que le pidan igual y acomodar él a mano. */
+function huecosModoFor(){ return (state.portal && state.portal.publicado && state.portal.publicado.huecosModo) || "libres"; }
+
 /* ============ "Pedir una clase" desde el portal (paso 160) ============
    huecosLibresProximos14Dias() cruza la disponibilidad declarada (arriba) con la agenda real de
-   los próximos 14 días — mismo criterio de bucket horario que usa la grilla semanal
-   (horaCeldaDe(): una clase larga sólo ocupa la hora en la que arranca, misma simplificación que
-   ya tiene vAgendaWeekGrid/esCeldaDisponible). El resultado se publica tal cual en
+   los próximos 14 días — bloquea TODAS las celdas horarias que pisa cada clase según su duración
+   real (celdasOcupadasPorEvento(), paso 198: antes sólo bloqueaba la celda de inicio, así que una
+   clase de 3 horas dejaba sus 2 horas siguientes ofrecidas como libres en el portal), salvo que el
+   docente haya elegido "todaDisponibilidad" (huecosModoFor(), paso 198) — en ese modo no se filtra
+   por ocupado, se ofrece toda la disponibilidad declarada. El resultado se publica tal cual en
    publicado.huecos (ver publicarPortal()/maybeSyncHuecosPortal() en sync.js) para que el portal
    público (sin acceso a la agenda real) pueda ofrecerlos sin exponer nada más. Si el docente nunca
-   declaró disponibilidad, da lista vacía — nunca "todo libre" por default. */
-function huecosLibresProximos14Dias(){
+   declaró disponibilidad, da lista vacía — nunca "todo libre" por default. modoOverride es para
+   maybeSyncHuecosPortal() en sync.js, que recalcula sobre una fila recién traída del server y no
+   puede confiar en state.portal (puede estar sin cargar o desactualizado en este dispositivo). */
+function huecosLibresProximos14Dias(modoOverride){
   const disp = disponibilidadFor();
   if(disp.length===0) return [];
+  const soloLibres = (modoOverride||huecosModoFor())!=="todaDisponibilidad";
   const start = today(), end = addDays(start, 13);
-  const ocupado = new Set(agendaRangeEvents(start, end).map(e=>e.date+" "+horaCeldaDe(e.time)));
+  const ocupado = new Set();
+  if(soloLibres){
+    agendaRangeEvents(start, end).forEach(e=>{
+      celdasOcupadasPorEvento(e.time, e.duration).forEach(hourLabel=>ocupado.add(e.date+" "+hourLabel));
+    });
+  }
   const nowHourLabel = String(new Date().getHours()).padStart(2,"0")+":00";
   const out = [];
   for(let d=start; d<=end; d=addDays(d,1)){
     if(esSemanaCompleta(mondayOfWeek(d))) continue; // paso 170: semana cerrada, no ofrecer nada de ella
     const dow = weekdayIdx(d);
     disp.filter(c=>c.day===dow).forEach(c=>{
-      if(ocupado.has(d+" "+c.hour)) return;
+      if(soloLibres && ocupado.has(d+" "+c.hour)) return;
       if(d===start && c.hour<=nowHourLabel) return; // no ofrecer horas de hoy que ya pasaron
       out.push({date:d, time:c.hour});
     });

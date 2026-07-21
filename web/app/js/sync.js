@@ -785,6 +785,26 @@ async function setReservaModo(modo){
     render();
   }
 }
+// "Qué horarios ven tus alumnos" (paso 198): mismo patrón optimista que setReservaModo, con el
+// mismo efecto secundario de recalcular y publicar huecos ya mismo (el cambio de modo altera qué
+// cuenta como "libre" sin que haga falta esperar al próximo sync ni a "Publicar cambios").
+async function setHuecosModo(modo){
+  if(!state.portal || huecosModoFor()===modo) return;
+  const prevPublicado=state.portal.publicado;
+  state.portal.publicado={...state.portal.publicado, huecosModo:modo};
+  const huecos=reservaModoFor()!=="apagado"?huecosLibresProximos14Dias():[];
+  const publicado={...state.portal.publicado, huecos};
+  state.portal.publicado=publicado; render();
+  if(IS_DEMO) return;
+  try{
+    const {uid_, h}=await fetchPortalRow("publicado");
+    await patchPortalRow(uid_, h, {publicado:state.portal.publicado});
+  }catch(e){
+    state.portal.publicado=prevPublicado;
+    state.portalError = !navigator.onLine ? "Sin conexión a internet." : "No se pudo actualizar. Probá de nuevo.";
+    render();
+  }
+}
 // "Permitir cancelar desde el portal" (paso 172): mismo patrón optimista que togglePedirClase,
 // pero sin efecto secundario sobre huecos — a diferencia de "Pedir una clase", arranca ENCENDIDO
 // (ver permitirCancelarPortalFor() en helpers.js, la ausencia del campo cuenta como activado).
@@ -818,7 +838,7 @@ async function maybeSyncHuecosPortal(uid_, s){
     const row=(await r.json())[0];
     if(!row || !row.habilitado) return;
     const habilitado=resolveReservaModo(row.publicado)!=="apagado";
-    const huecos=habilitado?huecosLibresProximos14Dias():[];
+    const huecos=habilitado?huecosLibresProximos14Dias((row.publicado&&row.publicado.huecosModo)||"libres"):[];
     const prevHuecos=(row.publicado&&row.publicado.huecos)||[];
     if(stableStringify(huecos)===stableStringify(prevHuecos)) return;
     const publicado={...row.publicado, huecos};

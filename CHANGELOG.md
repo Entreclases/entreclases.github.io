@@ -24,6 +24,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
+- Paso 198 (huecos de verdad libres en el portal): `huecosLibresProximos14Dias()` (`helpers.js`) sólo marcaba ocupada la celda de INICIO de cada clase (`horaCeldaDe(e.time)`), así que una clase de varias horas dejaba las horas siguientes ofrecidas como libres para pedir/reservar en el portal — ahora `celdasOcupadasPorEvento()` bloquea todas las celdas que pisa según su duración real. Nuevo toggle por docente en Cuenta → Portal, "Qué horarios ven tus alumnos": "Solo horarios libres" (default, ausente = libres) o "Toda mi disponibilidad declarada" (sin cruzar contra la agenda, para el docente que prefiere acomodar los pedidos a mano), guardado en `publicado.huecosModo`. Sube el caché del service worker.
 
 ## [2.5.2] - 2026-07-21
 - Paso 200 (cartelito de backend dev también en login/registro): el cartelito "⚙ backend de desarrollo" se armaba dentro de `render()` (`views-core.js`), así que sólo se veía una vez pasada la pantalla de login/registro — justo donde más hace falta no confundirse de backend si algo falla ahí. Se saca de `render()` y se inyecta directo al DOM al cargar `config.js` (si `IS_BACKEND_DEV`), fijo con `position:fixed`, visible en cualquier pantalla incluida `vAuth`/`vSetPassword`.
