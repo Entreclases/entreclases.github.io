@@ -1006,6 +1006,11 @@ function render(){
   const ses = getSes();
   const isAdmin = sesIsAdmin(ses);
   let m = "";
+  if(typeof IS_BACKEND_DEV!=="undefined" && IS_BACKEND_DEV){
+    m += `<div class="no-print" style="position:fixed;bottom:10px;right:10px;z-index:60;
+      background:var(--amberbg);border:1px solid var(--amberline,var(--blueline));border-radius:8px;
+      padding:4px 8px;font-size:11px;color:var(--status-pausado-fg);pointer-events:none">⚙ backend de desarrollo</div>`;
+  }
   if(IS_DEMO){
     m += `<div class="no-print" style="position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;
       background:var(--bluebg);border:1px solid var(--blueline);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px;color:var(--status-aprobo-fg)">

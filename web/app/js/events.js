@@ -2746,19 +2746,28 @@ checkRachaDiaria();
    ni dentro de un contenedor nativo como Tauri o Capacitor, que ya resuelven
    los archivos locales sin necesidad de cache de service worker) */
 if ("serviceWorker" in navigator && location.protocol.startsWith("http") && !IS_NATIVE) {
-  navigator.serviceWorker.register("sw.js").then(reg=>{
-    watchSwRegistration(reg);
-    // Además del chequeo automático del navegador (poco frecuente y no garantizado),
-    // se pide explícitamente cada SW_UPDATE_CHECK_INTERVAL_MS y cada vez que se vuelve
-    // a la pestaña — para que una versión nueva no tarde en avisar.
-    setInterval(()=>reg.update().catch(()=>{}), SW_UPDATE_CHECK_INTERVAL_MS);
-    document.addEventListener("visibilitychange", ()=>{
-      if(document.visibilityState==="visible") reg.update().catch(()=>{});
+  if(typeof IS_LOCALHOST!=="undefined" && IS_LOCALHOST){
+    // Paso 193: en localhost (desarrollo contra dev) nunca se registra el SW — y si ya había uno
+    // de una visita anterior a este mismo puerto, se desregistra — para ver siempre el código
+    // fresco sin pelear con la caché agresiva pensada para producción.
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      regs.forEach(r=>r.unregister());
+    }).catch(()=>{});
+  } else {
+    navigator.serviceWorker.register("sw.js").then(reg=>{
+      watchSwRegistration(reg);
+      // Además del chequeo automático del navegador (poco frecuente y no garantizado),
+      // se pide explícitamente cada SW_UPDATE_CHECK_INTERVAL_MS y cada vez que se vuelve
+      // a la pestaña — para que una versión nueva no tarde en avisar.
+      setInterval(()=>reg.update().catch(()=>{}), SW_UPDATE_CHECK_INTERVAL_MS);
+      document.addEventListener("visibilitychange", ()=>{
+        if(document.visibilityState==="visible") reg.update().catch(()=>{});
+      });
+    }).catch(()=>{});
+    navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+      if(_swReloading) return;
+      _swReloading = true;
+      location.reload();
     });
-  }).catch(()=>{});
-  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
-    if(_swReloading) return;
-    _swReloading = true;
-    location.reload();
-  });
+  }
 }

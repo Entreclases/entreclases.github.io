@@ -20,6 +20,15 @@ No build system, no package manager, no dependencies anywhere in this repo — e
 - Nada de librerías externas ni CDNs — la CSP del proyecto (`web/app/index.html`, `web/app/portal.html`) no las permite.
 - Todos los textos de cara al usuario van SIEMPRE en castellano rioplatense (vos, tenés, agendá — nunca "tú"/"tienes"/"agenda" en tono neutro).
 
+## Cómo trabajamos (dev/main)
+
+- Todo el desarrollo pasa por la rama `dev`: un commit por paso, push a `origin dev` apenas termina cada paso.
+- Nunca commitear/pushear/mergear a `main` salvo pedido explícito de Manuel — `main` es la versión estable publicada.
+- Los checkpoints de versión (bump de `APP_VERSION`, línea de `CHANGELOG.md`, tag) se hacen en `dev`.
+- El merge de `dev` a `main` lo dispara Manuel al cerrar una hoja de trabajo (o para un hotfix aprobado) — es lo único que dispara `deploy-pages.yml` y publica en GitHub Pages.
+- Hay DOS proyectos Supabase: `entreclases-dev` (usado automáticamente en `localhost`/`127.0.0.1`, ver `SUPA_DEV`/`IS_BACKEND_DEV` en `config.js`) y producción (la web publicada). Toda migración SQL nueva se entrega primero para pegar en `entreclases-dev`, se acumula versionada en `cuaderno-supabase`, y recién va a producción en el cierre de hoja — deben ser aditivas y retrocompatibles (mismo criterio que el formato del JSON del cuaderno).
+- Al arrancar una sesión nueva, levantar el servidor local (`npx serve web -l 8000`, ver "Running/testing") y avisar la URL sin que haga falta pedirlo.
+
 ## Cómo trabajar barato
 
 - Antes de abrir un archivo de `web/app/js/`, consultá `ARQUITECTURA.md` para saber cuál lo tiene, y usá Grep para ubicar la función exacta — no abras un `views-*.js` entero a ciegas.
@@ -52,7 +61,7 @@ Classic `<script src>` tags (no bundler, no `type="module"`), loaded in a fixed 
 No build, lint, or test tooling.
 
 - Open `web/index.html` or `web/app/index.html` directly in a browser for quick checks (`file://` works fine, no ES modules involved).
-- For service worker/offline/PWA behavior, serve `web/` with a static server instead (`npx serve web`, or `python -m http.server` from `web/`) — `IS_NATIVE`/native shells skip SW registration entirely.
+- For service worker/offline/PWA behavior, or for anything that talks to Supabase, serve `web/` with a static server instead: `npx serve web -l 8000` (no working Python in this environment; `python -m http.server` is the alternative where Python is available). On `localhost`/`127.0.0.1` the SW never registers (and any previous one auto-unregisters) and the backend switches automatically to `entreclases-dev` — see "Cómo trabajamos (dev/main)". Force production from localhost with `?backend=prod` (asks for confirmation first).
 - After editing anything under `web/app/`, bump `CACHE` in `web/app/sw.js` and make sure `FILES` still lists every precached file.
 - Manual testing only: login/signup, create/edit/delete a student, topic/semaforo cycling, log a class/simulacro, export/import JSON, offline, logout.
 

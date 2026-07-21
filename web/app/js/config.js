@@ -141,11 +141,32 @@ const DOWNLOADS_URL = "https://entreclases.github.io/#usala";
 // Mail de contacto institucional (paso 183) — único lugar del que lo lee el app; la landing, el
 // portal y terminos.html no comparten este archivo, así que repiten el mismo string literal.
 const CONTACT_EMAIL = "contacto.entreclases@gmail.com";
-// Backend de sincronización: un único proyecto Supabase para todos los usuarios de la app.
-// La anon key es pública por diseño — la seguridad la dan las políticas RLS de la tabla
-// `cuaderno` (cada cuenta solo puede leer/escribir su propia fila; ver el repo cuaderno-supabase).
-const SUPA_URL = "https://iwxsntxkqfqucxhwlfdv.supabase.co";
-const SUPA_ANON_KEY = "sb_publishable_S0zs9qmIRB5RWNZceO5gCg_vI7Hxx1D";
+// Backend de sincronización: un único proyecto Supabase por entorno (paso 193). En producción
+// (cualquier hostname que no sea localhost/127.0.0.1) siempre se usa el proyecto de producción de
+// abajo. En localhost se usa por defecto el proyecto de desarrollo (entreclases-dev) para no tocar
+// nunca datos reales durante pruebas — salvo que se pida explícitamente ?backend=prod (con
+// confirmación, para que no pase por accidente). La anon key es pública por diseño en ambos casos —
+// la seguridad la dan las políticas RLS de la tabla `cuaderno` (cada cuenta solo puede leer/escribir
+// su propia fila; ver el repo cuaderno-supabase).
+const SUPA_PROD = {
+  url: "https://iwxsntxkqfqucxhwlfdv.supabase.co",
+  anonKey: "sb_publishable_S0zs9qmIRB5RWNZceO5gCg_vI7Hxx1D",
+};
+const SUPA_DEV = {
+  url: "https://anubpgvuptyxnbagnkxa.supabase.co",
+  anonKey: "sb_publishable_RkC2wsv0m5mYBHX2soHDpw_nx-clEvq",
+};
+const IS_LOCALHOST = (location.hostname==="localhost" || location.hostname==="127.0.0.1");
+function usaBackendDev(){
+  if(!IS_LOCALHOST) return false;
+  if(new URLSearchParams(location.search).get("backend")==="prod"){
+    return !confirm("¿Usar el backend de PRODUCCIÓN desde localhost? Vas a leer y escribir datos reales. Cancelar para seguir en el backend de desarrollo.");
+  }
+  return true;
+}
+const IS_BACKEND_DEV = usaBackendDev();
+const SUPA_URL = IS_BACKEND_DEV ? SUPA_DEV.url : SUPA_PROD.url;
+const SUPA_ANON_KEY = IS_BACKEND_DEV ? SUPA_DEV.anonKey : SUPA_PROD.anonKey;
 // Materiales por materia: bucket privado de Storage, carpetas materiales/{uid}/{subjectId}/{archivo}.
 // El aislamiento entre usuarios lo dan las políticas RLS del bucket (ver cuaderno-supabase),
 // no el código de acá — el cliente nunca arma una ruta con un uid que no sea el propio.

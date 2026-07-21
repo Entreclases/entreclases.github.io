@@ -5,8 +5,21 @@
    propiamente dicha). Duplica SUPA_URL/SUPA_ANON_KEY porque este archivo no carga config.js
    — son constantes públicas igual, ver CLAUDE.md. Lee ?k=LLAVE y llama a la RPC pública
    portal_publico() (migración 013_portal.sql), que nunca expone el token ni el user_id. */
-const SUPA_URL = "https://iwxsntxkqfqucxhwlfdv.supabase.co";
-const SUPA_ANON_KEY = "sb_publishable_S0zs9qmIRB5RWNZceO5gCg_vI7Hxx1D";
+// Backend por entorno (paso 193) — mismo criterio que config.js: localhost usa el proyecto de
+// desarrollo salvo ?backend=prod (con confirmación); cualquier otro host usa producción.
+const SUPA_PROD = { url:"https://iwxsntxkqfqucxhwlfdv.supabase.co", anonKey:"sb_publishable_S0zs9qmIRB5RWNZceO5gCg_vI7Hxx1D" };
+const SUPA_DEV = { url:"https://anubpgvuptyxnbagnkxa.supabase.co", anonKey:"sb_publishable_RkC2wsv0m5mYBHX2soHDpw_nx-clEvq" };
+const IS_LOCALHOST = (location.hostname==="localhost" || location.hostname==="127.0.0.1");
+function usaBackendDev(){
+  if(!IS_LOCALHOST) return false;
+  if(new URLSearchParams(location.search).get("backend")==="prod"){
+    return !confirm("¿Usar el backend de PRODUCCIÓN desde localhost? Vas a leer datos reales. Cancelar para seguir en el backend de desarrollo.");
+  }
+  return true;
+}
+const IS_BACKEND_DEV = usaBackendDev();
+const SUPA_URL = IS_BACKEND_DEV ? SUPA_DEV.url : SUPA_PROD.url;
+const SUPA_ANON_KEY = IS_BACKEND_DEV ? SUPA_DEV.anonKey : SUPA_PROD.anonKey;
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
