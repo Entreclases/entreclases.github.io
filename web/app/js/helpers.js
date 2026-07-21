@@ -2361,6 +2361,24 @@ function adoptOrDiscardLegacyCuaderno(uid){
     localStorage.setItem(LAST_UID_KEY, uid);
   }catch(e){}
 }
+// Dos pestañas de la MISMA cuenta mantienen cada una su propia copia de state.students/catalog en
+// memoria — si una guarda un cambio, la otra no se entera hasta que recarga. Sin esto, si la
+// pestaña vieja sincroniza mientras tanto (por ejemplo al volver a tener foco, ver el listener de
+// "visibilitychange" en sync.js), syncNow() mergearía la nube con SU copia vieja y pisaría en
+// localStorage el cambio reciente de la otra pestaña, que todavía no llegó a la nube — refrescar
+// acá primero evita exactamente eso. Se llama desde syncNow() antes de mergear con la nube.
+function refreshStateFromLocalStorage(uid_){
+  if(!uid_) return;
+  try{
+    const raw = localStorage.getItem(nsKey(KEY, uid_));
+    if(!raw) return;
+    const p = JSON.parse(raw);
+    if(p.owner && p.owner!==uid_) return;
+    if(Array.isArray(p.students)) state.students = p.students;
+    if(p.catalog && Array.isArray(p.catalog.careers) && Array.isArray(p.catalog.subjects))
+      state.catalog = p.catalog;
+  }catch(e){}
+}
 // Al cerrar sesión (o detectar en storeSession() que la que está entrando es otra cuenta) hay
 // que vaciar en memoria TODO lo que se haya cacheado de la cuenta anterior — students/catalog
 // son lo crítico (evita que un sync suba datos ajenos, paso 194), pero también las listas

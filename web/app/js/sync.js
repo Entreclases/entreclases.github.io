@@ -55,6 +55,10 @@ async function syncNow(force){
       setStatus("idle"); syncing=false; return;
     }
     state.ownerUid=uid_;
+    // Multi-pestaña, misma cuenta (paso 194 bis): antes de mergear, ponerse al día con lo último
+    // que haya guardado localStorage — puede ser más fresco que la copia en memoria de ESTA
+    // pestaña si otra pestaña guardó algo mientras tanto (ver refreshStateFromLocalStorage()).
+    refreshStateFromLocalStorage(uid_);
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
     maybeHeartbeat(uid_, s);
     const dirty=isDirty();
