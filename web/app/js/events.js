@@ -1236,7 +1236,7 @@ document.addEventListener("click", (e)=>{
     if(activeTesterRequested()) return;
     if(!navigator.onLine){ state.activeTesterError="Se necesita conexión a internet para enviar la solicitud."; render(); return; }
     state.activeTesterStatus="sending"; state.activeTesterError=""; render();
-    sendReport("Quiero ser Active Tester: 30% de descuento permanente o 1 año gratis tras la beta, a cambio de 3 reportes por mes.", "active_tester", "cuenta").then(()=>{
+    sendReport("Quiero ser Active Tester: 50% de descuento permanente o 3 meses gratis tras la beta, a cambio de 3 reportes por mes.", "active_tester", "cuenta").then(()=>{
       markActiveTesterRequested(); state.activeTesterStatus="ok"; render();
     }).catch(()=>{
       state.activeTesterStatus="error";
