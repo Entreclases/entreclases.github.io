@@ -44,7 +44,7 @@ function vPagosResumen(){
   if(rows.length===0 && seniaRes.rows.length===0 && sinRegistrar.length===0)
     return h + emptyState(ICON_WALLET, "Todavía no hay nada para cobrar acá",
       "Cargá una tarifa o activá la seña desde la pestaña «Pagos» de cada alumno para que aparezcan los cobros de este mes.",
-      `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`);
+      `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`, "pagos");
 
   if(rows.length){
     const totalCobrado = rows.reduce((a,x)=>a+x.r.cobrado,0);
@@ -483,7 +483,9 @@ function vEstadisticas(){
   if(state.statsMode==="comparar") return h + vEstadisticasComparar();
 
   const subs = subjectsWithStudents();
-  if(subs.length===0) return h + `<div class="empty">Todavía no hay alumnos con una materia asignada.</div>`;
+  if(subs.length===0) return h + emptyState(ICON_CHART, "Todavía no hay nada para mostrar acá",
+    "En cuanto tengas alumnos activos con una materia asignada, acá vas a ver el avance de todo el grupo de un vistazo.",
+    `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`, "stats");
 
   const curId = subs.some(m=>m.id===state.statsSubjectId) ? state.statsSubjectId : subs[0].id;
   h += `<div class="field" style="max-width:320px;margin-bottom:18px">

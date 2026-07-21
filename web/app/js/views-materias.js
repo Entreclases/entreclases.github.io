@@ -131,6 +131,11 @@ function vCatalog(){
     <div class="field"><input id="new-career" placeholder="Ej: Contador Público" data-enter="cat-add-career"></div>
     <button class="chip" data-a="cat-add-career" style="margin-bottom:2px">+ Agregar carrera</button></div>
   <div class="hint" style="margin-top:6px">Quitar una carrera no afecta a los alumnos que ya la tienen (conservan el texto en su ficha) ni desvincula del todo lo demás — sólo sale de las materias que la tenían enlazada. Vinculá materias con carreras desde el editor de cada materia, más abajo.</div></div>`;
+  if(c.subjects.filter(m=>m.id!=="materia-ejemplo").length===0){
+    h += emptyState(ICON_BOOK, "Armá tu primera materia",
+      "Una materia con sus unidades es lo que arma solo la grilla de temas de cada alumno que la curse.",
+      `<button class="btn btn-primary" onclick="document.getElementById('new-subject').focus()">+ Agregar materia</button>`, "catalog");
+  }
   h += `<div class="formcard"><div class="ftitle">Materias y sus unidades</div>`;
   const groupBy = state.catMateriasGroupBy||"todas";
   if((c.careers||[]).length){

@@ -146,7 +146,8 @@ let state = { students:[], catalog:defaultCatalog(), ownerUid:null, editSubjectI
               toasts:[],
               fabOpen:false, fabPick:null,
               searchOpen:false, searchQuery:"", searchSel:0,
-              helpOpen:null, faqOpenIdx:null, alertMsgFor:null };
+              helpOpen:null, faqOpenIdx:null, alertMsgFor:null,
+              tourActive:false };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 // Color por materia (paso 73): key estable de SUBJECT_COLOR_KEYS. Si la materia ya tiene
@@ -720,6 +721,9 @@ function checkOnboardingComplete(){
   const id=uid();
   state.toasts=[...state.toasts, {id, text:"¡Listo! Ya diste los primeros pasos.", tone:"ok", undo:null, action:null}];
   setTimeout(()=>{ state.toasts=state.toasts.filter(t=>t.id!==id); render(); }, TOAST_MS);
+  // Festejo (paso 179/204): igual criterio que el resto de fireConfetti() — se salta solo con
+  // reduced-motion, no hace falta chequearlo acá.
+  if(typeof fireConfetti==="function") fireConfetti();
 }
 
 /* ============ recordatorio de copia manual (.json) ============ */

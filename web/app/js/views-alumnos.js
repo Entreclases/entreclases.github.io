@@ -166,7 +166,7 @@ function vLista(){
   if(shown.length===0) return h + (alive().length===0
     ? emptyState(ICON_USERS, "Todavía no hay alumnos",
         "Agregá tu primer alumno para empezar a llevar el seguimiento.",
-        `<button class="btn btn-primary" data-a="new">+ Agregá tu primer alumno</button>`)
+        `<button class="btn btn-primary" data-a="new">+ Agregá tu primer alumno</button>`, "lista")
     : `<div class="empty">Nadie coincide con estos filtros.</div>`) + vTrashFootLink();
 
   // En la vista "Todos" los alumnos en pausa (paso 114) se separan del resto en su propia

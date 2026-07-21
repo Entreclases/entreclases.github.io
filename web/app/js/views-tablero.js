@@ -1,18 +1,24 @@
 "use strict";
 
 /* ============ vistas ============ */
-// Guía de primeros pasos (paso 74): checklist de 4 pasos que se tilda sola en base a datos
-// reales (nunca se guarda el progreso aparte, se recalcula en cada render) — así no hay nada
-// que migrar ni desincronizar entre dispositivos. Se muestra mientras la cuenta esté "vacía"
-// (falta algún paso) y no se haya descartado a mano; se completa sola apenas se hacen los 4,
-// sin necesidad de tocar "descartar".
+// Guía de primeros pasos (paso 74, ampliada a 6 hitos en el 204): checklist que se tilda sola
+// en base a datos reales (nunca se guarda el progreso aparte, se recalcula en cada render) —
+// así no hay nada que migrar ni desincronizar entre dispositivos. Se muestra mientras la cuenta
+// esté "vacía" (falta algún paso) y no se haya descartado a mano; se completa sola apenas se
+// hacen los 6 (con festejo, paso 179 — ver checkOnboardingComplete en helpers.js), sin
+// necesidad de tocar "descartar". Mismos hitos y orden que el tour guiado (tour.js), pero acá
+// conviven como checklist persistente en vez de un recorrido paso a paso.
 const ONBOARDING_STEPS = [
-  {label:"Creá tu primera materia", action:"nav-catalog",
-    done:()=>state.catalog.subjects.some(m=>m.id!=="materia-ejemplo")},
   {label:"Agregá un alumno", action:"new",
     done:()=>alive().some(s=>!s.sample)},
+  {label:"Armá tu primera materia", action:"nav-catalog",
+    done:()=>state.catalog.subjects.some(m=>m.id!=="materia-ejemplo")},
+  {label:"Agendá una clase", action:"nav-agenda",
+    done:()=>alive().some(s=>!s.sample && (((s.horarios||[]).length)||((s.clasesPuntuales||[]).length)))},
   {label:"Registrá una clase", action:"nav-lista",
     done:()=>alive().some(s=>!s.sample && (s.sessions||[]).length>0)},
+  {label:"Marcá un cobro pagado", action:"nav-pagos",
+    done:()=>alive().some(s=>!s.sample && (s.sessions||[]).some(x=>x.cobrada))},
   {label:"Activá tu portal", action:"nav-cuenta", group:"portal",
     done:()=>!!(state.portal && state.portal.habilitado)},
 ];
@@ -21,9 +27,10 @@ function vTips(){
   if(tipsDismissed()) return "";
   const steps = ONBOARDING_STEPS.map(s=>({...s, ok:s.done()}));
   if(steps.every(s=>s.ok)) return ""; // normalmente ya la descartó checkOnboardingComplete() antes; fallback defensivo
+  const doneCount = steps.filter(s=>s.ok).length;
   return `<div class="formcard" style="display:flex;align-items:flex-start;gap:10px;justify-content:space-between">
     <div style="flex:1">
-      <div class="ftitle" style="margin-bottom:8px">Primeros pasos</div>
+      <div class="ftitle" style="margin-bottom:8px">Primeros pasos <span style="font-weight:400;color:var(--muted)">(${doneCount}/${steps.length})</span></div>
       <div style="display:flex;flex-direction:column;gap:6px">
         ${steps.map(s=>`<button class="tip-step ${s.ok?"done":""}" data-a="${s.action}" ${s.group?`data-group="${s.group}"`:""}>
           <span class="tip-step-check">${s.ok?ICON_CHECK.replace('stroke="white"','stroke="currentColor"'):""}</span>
@@ -294,6 +301,7 @@ function vTablero(){
   let h = pageHead("Tablero","Hoy",`<button class="btn btn-primary" data-a="new">+ Nuevo estudiante</button>`,
     "Lo que tenés que mirar hoy: clases del día, alertas y exámenes próximos.");
   h += vTips();
+  h += vTourResumeBanner();
   h += vFeedbackBanner();
   h += vBackupReminder();
   h += vCumpleanosBanner();

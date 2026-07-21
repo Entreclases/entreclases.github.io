@@ -221,7 +221,6 @@ function initCookieBar(){
   });
   document.body.appendChild(bar);
 }
-initCookieBar();
 // Materiales por materia: bucket privado de Storage, carpetas materiales/{uid}/{subjectId}/{archivo}.
 // El aislamiento entre usuarios lo dan las políticas RLS del bucket (ver cuaderno-supabase),
 // no el código de acá — el cliente nunca arma una ruta con un uid que no sea el propio.
@@ -262,6 +261,13 @@ const APP_VERSION = "2.5.5";
 // helpers.js), sin cuenta, sin sync y sin tocar localStorage ni el backend — ver el guard de
 // save() en helpers.js y el de ensureToken() en auth.js, y el gate de render() en views-core.js.
 const IS_DEMO = new URLSearchParams(location.search).get("demo")==="1";
+// Fix de regresión (paso 204): initCookieBar() se llamaba antes en el archivo (justo después de
+// definirse), pero su primera línea lee IS_DEMO — que recién se declara acá abajo. Al ser ambas
+// un `const` del mismo script, eso tiraba "Cannot access 'IS_DEMO' before initialization" en
+// TODA carga de la app (rompía config.js entero, así que ni helpers.js ni el resto llegaban a
+// correr) desde el commit del paso 203. Se detectó al probar el tour guiado en un cuaderno
+// recién cargado — la llamada se corre a este punto, ya con IS_DEMO inicializada.
+initCookieBar();
 // Empaquetado nativo: Tauri inyecta window.__TAURI__, Capacitor inyecta window.Capacitor
 const IS_NATIVE = !!(window.__TAURI__ || window.Capacitor);
 function detectPlatform(){
@@ -357,6 +363,7 @@ function defaultCatalog(){
     costos: defaultCostos(),
     docente: defaultDocente(),
     reciboSeq: {},
+    tourStep:null, tourDismissed:false, // paso 204: progreso del tour guiado, ver tour.js
     updatedAt:0 };
 }
 const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};

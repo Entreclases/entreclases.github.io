@@ -46,7 +46,7 @@ function vAgendaSemana(){
   if(alive().filter(s=>s.status==="activo").length===0 && !state.agendaDispEdit){
     h += emptyState(ICON_CALENDAR, "Sin alumnos activos",
       "Cargá horarios habituales o agendá una próxima clase desde la ficha de cada alumno (pestaña «Clases»).",
-      `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`);
+      `<button class="btn btn-primary" data-a="nav-lista">Ir a Estudiantes</button>`, "agenda");
     return h;
   }
 

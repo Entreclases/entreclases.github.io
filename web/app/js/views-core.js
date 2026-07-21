@@ -405,13 +405,18 @@ function syncChip(){
 
 
 /* ============ estado vacío con acción: ícono + frase + un botón claro para empezar,
-   en vez de un espacio en blanco (reusado en las secciones sin datos de cada vista) ============ */
-function emptyState(icon,title,text,actionHtml){
+   en vez de un espacio en blanco (reusado en las secciones sin datos de cada vista) ============
+   demoView (paso 204, opcional): key de NAV_VIEWS (events.js) — si viene, suma un link "Ver un
+   ejemplo" que abre la demo (?demo=1) en pestaña nueva directo en esa vista (mismo hash
+   #v=<vista> que ya arma navSnapshot()/urlForNavSnapshot() para F5/atrás, ver events.js — no
+   hace falta código nuevo para que la demo abra ahí). Oculto dentro de la demo misma. */
+function emptyState(icon,title,text,actionHtml,demoView){
   return `<div class="empty-state">
     <div class="empty-state-icon">${icon}</div>
     <div class="empty-state-title">${esc(title)}</div>
     <div class="empty-state-text">${esc(text)}</div>
     ${actionHtml||""}
+    ${demoView && !IS_DEMO ? `<div style="margin-top:10px"><a class="hint" href="?demo=1#v=${demoView}" target="_blank" rel="noopener">Ver un ejemplo →</a></div>` : ""}
   </div>`;
 }
 
@@ -959,6 +964,10 @@ let _prevViewKey = null;
 let _hasRenderedOnce = false;
 
 function render(){
+  // Tour guiado (paso 204): se saca ANTES de las vistas sin nav de abajo (recovery, informe,
+  // recibo…) para que nunca quede pegado tapando una vista a la que el tour no lleva — se
+  // vuelve a pintar solo desde el final de esta misma función en el camino normal.
+  if(typeof removeTourOverlay==="function") removeTourOverlay();
   // el shell de navegación (sidebar/barra inferior) sólo existe con sesión activa, fuera de
   // recovery e informe/contrato (documentos pensados para imprimir/compartir, sin nav) — la
   // clase "has-nav" en <body> reserva ese espacio fijo sólo cuando el nav realmente se pinta.
@@ -1009,6 +1018,7 @@ function render(){
   }
   document.body.classList.add("has-nav");
   if(typeof checkOnboardingComplete==="function") checkOnboardingComplete();
+  if(typeof checkTourAutoStart==="function") checkTourAutoStart();
   const ses = getSes();
   const isAdmin = sesIsAdmin(ses);
   let m = "";
@@ -1102,4 +1112,7 @@ function render(){
     const target=document.getElementById("mat-unit-"+targetId);
     if(target) target.scrollIntoView({behavior:"smooth", block:"start"});
   }
+  // Tour guiado (paso 204): al final del todo, ya con el DOM real de esta vista pintado —
+  // renderTourOverlay() puede re-render (ver tour.js) si el paso actual ya se completó solo.
+  if(typeof renderTourOverlay==="function") renderTourOverlay();
 }

@@ -1278,6 +1278,13 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="dismiss-tips"){ dismissTips(); return; }
   else if(a==="reactivate-tips"){ reactivateTips(); return; }
+  // Tour guiado (paso 204, ver tour.js): "Saltar este paso" y "Siguiente" hacen lo mismo
+  // (avanzar sin exigir el wait() del paso) — se muestra uno u otro según el paso, nunca los dos.
+  else if(a==="tour-next" || a==="tour-skip-step"){ tourAdvance(); return; }
+  else if(a==="tour-skip-all"){ tourSkipAll(); return; }
+  else if(a==="tour-resume"){ tourResume(); return; }
+  else if(a==="tour-discard-resume"){ tourDiscardResume(); return; }
+  else if(a==="tour-restart"){ tourRestart(); return; }
   // FAB de acciones rápidas (paso 77): siempre visible, con las 3 acciones más repetitivas.
   // Precarga lo que puede según el contexto — si ya estás en la ficha de un alumno, "nueva
   // clase"/"registrar pago" van directo a su pestaña; si no, primero piden elegir a quién.

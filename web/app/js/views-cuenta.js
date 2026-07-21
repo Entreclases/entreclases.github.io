@@ -643,6 +643,7 @@ function vCentroAyuda(){
   return `<div class="formcard"><div class="ftitle">Centro de ayuda</div>
     <div class="hint" style="margin-bottom:12px">Preguntas frecuentes sobre la app.</div>
     ${tipsDismissed()?`<button class="chip" data-a="reactivate-tips" style="margin-bottom:14px">Volver a mostrar "Primeros pasos"</button>`:""}
+    ${IS_DEMO?"":`<button class="chip" data-a="tour-restart" style="margin-bottom:14px">Ver la guía de nuevo</button>`}
     <div class="flabel" style="margin-bottom:6px">Mapa de la app</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
       ${APP_MAP.map(m=>`<div style="font-size:12.5px;color:var(--muted)"><b style="color:var(--ink)">${esc(m.nombre)}</b> — ${esc(m.desc)}</div>`).join("")}
@@ -702,7 +703,7 @@ function vPortalCard(){
   </div>`;
   if(!p.habilitado){
     h += emptyState(ICON_LINK,"El portal está apagado","Activalo para darles a tus alumnos un link propio, sin login, con lo que quieras compartirles.",
-      `<button class="btn btn-primary" data-a="portal-toggle" data-f="si">Activar portal</button>`);
+      `<button class="btn btn-primary" data-a="portal-toggle" data-f="si">Activar portal</button>`, "cuenta");
   }
   if(p.habilitado){
     h += `<div class="field"><div class="flabel">Link para compartir</div>
