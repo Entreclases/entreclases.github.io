@@ -225,7 +225,7 @@ const PLAN_META = {
 };
 const PLAN_FEATURES = {};
 function tienePlan(feature){ return true; }
-const APP_VERSION = "2.5.3";
+const APP_VERSION = "2.5.4";
 // Modo demo (paso 82): ?demo=1 carga un cuaderno ficticio en memoria (ver buildDemoData() en
 // helpers.js), sin cuenta, sin sync y sin tocar localStorage ni el backend — ver el guard de
 // save() en helpers.js y el de ensureToken() en auth.js, y el gate de render() en views-core.js.

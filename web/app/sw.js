@@ -1,5 +1,5 @@
 /* Entreclases — funcionamiento sin conexión */
-const CACHE = "cuaderno-v185";
+const CACHE = "cuaderno-v186";
 const FILES = ["./", "./index.html", "./styles.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",
   "./fonts/inter-latin.woff2", "./fonts/poppins-600.woff2", "./fonts/poppins-700.woff2", "./fonts/poppins-800.woff2",
   "./js/qrcode.js", "./js/config.js", "./js/helpers.js", "./js/auth.js", "./js/sync.js",
