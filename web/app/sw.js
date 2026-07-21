@@ -1,5 +1,5 @@
 /* Entreclases — funcionamiento sin conexión */
-const CACHE = "cuaderno-v196";
+const CACHE = "cuaderno-v197";
 const FILES = ["./", "./index.html", "./styles.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",
   "./fonts/inter-latin.woff2", "./fonts/poppins-600.woff2", "./fonts/poppins-700.woff2", "./fonts/poppins-800.woff2",
   "./js/qrcode.js", "./js/config.js", "./js/helpers.js", "./js/auth.js", "./js/sync.js",
@@ -61,6 +61,9 @@ self.addEventListener("fetch", (e) => {
   // Portal de invitados: página pública sin sesión, pensada para gente sin la app instalada —
   // fuera del precache y de la interceptación a propósito, para que siempre pegue a la red.
   if (url.pathname.endsWith("/portal.html") || url.pathname.endsWith("/js/portal.js")) return;
+  // Confirmación de aprobar/rechazar cuenta (paso 206): página pública para admins vía link de
+  // mail, sin sesión — mismo criterio que portal.html arriba, siempre a la red.
+  if (url.pathname.endsWith("/aprobar.html") || url.pathname.endsWith("/js/aprobar.js")) return;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(
       (hit) => hit || fetch(e.request).then((res) => {
