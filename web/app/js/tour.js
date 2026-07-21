@@ -50,7 +50,7 @@ const TOUR_STEPS = [
     navView:"stats", target:"[data-a=\"nav-stats\"]"},
   {id:"ayuda", title:"¿Necesitás una mano?",
     text:"En Cuenta → Ayuda tenés preguntas frecuentes, este botón de Sugerencias y podés repetir esta guía cuando quieras.",
-    navView:"cuenta", group:"aplicacion", target:"[data-a=\"feedback-open\"]", last:true},
+    navView:"cuenta", group:"aplicacion", target:"[data-a=\"sugerencias-open\"]", last:true},
 ];
 
 // Arranca sola una única vez: cuenta recién aprobada (ya pasó el gate de vCuentaEnRevision),

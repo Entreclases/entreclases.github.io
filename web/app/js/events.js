@@ -314,6 +314,11 @@ document.addEventListener("click", (e)=>{
   if(state.fabOpen && !e.target.closest(".fab-wrap")){ state.fabOpen=false; render(); }
   const el = e.target.closest("[data-a]"); if(!el) return;
   const a = el.dataset.a, s = sel();
+  // Tips periódicos (paso 205): el botón de la sugerencia es el mismo botón de navegación real
+  // (data-a="nav-..." etc, ver TIP_BANK en helpers.js) con un data-tip agregado — acá sólo se
+  // marca la sugerencia como abierta (deja de bloquear la cola) antes de que el resto del switch
+  // de abajo procese la navegación como si el botón nunca hubiera tenido data-tip.
+  if(el.dataset.tip){ tipMarkOpened(el.dataset.tip); state.sugerenciasOpen=false; }
   // Paso 136: si hay cambios sin guardar en la ficha (Resumen/Pagos), cortar cualquier navegación
   // que la abandone de verdad — a otro alumno, a otra vista, cerrar sesión — con una confirmación
   // (mismo `confirm()` nativo que ya usa "Cerrar sesión" un poco más abajo). Cambiar de pestaña
@@ -1177,6 +1182,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="toggle-animaciones"){ setAnimsOn(el.dataset.f==="si"); }
   else if(a==="toggle-fondo"){ setBgOn(el.dataset.f==="si"); }
   else if(a==="toggle-tu-dia"){ state.catalog.mostrarTuDia=el.dataset.f==="si"; touchCatalog(); return; }
+  else if(a==="toggle-tips-periodicos"){ setTipsOff(el.dataset.f==="no"); }
   else if(a==="marcar-recordatorio-examen"){
     // Festejo de "Tu día" en cero (paso 179): sólo si ESTA acción deja el checklist de vTuDia()
     // sin pendientes reales — no en cada "Ya avisé" suelto (ver pendingTasksToday() en helpers.js).
@@ -1210,11 +1216,12 @@ document.addEventListener("click", (e)=>{
     });
     return;
   }
-  else if(a==="feedback-open"){
-    state.feedbackOpen=true; state.feedbackTipo="problema"; state.feedbackMsg=""; state.feedbackStatus="idle"; state.feedbackError="";
+  else if(a==="sugerencias-open"){
+    state.sugerenciasOpen=true; state.feedbackTipo="problema"; state.feedbackMsg=""; state.feedbackStatus="idle"; state.feedbackError="";
   }
-  else if(a==="feedback-close"){ state.feedbackOpen=false; }
-  else if(a==="feedback-modal-noop"){ return; }
+  else if(a==="sugerencias-close"){ state.sugerenciasOpen=false; }
+  else if(a==="sugerencias-modal-noop"){ return; }
+  else if(a==="tip-dismiss"){ tipDismiss(el.dataset.tip); }
   else if(a==="feedback-tipo"){ state.feedbackTipo=el.dataset.f; }
   else if(a==="feedback-send"){
     const msg=(document.getElementById("feedback-msg").value||"").trim();
@@ -2714,6 +2721,7 @@ setInterval(()=>{
     const locked = loginLockRemainingMs()>0;
     if(locked || state._authWasLocked){ state._authWasLocked=locked; render(); }
   }
+  tickTips();
 },1000);
 
 /* ============ historial del navegador (paso 124) ============
@@ -2740,7 +2748,7 @@ function activeOverlayName(){
   if(state.envioOverlay) return "envio";
   if(state.shareOverlay) return "share";
   if(state.agendaEdit) return "agendaEdit";
-  if(state.feedbackOpen) return "feedback";
+  if(state.sugerenciasOpen) return "sugerencias";
   return null;
 }
 function navSnapshot(){
@@ -2784,7 +2792,7 @@ function applyNavSnapshot(snap){
   if(state.envioOverlay && !state.portalLoaded) loadPortal();
   state.agendaEdit = snap.m==="agendaEdit" ? snap.mx : null;
   state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
-  state.feedbackOpen = snap.m==="feedback";
+  state.sugerenciasOpen = snap.m==="sugerencias";
   if((state.view==="detalle"||state.view==="informe"||state.view==="contrato") && !sel()){
     state.view="tablero"; state.selId=null;
   }

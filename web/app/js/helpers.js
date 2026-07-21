@@ -782,6 +782,118 @@ function feedbackBannerActive(){
 }
 function dismissFeedbackBanner(){ try{ const k=nsKey(FEEDBACK_BANNER_UNTIL_KEY); if(k) localStorage.removeItem(k); }catch(e){} }
 
+/* ============ Tips periódicos (paso 205) ============
+   Banco de ~20 sugerencias contextuales — cada una liga a algo que la cuenta todavía no usa o le
+   conviene ahora, con su `cond()` recalculada en cada chequeo (nunca un flag "ya lo vi" propio:
+   si la condición se resuelve sola con el uso real de la app, la sugerencia deja de aparecer
+   sin bookkeeping aparte). `action` es exactamente el mismo {a, group} que ya entienden los
+   data-a="nav-..." existentes (ver ONBOARDING_STEPS más arriba) — el botón de la sugerencia es
+   literalmente ese botón de navegación, así que abrirla no duplica ninguna lógica de vistas. */
+// alive() incluye al "Alumno de ejemplo" sembrado en toda cuenta nueva (sample:true, con su
+// propio examDate/tarifa ficticios) — las condiciones de abajo cuentan alumnos DE VERDAD, para
+// no disparar un tip a partir de datos de muestra en una cuenta recién creada.
+function aliveReal(){ return alive().filter(s=>!s.sample); }
+const TIP_BANK = [
+  {id:"materia", cond:()=>aliveReal().length>0 && state.catalog.subjects.filter(m=>m.id!=="materia-ejemplo").length===0,
+    text:"Armá tu materia para seguir el avance por unidades y subunidades.", action:{a:"nav-catalog"}, label:"Ir a Materias"},
+  {id:"portal-off", cond:()=>aliveReal().length>0 && !(state.portal && state.portal.habilitado),
+    text:"Activá tu portal: tus alumnos ven su progreso y su saldo sin instalarse nada.", action:{a:"nav-cuenta", group:"portal"}, label:"Activar portal"},
+  {id:"llave-individual", cond:()=>aliveReal().length>0 && !!(state.portal && state.portal.habilitado) && Object.keys((state.portal&&state.portal.tokensAlumnos)||{}).length===0,
+    text:"Generá la llave individual de un alumno para compartirle su portal.", action:{a:"nav-cuenta", group:"portal"}, label:"Ver Portal"},
+  {id:"llave-grupal", cond:()=>!!(state.portal && state.portal.habilitado) && gruposClaseAll().length>0 && Object.keys((state.portal&&state.portal.tokensGrupos)||{}).length===0,
+    text:"Armá la llave grupal de un grupo de clase — todos entran con el mismo link.", action:{a:"nav-cuenta", group:"portal"}, label:"Ver Portal"},
+  {id:"disponibilidad", cond:()=>!!(state.portal && state.portal.habilitado) && disponibilidadFor().length===0,
+    text:"Cargá tus horarios en Agenda y dejá que te pidan clase solos.", action:{a:"nav-agenda"}, label:"Ir a Agenda"},
+  {id:"tarifa-habitual", cond:()=>!(Number(tarifaDefaultFor().monto)>0),
+    text:"Configurá tu tarifa habitual para no cargarla alumno por alumno.", action:{a:"nav-cuenta", group:"cobros"}, label:"Ver Cobros"},
+  {id:"examen-cerca", cond:()=>aliveReal().some(s=>s.status==="activo" && s.examDate && daysTo(s.examDate)!==null && daysTo(s.examDate)>=0 && daysTo(s.examDate)<=5 && !examRecordatorioEnviado(s)),
+    text:"Alguien tiene un examen cerca — mandale un recordatorio desde el tablero.", action:{a:"nav-tablero"}, label:"Ver Tablero"},
+  {id:"fin-de-mes", cond:()=>Number(today().slice(8,10))>=25 && cobrosAtrasadosSummary(0).count>0,
+    text:"Se acerca fin de mes — revisá quién todavía te debe.", action:{a:"nav-pagos"}, label:"Ver Pagos"},
+  {id:"grupos-clase", cond:()=>gruposClaseAll().length===0 && aliveReal().filter(s=>s.status==="activo").length>=3,
+    text:"Agrupá alumnos de la misma materia en un grupo de clase — compartís una sola llave de portal.", action:{a:"nav-cuenta", group:"gruposclase"}, label:"Ver Grupos"},
+  {id:"respaldo-manual", cond:()=>aliveReal().length>0 && getLastExport()===null,
+    text:"Descargá tu primera copia (.json) del cuaderno — es tu respaldo aparte de la nube.", action:{a:"export"}, label:"Descargar copia"},
+  {id:"interesados", cond:()=>interesadosFor().length>0,
+    text:"Tenés interesados en lista de espera — convertí al que ya confirmó en alumno.", action:{a:"nav-lista"}, label:"Ver Estudiantes"},
+  {id:"materiales-sin-compartir", cond:()=>state.catalog.subjects.some(m=>(m.materiales||[]).some(f=>!f.compartido)),
+    text:"Tenés material subido sin compartir — activalo para que llegue al portal de tus alumnos.", action:{a:"nav-catalog"}, label:"Ir a Materias"},
+  {id:"packs", cond:()=>(state.catalog.packs||[]).length===0 && state.catalog.subjects.filter(m=>m.id!=="materia-ejemplo").length>=2,
+    text:"Armá un pack para dar de alta a un alumno en varias materias de una sola vez.", action:{a:"nav-catalog"}, label:"Ir a Materias"},
+  {id:"resumen-semanal", cond:()=>{ const ses=getSes(); return !!ses && !ses.resumenSemanal; },
+    text:"Activá el resumen semanal por mail para no tener que entrar a revisar todo a mano.", action:{a:"nav-cuenta", group:"preferencias"}, label:"Ver Preferencias"},
+  {id:"notif-clases", cond:()=>{ const ses=getSes(); return !!ses && !ses.notifClasesDia; },
+    text:"Activá el recordatorio de las clases del día para no perderte ninguna.", action:{a:"nav-cuenta", group:"preferencias"}, label:"Ver Preferencias"},
+  {id:"ajustar-tarifas", cond:()=>aliveReal().filter(s=>s.status==="activo" && Number(s.tarifa)>0).length>=3,
+    text:"¿Hace rato no ajustás precios? Aumentá la tarifa de varios alumnos de una sola vez.", action:{a:"nav-pagos"}, label:"Ver Pagos"},
+  {id:"rentabilidad", cond:()=>costosFor().fijos.length===0 && aliveReal().filter(s=>s.status==="activo").length>=3,
+    text:"Cargá tus costos fijos y mirá cuánto te queda libre por hora de verdad.", action:{a:"nav-pagos"}, label:"Ver Pagos"},
+  {id:"cumpleanos", cond:()=>aliveReal().some(s=>s.status==="activo" && !s.birthDate),
+    text:"Cargá la fecha de nacimiento de tus alumnos para no perderte ningún cumpleaños.", action:{a:"nav-lista"}, label:"Ver Estudiantes"},
+  {id:"buscador", cond:()=>aliveReal().length>=3,
+    text:"Tip: tocá «/» en cualquier pantalla para buscar un alumno o una materia al toque.", action:{a:"open-search"}, label:"Probar"},
+  {id:"centro-ayuda", cond:()=>true,
+    text:"¿Tenés dudas? El Centro de ayuda tiene respuestas a lo más consultado.", action:{a:"nav-cuenta", group:"aplicacion"}, label:"Ver ayuda"},
+];
+
+// Orden del banco: arranca en el orden declarado arriba, y al descartar una sugerencia esa va al
+// final (tipDismiss) — se guarda como lista de ids en localStorage (no en catalog, ver nota de
+// arriba). Ids nuevos del banco (tras una actualización) se agregan al final si faltan; ids viejos
+// que ya no existen en TIP_BANK se descartan solos.
+function tipsOrderList(){
+  const k = nsKey(TIPS_ORDER_KEY);
+  let order = [];
+  try{ order = (k && JSON.parse(localStorage.getItem(k)||"[]")) || []; }catch(e){ order = []; }
+  const known = new Set(TIP_BANK.map(t=>t.id));
+  order = order.filter(id=>known.has(id));
+  TIP_BANK.forEach(t=>{ if(!order.includes(t.id)) order.push(t.id); });
+  return order;
+}
+function saveTipsOrderList(order){ const k=nsKey(TIPS_ORDER_KEY); if(k) localStorage.setItem(k, JSON.stringify(order)); }
+function tipsPendingId(){ const k=nsKey(TIPS_PENDING_KEY); return (k && localStorage.getItem(k)) || null; }
+function setTipsPendingId(id){ const k=nsKey(TIPS_PENDING_KEY); if(!k) return; if(id) localStorage.setItem(k,id); else localStorage.removeItem(k); }
+function tipsLastId(){ const k=nsKey(TIPS_LAST_KEY); return (k && localStorage.getItem(k)) || null; }
+function setTipsLastId(id){ const k=nsKey(TIPS_LAST_KEY); if(k) localStorage.setItem(k, id||""); }
+function tipsActiveMs(){ const k=nsKey(TIPS_ACTIVE_MS_KEY); return (k && Number(localStorage.getItem(k))) || 0; }
+function setTipsActiveMs(ms){ const k=nsKey(TIPS_ACTIVE_MS_KEY); if(k) localStorage.setItem(k, String(ms)); }
+function currentTip(){ const id = tipsPendingId(); return id ? TIP_BANK.find(t=>t.id===id) || null : null; }
+// Elige la próxima sugerencia elegible siguiendo tipsOrderList(), evitando repetir la última
+// mostrada si hay alguna otra elegible.
+function pickNextTip(){
+  const order = tipsOrderList();
+  const last = tipsLastId();
+  const eligible = order.map(id=>TIP_BANK.find(t=>t.id===id)).filter(t=>t && t.cond());
+  if(eligible.length===0) return null;
+  return eligible.find(t=>t.id!==last) || eligible[0];
+}
+// Se llama al abrir la sugerencia (mira la pantalla) — deja de bloquear la cola pero NO reordena.
+function tipMarkOpened(id){
+  if(tipsPendingId()===id){ setTipsPendingId(null); setTipsLastId(id); }
+}
+// Se llama al descartarla explícitamente — deja de bloquear Y la manda al final de la cola.
+function tipDismiss(id){
+  if(tipsPendingId()===id) setTipsPendingId(null);
+  setTipsLastId(id);
+  const order = tipsOrderList().filter(x=>x!==id);
+  order.push(id);
+  saveTipsOrderList(order);
+}
+// Tick de 1s (ver events.js): acumula tiempo activo y dispara una sugerencia nueva a los
+// TIPS_INTERVAL_MS — nunca en demo, durante el tour, sin sesión, con la preferencia apagada, o si
+// ya hay una sugerencia pendiente sin abrir/descartar (regla de oro del paso 205).
+function tickTips(){
+  if(IS_DEMO || !getSes() || state.tourActive || tipsOff()) return;
+  if(document.hidden) return;
+  if(tipsPendingId()) return;
+  const ms = tipsActiveMs() + 1000;
+  if(ms < TIPS_INTERVAL_MS){ setTipsActiveMs(ms); return; }
+  const tip = pickNextTip();
+  setTipsActiveMs(0);
+  if(!tip) return;
+  setTipsPendingId(tip.id);
+  toast(tip.text, "ok", null, {label:"Ver", run:()=>{ state.sugerenciasOpen=true; }});
+}
+
 /* ============ Programa Active Tester (paso 202) ============
    Sólo evita mandar más de un pedido por cuenta DESDE ESTE DISPOSITIVO — no hay lectura de
    `reportes` para no-admin, así que si el docente pide desde otro dispositivo no hay forma de

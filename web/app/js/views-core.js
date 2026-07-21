@@ -110,13 +110,17 @@ function logoutNavBtn(){
   return `<button class="navitem" data-a="nav-logout" title="Cerrar sesión">${ICON_LOGOUT}<span class="navitem-label">Salir</span></button>`;
 }
 
-// Botón discreto y permanente de feedback (paso 147) — mismo lugar que el resto del pie de la
-// barra, siempre visible, para que reportar algo nunca dependa de encontrar Cuenta primero.
-// Oculto en modo demo: no hay cuenta real detrás para asociar el reporte (mismo criterio que
-// sesIsAdmin() con IS_DEMO — la demo no toca el backend de verdad).
-function feedbackNavBtn(){
+// Botón discreto y permanente de "Sugerencias" (paso 147, fusionado con los tips periódicos en
+// el 205) — mismo lugar que el resto del pie de la barra, siempre visible. Abre un único panel
+// con dos cosas claras: la sugerencia contextual pendiente (si hay una, ver TIP_BANK en
+// helpers.js) arriba, y el feedback de siempre ("contanos qué te parece") abajo — nunca dos
+// overlays por separado. El puntito rojo (paso 205) marca que hay una sugerencia sin abrir/
+// descartar. Oculto en modo demo: no hay cuenta real detrás para asociar el reporte ni tips que
+// tengan sentido (mismo criterio que sesIsAdmin() con IS_DEMO).
+function sugerenciasNavBtn(){
   if(IS_DEMO) return "";
-  return `<button class="navitem" data-a="feedback-open" title="¿Sugerencias? Contanos qué te parece">${ICON_CHAT}<span class="navitem-label">Sugerencias</span></button>`;
+  const pend = !!tipsPendingId();
+  return `<button class="navitem" data-a="sugerencias-open" title="Sugerencias — tips y contanos qué te parece">${ICON_CHAT}<span class="navitem-label">Sugerencias</span>${pend?`<span class="navdot"></span>`:""}</button>`;
 }
 
 // Foto del docente en la barra lateral (paso 137, sólo escritorio — .appnav-brand/.docente-mini
@@ -142,7 +146,7 @@ function navShell(isAdmin){
     <button class="appnav-brand" data-a="nav-tablero" aria-label="Ir al tablero"><span class="logo-mark">${ICON_CHECK}</span>Entreclases</button>
     <button class="navitem navitem-search" data-a="open-search" title="Buscar (atajo: /)">${ICON_SEARCH}<span class="navitem-label">Buscar</span></button>
     <div class="appnav-list">${itemsHtml}</div>
-    <div class="appnav-foot">${docenteMiniHtml()}${syncChip()}${feedbackNavBtn()}${themeNavBtn()}${logoutNavBtn()}</div>
+    <div class="appnav-foot">${docenteMiniHtml()}${syncChip()}${sugerenciasNavBtn()}${themeNavBtn()}${logoutNavBtn()}</div>
   </nav>`;
 }
 
@@ -335,26 +339,44 @@ function vEnvioOverlay(){
 }
 
 
-// Feedback (paso 147): "¿Sugerencias?" en el pie de la barra — sin fricción, dos clicks (abrir +
-// enviar) y gracias. La pantalla actual (state.view) se adjunta sola al mandar (ver feedback-send
-// en events.js), nunca se le pide al docente que la tipee. Mismo patrón de overlay/modal que
-// vShareOverlay/vEnvioOverlay.
-function vFeedbackOverlay(){
-  if(!state.feedbackOpen) return "";
+// Sugerencia contextual (paso 205): la mitad de arriba del panel de Sugerencias, sólo si hay un
+// tip pendiente (ver TIP_BANK/pickNextTip en helpers.js). El botón de acción es el mismo botón de
+// navegación real (data-a=tip.action.a, data-group=tip.action.group) con un data-tip agregado —
+// tipMarkOpened() (events.js, antes del switch principal) ya se encarga de desbloquear la cola
+// justo antes de que esa navegación corra normal. "Descartar" no navega, sólo manda el tip al
+// final de la cola (tipDismiss).
+function vSugerenciaCard(){
+  const tip = currentTip(); if(!tip) return "";
+  return `<div class="formcard" style="margin-bottom:12px">
+    <div class="hint" style="margin-bottom:10px">${esc(tip.text)}</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="chip" data-a="tip-dismiss" data-tip="${tip.id}">Descartar</button>
+      <button class="primary" style="margin-left:0" data-a="${tip.action.a}" ${tip.action.group?`data-group="${tip.action.group}"`:""} data-tip="${tip.id}">${esc(tip.label)}</button>
+    </div>
+  </div>`;
+}
+
+// Feedback (paso 147, fusionado con los tips en el 205): "Sugerencias" en el pie de la barra —
+// sin fricción, dos clicks (abrir + enviar) y gracias. La pantalla actual (state.view) se adjunta
+// sola al mandar (ver feedback-send en events.js), nunca se le pide al docente que la tipee.
+// Mismo patrón de overlay/modal que vShareOverlay/vEnvioOverlay.
+function vSugerenciasOverlay(){
+  if(!state.sugerenciasOpen) return "";
   const status = state.feedbackStatus||"idle";
   if(status==="ok"){
-    return `<div class="overlay no-print" data-a="feedback-close">
-      <div class="modal" data-a="feedback-modal-noop" style="max-width:360px;text-align:center">
+    return `<div class="overlay no-print" data-a="sugerencias-close">
+      <div class="modal" data-a="sugerencias-modal-noop" style="max-width:360px;text-align:center">
         <div class="ftitle" style="font-size:16px">¡Gracias!</div>
         <div class="hint" style="margin:10px 0 14px">Ya nos llegó tu mensaje.</div>
-        <button class="chip" data-a="feedback-close">Cerrar</button>
+        <button class="chip" data-a="sugerencias-close">Cerrar</button>
       </div>
     </div>`;
   }
   const tipo = state.feedbackTipo||"problema";
-  return `<div class="overlay no-print" data-a="feedback-close">
-    <div class="modal" data-a="feedback-modal-noop" style="max-width:400px">
-      <div class="ftitle" style="font-size:16px">¿Sugerencias?</div>
+  return `<div class="overlay no-print" data-a="sugerencias-close">
+    <div class="modal" data-a="sugerencias-modal-noop" style="max-width:400px">
+      ${vSugerenciaCard()}
+      <div class="ftitle" style="font-size:16px">¿Sugerencias para nosotros?</div>
       <div class="hint" style="margin-bottom:10px">Un problema, una idea o algo que te gustó — nos sirve todo.</div>
       <div class="tabs" style="margin-bottom:10px">
         ${FEEDBACK_TIPOS.map(t=>`<button class="tabbtn ${tipo===t.id?"on":""}" data-a="feedback-tipo" data-f="${t.id}">${esc(t.label)}</button>`).join("")}
@@ -363,7 +385,7 @@ function vFeedbackOverlay(){
       <div class="hint" style="margin:6px 0 10px">Se adjunta sola la pantalla en la que estás — nunca datos de tus alumnos.</div>
       ${status==="error"?`<div class="saveerr" style="margin-bottom:8px">${esc(state.feedbackError||"No se pudo enviar.")}</div>`:""}
       <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button class="chip" data-a="feedback-close">Cancelar</button>
+        <button class="chip" data-a="sugerencias-close">Cancelar</button>
         <button class="primary" style="margin-left:0" data-a="feedback-send" ${status==="sending"?"disabled":""}>${status==="sending"?"Enviando…":"Enviar"}</button>
       </div>
     </div>
@@ -377,7 +399,7 @@ function vFeedbackBanner(){
   return `<div class="formcard" style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap">
     <div style="font-size:13px;color:var(--muted)">¿Qué te está pareciendo Entreclases? Contanos — nos sirve tanto un problema como una idea o un simple "me gusta".</div>
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-      <button class="chip" data-a="feedback-open">Contar algo</button>
+      <button class="chip" data-a="sugerencias-open">Contar algo</button>
       <button class="del" style="font-size:20px" data-a="feedback-banner-dismiss" title="Descartar" aria-label="Descartar">×</button>
     </div>
   </div>`;
@@ -1059,7 +1081,7 @@ function render(){
   if(state.qrOverlay) m += vQrOverlay();
   if(state.shareOverlay) m += vShareOverlay();
   if(state.envioOverlay) m += vEnvioOverlay();
-  if(state.feedbackOpen) m += vFeedbackOverlay();
+  if(state.sugerenciasOpen) m += vSugerenciasOverlay();
   if(state.agendaEdit) m += vAgendaEditOverlay();
   if(state.agendaEditGrupal) m += vAgendaEditOverlayGrupal();
   if(state.agendaHourList) m += vAgendaHourListOverlay();

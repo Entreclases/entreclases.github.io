@@ -207,6 +207,7 @@
   .navitem-label{max-width:60px;overflow:hidden;text-overflow:ellipsis}
   .navbadge{background:var(--red);color:#fff;font-size:9px;font-weight:700;border-radius:99px;
     padding:1px 5px;line-height:1.4;flex-shrink:0}
+  .navdot{width:7px;height:7px;border-radius:99px;background:var(--red);flex-shrink:0}
   .docente-mini{display:none}
   @media (min-width:860px){
     .appnav{top:0;left:0;bottom:0;right:auto;width:220px;flex-direction:column;

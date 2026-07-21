@@ -47,6 +47,21 @@ const FEEDBACK_TIPOS = [
   {id:"idea", label:"Idea"},
   {id:"me_gusta", label:"Me gusta"},
 ];
+// Tips periódicos (paso 205): sugerencias contextuales que invitan a usar algo que la cuenta
+// todavía no aprovecha (ver TIP_BANK en helpers.js). Cadencia por TIEMPO ACTIVO (pestaña visible,
+// no reloj de pared — se acumula en el tick de 1s ya existente, ver events.js), no por sesión ni
+// por login. Todo namespaceado por uid (paso 194): son casi-datos de la cuenta (qué tip tocó,
+// en qué orden), aunque vivan en localStorage y no en catalog — así no tocan el JSON sincronizado
+// ni sync.js, y conviven sin romper nada si el usuario entra desde otro dispositivo (ahí arranca
+// de cero, cosa aceptable para una cadencia de recordatorios).
+const TIPS_INTERVAL_MS = 30*60*1000;
+const TIPS_OFF_KEY = "tutoria-tips-off"; // namespaceada por uid
+const TIPS_ACTIVE_MS_KEY = "tutoria-tips-active-ms"; // namespaceada por uid
+const TIPS_ORDER_KEY = "tutoria-tips-order"; // namespaceada por uid
+const TIPS_PENDING_KEY = "tutoria-tips-pending"; // namespaceada por uid
+const TIPS_LAST_KEY = "tutoria-tips-last"; // namespaceada por uid
+function tipsOff(){ const k=nsKey(TIPS_OFF_KEY); return !!k && localStorage.getItem(k)==="1"; }
+function setTipsOff(off){ const k=nsKey(TIPS_OFF_KEY); if(k) localStorage.setItem(k, off?"1":"0"); }
 // Programa Active Tester (paso 202): reusa la tabla `reportes` con tipo propio ("active_tester")
 // en vez de sumar una tabla nueva — el panel admin (vReportes, views-admin.js) ya lista y filtra
 // por tipo, así que sirve tal cual para que el cupo de 20 se administre a mano marcando cada

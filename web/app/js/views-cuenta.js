@@ -543,6 +543,13 @@ function vCuenta(){
         <button class="chip ${mostrarTuDia()?"on":""}" data-a="toggle-tu-dia" data-f="si">Mostrar Tu día y racha</button>
       </div>
     </div>
+    <div class="formcard"><div class="ftitle">Sugerencias periódicas</div>
+      <div class="hint" style="margin-bottom:8px">Cada tanto de uso activo, un aviso discreto con un tip de algo que todavía no probaste o te conviene ahora (portal, tarifas, etc.) — nunca más de uno pendiente a la vez.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="chip ${tipsOff()?"on":""}" data-a="toggle-tips-periodicos" data-f="no">Apagadas</button>
+        <button class="chip ${!tipsOff()?"on":""}" data-a="toggle-tips-periodicos" data-f="si">Activadas</button>
+      </div>
+    </div>
     ${vEscalaObjetivoCard()}
     <div class="formcard"><div class="ftitle" style="display:flex;align-items:center;gap:7px">Política de cancelación${helpTip("cancelPolicy")}</div>
       <div class="hint" style="margin-bottom:10px">Se aplica al cancelar una clase puntual con seña ya cobrada (ver la ficha de cada alumno). El texto queda guardado para reutilizarlo donde haga falta.</div>
