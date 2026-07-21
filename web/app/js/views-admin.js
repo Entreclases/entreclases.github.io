@@ -3,7 +3,7 @@
 function vPanel(){
   const tab = state.panelTab||"reportes";
   let h = pageHead("Panel","Administración",null,
-    "Sólo para administradores: reportes de usuarios, actividad y recursos de todo el sistema.");
+    "Sólo para administradores: reportes de usuarios, actividad y recursos de todo el sistema.", "admin");
   h += `<div class="tabs" style="margin-bottom:14px">
     ${tabbtn("panel-tab-reportes",tab==="reportes","Reportes")}
     ${tabbtn("panel-tab-usuarios",tab==="usuarios","Usuarios")}

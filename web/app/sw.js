@@ -1,11 +1,11 @@
 /* Entreclases — funcionamiento sin conexión */
-const CACHE = "cuaderno-v197";
+const CACHE = "cuaderno-v198";
 const FILES = ["./", "./index.html", "./styles.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",
   "./fonts/inter-latin.woff2", "./fonts/poppins-600.woff2", "./fonts/poppins-700.woff2", "./fonts/poppins-800.woff2",
   "./js/qrcode.js", "./js/config.js", "./js/helpers.js", "./js/auth.js", "./js/sync.js",
   "./js/views-core.js", "./js/views-tablero.js", "./js/views-alumnos.js", "./js/views-ficha.js",
   "./js/views-agenda.js", "./js/views-materias.js", "./js/views-stats.js", "./js/views-cuenta.js",
-  "./js/views-admin.js", "./js/tour.js", "./js/events.js"];
+  "./js/views-admin.js", "./js/tour.js", "./js/help-tutoriales.js", "./js/events.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)));

@@ -4,7 +4,7 @@
 function vAgenda(){
   const mode = state.agendaViewMode||"semana";
   let h = pageHead("Agenda","Calendario de clases",null,
-    "Horarios habituales y clases sueltas, por semana o por mes — tocá una clase para editarla.");
+    "Horarios habituales y clases sueltas, por semana o por mes — tocá una clase para editarla.", "agenda");
   h += `<div class="tabs" style="margin-bottom:16px">
     ${tabbtn("agenda-view-semana",mode==="semana","Semana")}
     ${tabbtn("agenda-view-mes",mode==="mes","Mes")}

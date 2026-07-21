@@ -117,7 +117,7 @@ function vLista(){
     });
 
   let h = pageHead("Estudiantes","Tus alumnos",`<button class="btn btn-primary" data-a="new">+ Nuevo estudiante</button>`,
-    "Todos tus alumnos, con filtros y búsqueda — tocá uno para abrir su ficha.");
+    "Todos tus alumnos, con filtros y búsqueda — tocá uno para abrir su ficha.", "alumnos");
   const estTab = state.estudiantesTab||"alumnos";
   h += `<div class="tabs" style="margin-bottom:14px">
     ${tabbtn("estudiantes-tab-alumnos",estTab==="alumnos","Alumnos")}

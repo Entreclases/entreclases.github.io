@@ -1292,6 +1292,32 @@ document.addEventListener("click", (e)=>{
   else if(a==="tour-resume"){ tourResume(); return; }
   else if(a==="tour-discard-resume"){ tourDiscardResume(); return; }
   else if(a==="tour-restart"){ tourRestart(); return; }
+  // Tutoriales avanzados por sección (paso 207, ver help-tutoriales.js) — de referencia y
+  // repetibles: nunca se abren mientras el tour guiado esté activo (no compiten, ver
+  // sectionHelpBtn()). "Mostrame" navega hasta el elemento real y lo resalta con el mismo
+  // spotlight del tour (tour.js), sin avanzar ningún paso — se cierra solo, no hay progreso.
+  else if(a==="tut-open"){
+    if(state.tourActive) return;
+    const id=el.dataset.id; if(!HELP_SECTIONS[id]) return;
+    state.tutOpen=id;
+    if(state.tutSubOpen[id]==null) state.tutSubOpen[id]=0;
+  }
+  else if(a==="tut-modal-noop"){ return; }
+  else if(a==="tut-close"){ state.tutOpen=null; }
+  else if(a==="tut-level"){ setTutLevel(el.dataset.f); }
+  else if(a==="tut-sub-toggle"){
+    const i=Number(el.dataset.i), id=state.tutOpen; if(!id) return;
+    state.tutSubOpen[id] = state.tutSubOpen[id]===i ? null : i;
+  }
+  else if(a==="tut-showme"){
+    const sec=HELP_SECTIONS[el.dataset.sec], sub=sec&&sec.full[Number(el.dataset.i)];
+    if(!sub || !sub.showme) return;
+    const resolved=tutResolveShowme(sub.showme);
+    tutNavigateFor(resolved.nav);
+    state.tutOpen=null;
+    state.tutSpot={target:resolved.target, label:sub.title, text:resolved.text};
+  }
+  else if(a==="tut-spot-close"){ state.tutSpot=null; }
   // FAB de acciones rápidas (paso 77): siempre visible, con las 3 acciones más repetitivas.
   // Precarga lo que puede según el contexto — si ya estás en la ficha de un alumno, "nueva
   // clase"/"registrar pago" van directo a su pestaña; si no, primero piden elegir a quién.
@@ -2407,6 +2433,8 @@ document.addEventListener("keydown",(e)=>{
     if(e.key==="Escape" && state.fabPick){ state.fabPick=null; render(); return; }
     if(e.key==="Escape" && state.fabOpen){ state.fabOpen=false; render(); return; }
     if(e.key==="Escape" && state.helpOpen){ state.helpOpen=null; render(); }
+    if(e.key==="Escape" && state.tutSpot){ state.tutSpot=null; render(); return; }
+    if(e.key==="Escape" && state.tutOpen){ state.tutOpen=null; render(); return; }
     if(e.key==="Escape" && state.agendaEdit){
       state.agendaEdit=null; state.agendaEditPending=null; state.agendaEditCancelConfirm=false; state.agendaEditDeleteConfirm=false;
       render(); return;

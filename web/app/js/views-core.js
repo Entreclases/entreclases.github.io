@@ -18,10 +18,12 @@ const examplePill = (s) => s.sample ? `<span class="pill" style="color:var(--sta
    vista de la app para dar jerarquía visual consistente ============ */
 // desc (paso 142, opcional): subtítulo de una línea que explica qué se hace en la vista — sólo
 // texto plano corto, no HTML (usa esc() como todo lo demás acá).
-const pageHead = (eyebrow,title,actionHtml,desc) =>
+// helpId (paso 207, opcional): id de HELP_SECTIONS (help-tutoriales.js) — suma el botón discreto
+// "¿Cómo se usa esto?" junto a la acción principal, si hay una.
+const pageHead = (eyebrow,title,actionHtml,desc,helpId) =>
   `<div class="pagehead"><div><div class="eyebrow">${esc(eyebrow)}</div><h2>${esc(title)}</h2>${
     desc?`<div class="hint" style="margin-top:2px">${esc(desc)}</div>`:""}</div>${
-    actionHtml?`<div class="pagehead-action">${actionHtml}</div>`:""}</div>`;
+    (actionHtml||helpId)?`<div class="pagehead-action" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${actionHtml||""}${sectionHelpBtn(helpId)}</div>`:""}</div>`;
 
 
 /* ============ navegación persistente (sidebar en escritorio / barra inferior en mobile) ============
@@ -458,6 +460,10 @@ const ICON_INBOX=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_LINK=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"/><path d="M13 18l-1 1a4 4 0 0 1-6-6l1-1"/></svg>`;
 
 const ICON_TRASH=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>`;
+
+// Círculo con "?" (paso 207): botón de cabecera "¿Cómo se usa esto?" de los tutoriales por
+// sección — ver sectionHelpBtn() en help-tutoriales.js.
+const ICON_HELP=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.5 2.5 0 1 1 3.9 2.1c-.8.5-1.4 1-1.4 2.1"/><path d="M12 17.2h.01"/></svg>`;
 
 // Lápiz (paso 127, renombrar unidad/subunidad) — mismo set de línea (stroke=currentColor,
 // stroke-width 2) que el resto de ICON_*.
@@ -990,6 +996,9 @@ function render(){
   // recibo…) para que nunca quede pegado tapando una vista a la que el tour no lleva — se
   // vuelve a pintar solo desde el final de esta misma función en el camino normal.
   if(typeof removeTourOverlay==="function") removeTourOverlay();
+  // Spotlight de "Mostrame" (paso 207): mismo motivo — que nunca quede pegado tapando una vista
+  // sin nav (recovery, informe, recibo…) a la que estos tutoriales no llevan.
+  if(typeof removeTutSpotOverlay==="function") removeTutSpotOverlay();
   // el shell de navegación (sidebar/barra inferior) sólo existe con sesión activa, fuera de
   // recovery e informe/contrato (documentos pensados para imprimir/compartir, sin nav) — la
   // clase "has-nav" en <body> reserva ese espacio fijo sólo cuando el nav realmente se pinta.
@@ -1088,6 +1097,7 @@ function render(){
   if(state.agendaSolicitudOpen) m += vAgendaSolicitudOverlay();
   if(state.grupalForm) m += vGrupalForm();
   if(state.finCuatrimestreOpen) m += vFinCuatrimestreOverlay();
+  if(state.tutOpen) m += vTutPanel();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
   const viewKey = state.view;
   const viewChanged = viewKey!==_prevViewKey;
@@ -1137,4 +1147,7 @@ function render(){
   // Tour guiado (paso 204): al final del todo, ya con el DOM real de esta vista pintado —
   // renderTourOverlay() puede re-render (ver tour.js) si el paso actual ya se completó solo.
   if(typeof renderTourOverlay==="function") renderTourOverlay();
+  // "Mostrame" de los tutoriales por sección (paso 207): mismo motivo que el de arriba — necesita
+  // el DOM real ya pintado para poder medir el elemento resaltado.
+  if(typeof renderTutSpotOverlay==="function") renderTutSpotOverlay();
 }

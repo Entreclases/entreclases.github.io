@@ -146,11 +146,50 @@ function removeTourOverlay(){
 // "Saltar"/"Omitir" respondían, ni un campo del formulario). Mientras alguno de éstos esté
 // abierto, el tour se hace a un lado del todo (ni mask ni tarjeta) y vuelve a aparecer solo
 // en el próximo render una vez que el usuario lo cierra (completando la acción o cancelando).
+// Nota (paso 207): no incluye state.tutOpen/state.tutSpot a propósito — esta misma función la
+// llama renderTutSpotOverlay() (help-tutoriales.js) para chequear si HAY OTRO modal encima, y
+// state.tutSpot siempre está activo mientras se ejecuta esa llamada (se auto-bloquearía). El tour
+// y los tutoriales por sección no compiten de otra forma: tut-open/tut-showme no hacen nada
+// mientras el tour esté activo (ver sectionHelpBtn()).
 function tourBlockingOverlayOpen(){
   return !!(state.showNew || state.searchOpen || state.fabPick || state.qrOverlay ||
     state.shareOverlay || state.envioOverlay || state.feedbackOpen || state.agendaEdit ||
     state.agendaEditGrupal || state.agendaHourList || state.agendaSolicitudOpen ||
     state.grupalForm || state.finCuatrimestreOpen);
+}
+
+/* ============ geometría de spotlight, compartida con los "Mostrame" de la ayuda por sección
+   (paso 207, ver help-tutoriales.js) — de una lista de selectores a un único rect unión (o null
+   si ninguno está en el DOM todavía), las cuatro franjas oscuras + anillo alrededor, y el
+   posicionamiento de la tarjeta. Extraído de lo que antes era código inline de
+   renderTourOverlay() para no duplicar esta cuenta dos veces. ============ */
+function spotlightRectFor(target){
+  const selectors = Array.isArray(target) ? target : (target ? [target] : []);
+  const rects = selectors.map(sel=>{
+    const el = document.querySelector(sel);
+    return el ? el.getBoundingClientRect() : null;
+  }).filter(r=>r && r.width>0 && r.height>0);
+  if(!rects.length) return null;
+  const rect = rects.reduce((u,r)=>({
+    left:Math.min(u.left,r.left), top:Math.min(u.top,r.top),
+    right:Math.max(u.right,r.right), bottom:Math.max(u.bottom,r.bottom),
+  }), {left:rects[0].left, top:rects[0].top, right:rects[0].right, bottom:rects[0].bottom});
+  rect.width=rect.right-rect.left; rect.height=rect.bottom-rect.top;
+  return rect;
+}
+
+// maskDataA (opcional): data-a que se agrega a cada franja — el spotlight de "Mostrame" se cierra
+// tocando afuera del hueco; el tour guiado no (nada de data-a, sólo responde a sus botones).
+function spotlightMasksHtml(rect, vw, vh, reduced, maskDataA){
+  const attr = maskDataA ? ` data-a="${maskDataA}"` : "";
+  const pad=6;
+  const x1=Math.max(0,rect.left-pad), y1=Math.max(0,rect.top-pad);
+  const x2=Math.min(vw,rect.right+pad), y2=Math.min(vh,rect.bottom+pad);
+  return `<div class="tour-mask"${attr} style="top:0;left:0;width:100%;height:${y1}px"></div>
+    <div class="tour-mask"${attr} style="top:${y2}px;left:0;width:100%;height:${Math.max(0,vh-y2)}px"></div>
+    <div class="tour-mask"${attr} style="top:${y1}px;left:0;width:${x1}px;height:${Math.max(0,y2-y1)}px"></div>
+    <div class="tour-mask"${attr} style="top:${y1}px;left:${x2}px;width:${Math.max(0,vw-x2)}px;height:${Math.max(0,y2-y1)}px"></div>
+    <div class="tour-ring${reduced?"":" tour-ring-pulse"}" style="top:${y1}px;left:${x1}px;width:${x2-x1}px;height:${y2-y1}px"></div>`;
 }
 
 function renderTourOverlay(){
@@ -166,16 +205,7 @@ function renderTourOverlay(){
   // caso el hueco es la UNIÓN de todos los que existan ahora (paso 204, fix): el paso
   // "materia" necesita el input Y el botón resaltados juntos, si no el input queda tapado
   // por el mask y no se puede escribir nada ahí (el bug reportado).
-  const targetSelectors = Array.isArray(step.target) ? step.target : (step.target ? [step.target] : []);
-  const rects = targetSelectors.map(sel=>{
-    const el = document.querySelector(sel);
-    return el ? el.getBoundingClientRect() : null;
-  }).filter(r=>r && r.width>0 && r.height>0);
-  const rect = rects.length ? rects.reduce((u,r)=>({
-    left:Math.min(u.left,r.left), top:Math.min(u.top,r.top),
-    right:Math.max(u.right,r.right), bottom:Math.max(u.bottom,r.bottom),
-  }), {left:rects[0].left, top:rects[0].top, right:rects[0].right, bottom:rects[0].bottom}) : null;
-  if(rect){ rect.width=rect.right-rect.left; rect.height=rect.bottom-rect.top; }
+  const rect = spotlightRectFor(step.target);
   const vw=window.innerWidth, vh=window.innerHeight;
   const reduced = (typeof prefersReducedMotion==="function") && prefersReducedMotion();
 
@@ -189,14 +219,7 @@ function renderTourOverlay(){
   let masksHtml, blocking;
   if(rect && rect.width>0 && rect.height>0){
     blocking=true;
-    const pad=6;
-    const x1=Math.max(0,rect.left-pad), y1=Math.max(0,rect.top-pad);
-    const x2=Math.min(vw,rect.right+pad), y2=Math.min(vh,rect.bottom+pad);
-    masksHtml = `<div class="tour-mask" style="top:0;left:0;width:100%;height:${y1}px"></div>
-      <div class="tour-mask" style="top:${y2}px;left:0;width:100%;height:${Math.max(0,vh-y2)}px"></div>
-      <div class="tour-mask" style="top:${y1}px;left:0;width:${x1}px;height:${Math.max(0,y2-y1)}px"></div>
-      <div class="tour-mask" style="top:${y1}px;left:${x2}px;width:${Math.max(0,vw-x2)}px;height:${Math.max(0,y2-y1)}px"></div>
-      <div class="tour-ring${reduced?"":" tour-ring-pulse"}" style="top:${y1}px;left:${x1}px;width:${x2-x1}px;height:${y2-y1}px"></div>`;
+    masksHtml = spotlightMasksHtml(rect, vw, vh, reduced);
   } else if(noTargetDefined){
     blocking=true;
     masksHtml = `<div class="tour-mask" style="top:0;left:0;width:100%;height:100%"></div>`;
@@ -230,8 +253,10 @@ function renderTourOverlay(){
 // target encontrado pero CON target definido (esperando a que el usuario llegue ahí) va a una
 // esquina en vez del centro — no hay mask acá (ver renderTourOverlay), así que el centro de la
 // pantalla suele ser justo lo que el usuario necesita tocar (ej.: el calendario de la agenda).
-function positionTourCard(rect, centered){
-  const card=document.getElementById("tour-card"); if(!card) return;
+// generalizada (paso 207) para que el spotlight de "Mostrame" (help-tutoriales.js) reuse la
+// misma cuenta de posición contra su propia tarjeta, en vez de la del tour.
+function positionSpotlightCard(card, rect, centered){
+  if(!card) return;
   const vw=window.innerWidth, vh=window.innerHeight;
   if(!rect && centered){
     card.style.top="50%"; card.style.left="50%"; card.style.transform="translate(-50%,-50%)";
@@ -254,6 +279,10 @@ function positionTourCard(rect, centered){
     if(cr.bottom>vh-8){ card.style.top=""; card.style.bottom="8px"; }
     if(cr.top<8){ card.style.bottom=""; card.style.top="8px"; }
   });
+}
+
+function positionTourCard(rect, centered){
+  positionSpotlightCard(document.getElementById("tour-card"), rect, centered);
 }
 
 // Reposiciona sin reconstruir todo el estado del paso (resize/scroll) — mismo costo que un

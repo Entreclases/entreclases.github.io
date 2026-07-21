@@ -299,7 +299,7 @@ function vTablero(){
                           .sort((a,b)=>a.examDate.localeCompare(b.examDate));
   const enRiesgo = new Set(alerts.map(a=>a.s.id)).size;
   let h = pageHead("Tablero","Hoy",`<button class="btn btn-primary" data-a="new">+ Nuevo estudiante</button>`,
-    "Lo que tenés que mirar hoy: clases del día, alertas y exámenes próximos.");
+    "Lo que tenés que mirar hoy: clases del día, alertas y exámenes próximos.", "tablero");
   h += vTips();
   h += vTourResumeBanner();
   h += vFeedbackBanner();

@@ -446,12 +446,16 @@ function vCuentaEssentials(){
 
 // Subpestaña seleccionada: título + descripción (fijos, no colapsables) y su contenido entero.
 // Ninguna seleccionada todavía: pista para tocar una de arriba, en vez de una pantalla en blanco.
-function vCuentaGroup(id, title, desc, bodyHtml){
+// helpId (paso 207, opcional): sólo Portal lo usa hoy — suma el botón "¿Cómo se usa esto?" junto
+// al título de la sub-pestaña, con flex-wrap propio (a diferencia de pageHead(), este encabezado
+// no tenía lugar pensado para una segunda acción).
+function vCuentaGroup(id, title, desc, bodyHtml, helpId){
   if(state.cuentaOpenGroupId!==id) return "";
   return `<div class="cuenta-group" id="cuenta-grp-${id}">
-    <div class="cuenta-group-head" style="cursor:default">
-      <div><div class="ftitle" style="margin-bottom:2px">${esc(title)}</div>
+    <div class="cuenta-group-head" style="cursor:default;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px"><div class="ftitle" style="margin-bottom:2px">${esc(title)}</div>
         <div class="hint">${esc(desc)}</div></div>
+      ${helpId?`<div style="flex-shrink:0">${sectionHelpBtn(helpId)}</div>`:""}
     </div>
     <div class="cuenta-group-body">${bodyHtml}</div>
   </div>`;
@@ -481,7 +485,7 @@ function vCuenta(){
   const pol=cancelPolicyFor();
   const doc=docenteFor();
   return pageHead("Cuenta","Tu cuenta y preferencias",null,
-    "Todo lo tuyo, agrupado — tocá una sección de arriba para verla entera.") + `
+    "Todo lo tuyo, agrupado — tocá una sección de arriba para verla entera.", "cuenta") + `
   ${vCuentaEssentials()}
   ${vCuentaIndice()}
   ${vCuentaVacia()}
@@ -592,7 +596,8 @@ function vCuenta(){
     vCuentaSub("portal","avisos","Avisos", vPortalAvisosCard())+
     vCuentaSub("portal","llaves","Llaves por alumno", vPortalLlavesAlumnosCard())+
     vCuentaSub("portal","grupos","Llaves grupales", vPortalGruposCard())+
-    vCuentaSub("portal","preview","Ver como alumno", vPortalPreviewCard()))}
+    vCuentaSub("portal","preview","Ver como alumno", vPortalPreviewCard()),
+    "portal")}
   ${vCuentaGroup("gruposclase","Grupos de clase","Quiénes integran cada clase grupal (intensivos, grupitos de 2-3) — para no re-elegirlos cada vez. Distinto de las llaves grupales de portal, de arriba.", vGruposClaseCard())}
   ${vCuentaGroup("datos","Datos y respaldos","Copias automáticas, retención y la papelera de alumnos/materias borrados.", `
     <div class="formcard"><div class="ftitle">Respaldos automáticos</div>
@@ -651,6 +656,7 @@ function vCentroAyuda(){
     <div class="hint" style="margin-bottom:12px">Preguntas frecuentes sobre la app.</div>
     ${tipsDismissed()?`<button class="chip" data-a="reactivate-tips" style="margin-bottom:14px">Volver a mostrar "Primeros pasos"</button>`:""}
     ${IS_DEMO?"":`<button class="chip" data-a="tour-restart" style="margin-bottom:14px">Ver la guía de nuevo</button>`}
+    ${vTutorialesIndice()}
     <div class="flabel" style="margin-bottom:6px">Mapa de la app</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
       ${APP_MAP.map(m=>`<div style="font-size:12.5px;color:var(--muted)"><b style="color:var(--ink)">${esc(m.nombre)}</b> — ${esc(m.desc)}</div>`).join("")}

@@ -73,7 +73,7 @@ function vUnitRow(u, i, total, subjectId){
 function vCatalog(){
   const c=state.catalog;
   let h = pageHead("Materias","Materias, carreras y materiales",null,
-    "El catálogo compartido: unidades por materia, carreras, packs y archivos — editar acá no toca el avance ya cargado de ningún alumno.");
+    "El catálogo compartido: unidades por materia, carreras, packs y archivos — editar acá no toca el avance ya cargado de ningún alumno.", "materias");
   const em = state.editSubjectId ? subjById(state.editSubjectId) : null;
   if(em){
     h += `<div class="formcard"><div class="ftitle" style="display:flex;align-items:center;gap:8px">${subjectDot(em)}Editar materia</div>

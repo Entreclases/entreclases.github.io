@@ -793,6 +793,14 @@
   .cuenta-group-body .formcard{border:none;padding:14px 0 0;margin:0;border-top:1px solid var(--soft)}
   .cuenta-group-body .formcard:first-child{border-top:none;padding-top:0}
 
+  /* ============ Tutoriales avanzados por sección (paso 207): panel + guía rápida ============
+     El panel reusa .overlay/.modal (mismo scroll interno que cualquier otro modal de la app,
+     ver .modal más arriba) — sólo se agranda un poco el ancho para que la guía completa respire. */
+  .tut-modal{max-width:640px}
+  .tut-open-btn{white-space:nowrap}
+  .tut-quick{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;
+    font-size:14px;color:var(--muted);line-height:1.5}
+
   /* ============ toasts: feedback breve y no intrusivo tras una acción ============ */
   /* bottom:140px en mobile deja lugar arriba del FAB (ver .fab-wrap) sin que se tapen */
   .toast-wrap{position:fixed;left:0;right:0;bottom:calc(140px + env(safe-area-inset-bottom));z-index:70;display:flex;flex-direction:column;

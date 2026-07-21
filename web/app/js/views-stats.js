@@ -5,7 +5,7 @@
 function vPagos(){
   const tab = state.pagosTab||"resumen";
   let h = pageHead("Pagos","Cobros y rentabilidad",null,
-    "Qué cobraste, qué falta cobrar y cuánto te queda libre por mes, por materia y por alumno.");
+    "Qué cobraste, qué falta cobrar y cuánto te queda libre por mes, por materia y por alumno.", "pagos");
   h += `<div class="tabs" style="margin-bottom:14px">
     <button class="tabbtn ${tab==="resumen"?"on":""}" data-a="pagos-tab" data-t="resumen">Resumen</button>
     <button class="tabbtn ${tab==="rentabilidad"?"on":""}" data-a="pagos-tab" data-t="rentabilidad">Rentabilidad</button>
@@ -475,7 +475,7 @@ function vEstadisticasComparar(){
 
 function vEstadisticas(){
   let h = pageHead("Estadísticas","Panorama del grupo",null,
-    "Cómo viene el grupo en conjunto: avance por tema, objetivos, exámenes y asistencia, por materia.");
+    "Cómo viene el grupo en conjunto: avance por tema, objetivos, exámenes y asistencia, por materia.", "estadisticas");
   h += `<div class="tabs" style="margin-bottom:16px">
     <button class="tabbtn ${(state.statsMode||"normal")==="normal"?"on":""}" data-a="stats-mode" data-m="normal">Vista normal</button>
     <button class="tabbtn ${state.statsMode==="comparar"?"on":""}" data-a="stats-mode" data-m="comparar">Comparar períodos</button>
