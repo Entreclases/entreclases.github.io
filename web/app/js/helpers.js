@@ -99,7 +99,7 @@ async function copyToClipboard(text){
 }
 
 /* ============ estado ============ */
-let state = { students:[], catalog:defaultCatalog(), editSubjectId:null, editPackId:null,
+let state = { students:[], catalog:defaultCatalog(), ownerUid:null, editSubjectId:null, editPackId:null,
               editUnitId:null, editSubunitId:null, editCareerId:null, catMateriasGroupBy:"todas",
               newPackName:"", newPackSubjects:[], newPackError:"",
               view:"tablero", selId:null, filter:"activo", tab:"temas",
@@ -529,13 +529,23 @@ function load(){
     state.portal=d.portal; state.portalLoaded=true; state.portalError="";
     return;
   }
-  try{
-    const raw = localStorage.getItem(KEY);
-    if(raw){ const p = JSON.parse(raw);
-      if(Array.isArray(p.students)) state.students = p.students;
-      if(p.catalog && Array.isArray(p.catalog.careers) && Array.isArray(p.catalog.subjects))
-        state.catalog = p.catalog; }
-  }catch(e){}
+  const uid_ = sesUid();
+  adoptOrDiscardLegacyCuaderno(uid_);
+  state.students=[]; state.catalog=defaultCatalog(); state.ownerUid=uid_;
+  if(uid_){
+    try{
+      const raw = localStorage.getItem(nsKey(KEY, uid_));
+      if(raw){ const p = JSON.parse(raw);
+        if(!p.owner || p.owner===uid_){
+          if(Array.isArray(p.students)) state.students = p.students;
+          if(p.catalog && Array.isArray(p.catalog.careers) && Array.isArray(p.catalog.subjects))
+            state.catalog = p.catalog;
+        }else{
+          console.error("cuaderno local: dueño guardado ("+p.owner+") no coincide con la sesión ("+uid_+") — se ignora");
+        }
+      }
+    }catch(e){}
+  }
   if(!Array.isArray(state.catalog.packs)) state.catalog.packs=[];
   if(!Array.isArray(state.catalog.trash)) state.catalog.trash=[];
   if(!Array.isArray(state.catalog.tags)) state.catalog.tags=[];
@@ -550,11 +560,16 @@ function load(){
 const TRASH_DAYS = 7;
 // días restantes antes de que la papelera purgue algo sola, a partir de un ts en ms (deletedAt)
 function trashDaysLeft(deletedAt){ return Math.max(0, TRASH_DAYS - Math.floor((Date.now()-(deletedAt||0))/86400000)); }
-function setDirty(v){ try{ v ? localStorage.setItem(DIRTY_KEY,"1") : localStorage.removeItem(DIRTY_KEY); }catch(e){} }
-function isDirty(){ return localStorage.getItem(DIRTY_KEY)==="1"; }
+function setDirty(v){ const k=nsKey(DIRTY_KEY); if(!k) return; try{ v ? localStorage.setItem(k,"1") : localStorage.removeItem(k); }catch(e){} }
+function isDirty(){ const k=nsKey(DIRTY_KEY); return k ? localStorage.getItem(k)==="1" : false; }
 function save(){
   if(IS_DEMO) return; // en modo demo nada se persiste — ni localStorage ni sync (ver IS_DEMO en config.js)
-  try{ localStorage.setItem(KEY, JSON.stringify({students:state.students, catalog:state.catalog})); state.saveErr=false; }
+  // Sin dueño conocido no hay dónde guardar contenido de cuaderno (paso 194): nunca escribir a la
+  // clave sin namespacear — evitar esto en la práctica nunca debería pasar (save() sólo se llama
+  // desde la app ya logueada), pero es la última barrera contra fusionar cuentas.
+  const k=nsKey(KEY, state.ownerUid);
+  if(!k){ state.saveErr=true; return; }
+  try{ localStorage.setItem(k, JSON.stringify({owner:state.ownerUid, students:state.students, catalog:state.catalog})); state.saveErr=false; }
   catch(e){ state.saveErr=true; }
   setDirty(true);
   scheduleSync();
@@ -706,15 +721,16 @@ function checkOnboardingComplete(){
 }
 
 /* ============ recordatorio de copia manual (.json) ============ */
-function getLastExport(){ const v=localStorage.getItem(LAST_EXPORT_KEY); return v?parseInt(v,10):null; }
-function markExported(){ localStorage.setItem(LAST_EXPORT_KEY, String(Date.now())); }
-function dismissBackupReminder(){ localStorage.setItem(BACKUP_REMINDER_DISMISS_KEY, String(Date.now())); }
+function getLastExport(){ const k=nsKey(LAST_EXPORT_KEY); const v=k&&localStorage.getItem(k); return v?parseInt(v,10):null; }
+function markExported(){ const k=nsKey(LAST_EXPORT_KEY); if(k) localStorage.setItem(k, String(Date.now())); }
+function dismissBackupReminder(){ const k=nsKey(BACKUP_REMINDER_DISMISS_KEY); if(k) localStorage.setItem(k, String(Date.now())); }
 function shouldShowBackupReminder(){
   if(alive().length===0) return false;
   const last = getLastExport();
   const daysSince = last ? (Date.now()-last)/86400000 : Infinity;
   if(daysSince < BACKUP_REMINDER_DAYS) return false;
-  const dismissedAt = parseInt(localStorage.getItem(BACKUP_REMINDER_DISMISS_KEY)||"0",10);
+  const k=nsKey(BACKUP_REMINDER_DISMISS_KEY);
+  const dismissedAt = parseInt((k&&localStorage.getItem(k))||"0",10);
   if(dismissedAt && (Date.now()-dismissedAt)/86400000 < BACKUP_REMINDER_SNOOZE_DAYS) return false;
   return true;
 }
@@ -736,11 +752,12 @@ function alumnosSinClasesFinCuatrimestre(days){
     return ds!==null && ds>=days;
   }).sort((a,b)=>daysSince(lastSessionDate(b)||b.startDate)-daysSince(lastSessionDate(a)||a.startDate));
 }
-function dismissFinCuatrimestre(){ localStorage.setItem(FIN_CUATRIMESTRE_DISMISS_KEY, String(Date.now())); }
+function dismissFinCuatrimestre(){ const k=nsKey(FIN_CUATRIMESTRE_DISMISS_KEY); if(k) localStorage.setItem(k, String(Date.now())); }
 function shouldSuggestFinCuatrimestre(){
   if(!finCuatrimestreTemporada()) return false;
   if(alumnosSinClasesFinCuatrimestre(FIN_CUATRIMESTRE_DIAS_SIN_CLASE).length===0) return false;
-  const dismissedAt = parseInt(localStorage.getItem(FIN_CUATRIMESTRE_DISMISS_KEY)||"0",10);
+  const k=nsKey(FIN_CUATRIMESTRE_DISMISS_KEY);
+  const dismissedAt = parseInt((k&&localStorage.getItem(k))||"0",10);
   if(dismissedAt && (Date.now()-dismissedAt)/86400000 < FIN_CUATRIMESTRE_SNOOZE_DAYS) return false;
   return true;
 }
@@ -750,14 +767,14 @@ function shouldSuggestFinCuatrimestre(){
    FEEDBACK_BANNER_DAYS — nunca en modo demo, que no pasa por auth-signup. Se apaga sola pasado
    el plazo o al descartarla a mano; no vuelve a aparecer una vez cerrada. */
 function startFeedbackBannerWindow(){
-  try{ localStorage.setItem(FEEDBACK_BANNER_UNTIL_KEY, String(Date.now()+FEEDBACK_BANNER_DAYS*86400000)); }catch(e){}
+  try{ const k=nsKey(FEEDBACK_BANNER_UNTIL_KEY); if(k) localStorage.setItem(k, String(Date.now()+FEEDBACK_BANNER_DAYS*86400000)); }catch(e){}
 }
 function feedbackBannerActive(){
   if(IS_DEMO) return false;
-  try{ return Date.now() < (Number(localStorage.getItem(FEEDBACK_BANNER_UNTIL_KEY))||0); }
+  try{ const k=nsKey(FEEDBACK_BANNER_UNTIL_KEY); return !!k && Date.now() < (Number(localStorage.getItem(k))||0); }
   catch(e){ return false; }
 }
-function dismissFeedbackBanner(){ try{ localStorage.removeItem(FEEDBACK_BANNER_UNTIL_KEY); }catch(e){} }
+function dismissFeedbackBanner(){ try{ const k=nsKey(FEEDBACK_BANNER_UNTIL_KEY); if(k) localStorage.removeItem(k); }catch(e){} }
 
 /* ============ alertas ============ */
 // cada alerta trae "wa": qué mensaje pre-armado de WhatsApp corresponde si el
@@ -2305,6 +2322,63 @@ function rememberEmail(email){
 function jwtSub(tok){
   try{ return JSON.parse(atob(tok.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).sub; }
   catch(e){ return null; }
+}
+// uid de la sesión activa, decodificado del JWT ya guardado (sin red: el claim "sub" no cambia
+// con el refresh) — fuente de verdad para namespacear todo lo que sea contenido del cuaderno
+// (paso 194). null si no hay sesión (deslogueado, o el JWT no tiene el claim).
+function sesUid(ses){ ses = ses===undefined ? getSes() : ses; return (ses && ses.access) ? jwtSub(ses.access) : null; }
+// Namespacea una clave de localStorage con el uid de la cuenta dueña del contenido (paso 194):
+// dos cuentas en el mismo navegador jamás leen ni pisan la clave de la otra. Sin uid (nadie
+// logueado, o "no se sabe" de quién es) devuelve null a propósito — nunca se lee/escribe
+// contenido de cuaderno sin un dueño claro, ver load()/save() más abajo.
+function nsKey(base, uid){
+  uid = uid===undefined ? sesUid() : uid;
+  return uid ? base+":"+uid : null;
+}
+// Migración suave del cuaderno pre-paso-194 (una sola clave sin sufijo, compartida por
+// cualquier cuenta que hubiera usado este navegador): al conocer el uid que está por entrar,
+// si coincide con LAST_UID_KEY (el último uid visto en este dispositivo, sobrevive al logout a
+// propósito) se adopta esa clave vieja renombrándola con el sufijo del uid; si es otra cuenta —
+// o nunca supimos quién fue el último— NO se adopta, se descarta sin más (arranca vacío y baja
+// su propio cuaderno de la nube en el próximo sync). Corre una sola vez por login real (ver
+// storeSession() en auth.js) y por arranque con sesión ya guardada (ver load()).
+const LEGACY_CONTENT_KEYS = [KEY, DIRTY_KEY, LAST_REMOTE_KEY, BACKUP_DATE_KEY, LAST_EXPORT_KEY,
+  BACKUP_REMINDER_DISMISS_KEY, FIN_CUATRIMESTRE_DISMISS_KEY, LAST_COBROS_NOTIFY_KEY,
+  FEEDBACK_BANNER_UNTIL_KEY, PORTAL_RENEW_CHECK_KEY, FIRST_RESERVA_KEY];
+function adoptOrDiscardLegacyCuaderno(uid){
+  if(!uid) return;
+  try{
+    const lastUid = localStorage.getItem(LAST_UID_KEY);
+    const sameUser = lastUid===uid;
+    LEGACY_CONTENT_KEYS.forEach(base=>{
+      const legacy = localStorage.getItem(base);
+      if(legacy!=null){
+        const nsed = base+":"+uid;
+        if(sameUser && localStorage.getItem(nsed)==null) localStorage.setItem(nsed, legacy);
+        localStorage.removeItem(base);
+      }
+    });
+    localStorage.setItem(LAST_UID_KEY, uid);
+  }catch(e){}
+}
+// Al cerrar sesión (o detectar en storeSession() que la que está entrando es otra cuenta) hay
+// que vaciar en memoria TODO lo que se haya cacheado de la cuenta anterior — students/catalog
+// son lo crítico (evita que un sync suba datos ajenos, paso 194), pero también las listas
+// cacheadas por vista (reportes/usuarios/actividad/backups/materiales/portal) para que la cuenta
+// nueva no vea ni por un instante algo de la vieja mientras recarga cada una a demanda.
+function clearAccountState(){
+  state.students=[]; state.catalog=defaultCatalog(); state.ownerUid=null;
+  state.selId=null; state.fichaDraft=null; state.fichaError="";
+  state.view="tablero"; state.tab="temas";
+  state.portal=null; state.portalLoaded=false; state.portalError="";
+  state.reportes=[]; state.reportesLoaded=false; state.reportesError="";
+  state.users=[]; state.usersLoaded=false; state.usersError="";
+  state.metricas=[]; state.altas=[]; state.actividadLoaded=false; state.actividadError="";
+  state.metricasHorarias=[]; state.metricasHorariasLoaded=false; state.metricasHorariasError="";
+  state.recursos=null; state.recursosLoaded=false; state.recursosError="";
+  state.backups=[]; state.backupsLoaded=false; state.backupsError="";
+  state.materialesList=[]; state.materialesLoaded=false; state.materialesError="";
+  state.solicitudesClase=[]; state.reservasDirectas=[];
 }
 
 /* ============ búsqueda global (paso 72): alumnos, materias y materiales por nombre, todo

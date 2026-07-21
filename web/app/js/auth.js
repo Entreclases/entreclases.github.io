@@ -37,6 +37,14 @@ function storeSession(j,email){
   setSes({access:j.access_token,refresh:j.refresh_token,
           exp:Date.now()+((j.expires_in||3600)-60)*1000,email,loginAt,role});
   rememberEmail(email);
+  // Aislamiento por cuenta (paso 194): si el uid que acaba de entrar (login/signup, o el mismo
+  // de siempre en un refresh de token) no es el que ya estaba cargado en memoria, hay que
+  // vaciar TODO lo cacheado de la cuenta anterior y recargar SOLO el cache local del uid nuevo
+  // antes de seguir — así el primer syncNow() de la sesión ya arranca con el cuaderno correcto,
+  // nunca con el de quien usó este navegador antes. En un refresh normal (misma cuenta) esto no
+  // hace nada, state.ownerUid ya coincide.
+  const uid_=jwtSub(j.access_token);
+  if(uid_ && uid_!==state.ownerUid){ clearAccountState(); load(); }
   loadRole();
 }
 // Lee el rol propio (tabla perfiles) una vez por login/refresh de sesión y lo cachea

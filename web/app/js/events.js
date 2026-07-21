@@ -242,14 +242,14 @@ function maybeNotifyCobros(){
   const rec = recordatoriosFor();
   if(!rec.activo || !rec.notificacionesOS) return;
   if(typeof Notification==="undefined" || Notification.permission!=="granted") return;
-  if(localStorage.getItem(LAST_COBROS_NOTIFY_KEY)===today()) return;
+  if(localStorage.getItem(nsKey(LAST_COBROS_NOTIFY_KEY))===today()) return;
   const sum = cobrosAtrasadosSummary(rec.diasAtraso);
   if(sum.count===0) return;
   try{
     new Notification("Entreclases", {
       body: `Tenés ${sum.count} cobro${sum.count===1?"":"s"} atrasado${sum.count===1?"":"s"} por ${fmtMoney(sum.total)}.`,
     });
-    localStorage.setItem(LAST_COBROS_NOTIFY_KEY, today());
+    localStorage.setItem(nsKey(LAST_COBROS_NOTIFY_KEY), today());
   }catch(e){ /* silencioso: algún navegador/SO puntual puede bloquear la construcción */ }
 }
 
@@ -345,7 +345,7 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="nav-logout"){
     if(!confirm("¿Cerrar sesión?")) return;
-    setSes(null); state.view="tablero"; _navSnapshot=null; render(); return;
+    setSes(null); clearAccountState(); state.view="tablero"; _navSnapshot=null; render(); return;
   }
   else if(a==="agenda-view-semana"){ state.agendaViewMode="semana"; }
   else if(a==="agenda-view-mes"){ state.agendaViewMode="mes"; state.agendaGridQuick=null; }
@@ -868,9 +868,13 @@ document.addEventListener("click", (e)=>{
     if(pw.length<6){ authMsgShow("La contraseña tiene que tener al menos 6 caracteres."); return; }
     if(!acceptedTerms){ authMsgShow("Tenés que aceptar los términos y la política de privacidad."); return; }
     authMsgShow("Creando cuenta…",true);
-    startFeedbackBannerWindow();
     doSignup(em,pw).then(ok=>{
-      if(ok){ registrarAceptacionTerminos(); return loadRole().then(()=>{ render(); syncNow(); }); }
+      if(ok){
+        // recién acá hay sesión (uid) para namespacear la clave (paso 194) — antes de storeSession()
+        // (dentro de doSignup) startFeedbackBannerWindow() no tendría dueño y no guardaría nada.
+        startFeedbackBannerWindow();
+        registrarAceptacionTerminos(); return loadRole().then(()=>{ render(); syncNow(); });
+      }
       else{
         try{ localStorage.setItem(PENDING_TERMS_KEY, em); }catch(e){}
         state.pendingConfirmEmail=em; state.confirmStatus="idle"; state.confirmError=""; render();
@@ -1169,7 +1173,7 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="feedback-banner-dismiss"){ dismissFeedbackBanner(); }
-  else if(a==="auth-logout"){ setSes(null); state.view="tablero"; _navSnapshot=null; render(); return; }
+  else if(a==="auth-logout"){ setSes(null); clearAccountState(); state.view="tablero"; _navSnapshot=null; render(); return; }
   else if(a==="open"){
     state.view="detalle"; state.selId=el.dataset.id; state.tab=el.dataset.tab||"resumen"; state.confirmDel=false;
     state.simTimer=null; state.simPrefillNote=""; state.fichaError=""; state.sessionPrefillDate="";

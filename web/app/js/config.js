@@ -1,36 +1,44 @@
 "use strict";
 /* ============ configuración: claves, urls, versiones, metadatos de estados ============ */
 const KEY = "tutoria-seguimiento-v1";
+// Aislamiento por cuenta (paso 194): toda clave ligada al CONTENIDO del cuaderno (esta y las
+// marcadas más abajo) se namespacea con el uid de la sesión activa vía nsKey() (helpers.js) —
+// dos cuentas en el mismo navegador nunca comparten ni fusionan datos. LAST_UID_KEY es la única
+// excepción: vive SIN namespacear a propósito, es el puntero de "qué uid fue el último en usar
+// este dispositivo" que usa adoptOrDiscardLegacyCuaderno() (helpers.js) para decidir, en el
+// próximo login, si un cuaderno viejo sin sufijo (de antes de este paso) le pertenece a quien
+// está entrando o hay que descartarlo sin adoptarlo.
+const LAST_UID_KEY = "tutoria-last-uid";
 const SES_KEY = "tutoria-sync-ses";   // sesión iniciada (tokens): cookie de sesión en la web (se borra al cerrar el navegador), localStorage en apps nativas (Tauri/Capacitor)
 const EMAILS_KEY = "tutoria-remembered-emails"; // emails con los que se inició sesión con éxito en este dispositivo — no se borra al cerrar sesión
-const BACKUP_DATE_KEY = "tutoria-last-backup-date"; // fecha (YYYY-MM-DD) del último snapshot subido a cuaderno_respaldos, para hacer uno solo por día
+const BACKUP_DATE_KEY = "tutoria-last-backup-date"; // fecha (YYYY-MM-DD) del último snapshot subido a cuaderno_respaldos, para hacer uno solo por día — namespaceada por uid (paso 194)
 const MAX_BACKUPS = 15;
-const DIRTY_KEY = "tutoria-sync-dirty"; // "1" mientras hay cambios locales sin confirmar por una escritura exitosa a la nube
-const LAST_REMOTE_KEY = "tutoria-last-remote-updated"; // último updated_at de la fila remota que ya vimos, para el chequeo liviano
+const DIRTY_KEY = "tutoria-sync-dirty"; // "1" mientras hay cambios locales sin confirmar por una escritura exitosa a la nube — namespaceada por uid (paso 194)
+const LAST_REMOTE_KEY = "tutoria-last-remote-updated"; // último updated_at de la fila remota que ya vimos, para el chequeo liviano — namespaceada por uid (paso 194)
 const VERSION_CHECK_KEY = "tutoria-last-version-check"; // timestamp del último chequeo de versión (apps nativas)
 const VERSION_CHECK_INTERVAL_MS = 24*60*60*1000;
 const SW_UPDATE_CHECK_INTERVAL_MS = 60*60*1000; // cada cuánto se pide al service worker que busque una versión nueva (además del chequeo al cargar y al volver a la pestaña)
-const LAST_EXPORT_KEY = "tutoria-last-export"; // timestamp de la última descarga manual del .json
-const BACKUP_REMINDER_DISMISS_KEY = "tutoria-backup-reminder-dismissed-at"; // timestamp del último "descartar" del aviso de respaldo
+const LAST_EXPORT_KEY = "tutoria-last-export"; // timestamp de la última descarga manual del .json — namespaceada por uid (paso 194)
+const BACKUP_REMINDER_DISMISS_KEY = "tutoria-backup-reminder-dismissed-at"; // timestamp del último "descartar" del aviso de respaldo — namespaceada por uid (paso 194)
 const BACKUP_REMINDER_DAYS = 30; // a partir de cuántos días sin exportar se sugiere hacerlo
 const BACKUP_REMINDER_SNOOZE_DAYS = 7; // cada cuánto reaparece el aviso si se descarta
 // Cierre de cuatrimestre (paso 163): mismo patrón de descartar/reaparecer que el aviso de
 // respaldo — se sugiere en meses de recambio (jul/ago, nov-dic-feb, ver finCuatrimestreTemporada()
 // en helpers.js) y, si se descarta, no vuelve a aparecer hasta FIN_CUATRIMESTRE_SNOOZE_DAYS después.
-const FIN_CUATRIMESTRE_DISMISS_KEY = "tutoria-fin-cuatrimestre-dismissed-at";
+const FIN_CUATRIMESTRE_DISMISS_KEY = "tutoria-fin-cuatrimestre-dismissed-at"; // namespaceada por uid (paso 194)
 const FIN_CUATRIMESTRE_SNOOZE_DAYS = 14;
 const FIN_CUATRIMESTRE_DIAS_SIN_CLASE = 30; // umbral por defecto ("30/60 días" del paso 163)
 const LOGIN_ATTEMPTS_KEY = "tutoria-login-attempts"; // {count, lockUntil} — freno local a intentos de login seguidos, aparte del rate-limit propio de Supabase
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCK_MS = 5*60*1000;
 const PENDING_TERMS_KEY = "tutoria-pending-terms-accept"; // email pendiente de registrar perfiles.terminos_aceptados_at tras confirmar el mail (paso 144)
-const LAST_COBROS_NOTIFY_KEY = "tutoria-last-cobros-notify-date"; // fecha (YYYY-MM-DD) del último aviso del sistema por cobros atrasados — uno por día, por dispositivo
+const LAST_COBROS_NOTIFY_KEY = "tutoria-last-cobros-notify-date"; // fecha (YYYY-MM-DD) del último aviso del sistema por cobros atrasados — uno por día, por dispositivo y namespaceada por uid (paso 194)
 // Feedback y errores silenciosos (paso 147): FEEDBACK_BANNER_UNTIL_KEY guarda hasta cuándo se
 // muestra el banner de bienvenida post-registro (se arranca al crear la cuenta, ver auth-signup
 // en events.js); ERROR_LOG_COUNT_KEY es un contador en sessionStorage (no localStorage: el freno
 // es "por sesión de pestaña", se reinicia solo al abrir una nueva) para no ametrallar `reportes`
 // si algo entra en loop de errores.
-const FEEDBACK_BANNER_UNTIL_KEY = "tutoria-feedback-banner-until";
+const FEEDBACK_BANNER_UNTIL_KEY = "tutoria-feedback-banner-until"; // namespaceada por uid (paso 194)
 const FEEDBACK_BANNER_DAYS = 4;
 const ERROR_LOG_COUNT_KEY = "tutoria-error-log-count";
 const ERROR_LOG_MAX_PER_SESSION = 5;
@@ -44,7 +52,7 @@ const FEEDBACK_TIPOS = [
 // en sync.js) cuando les queda menos de PORTAL_LINK_TTL_DAYS-PORTAL_LINK_RENEW_AFTER_DAYS de vida.
 const PORTAL_LINK_TTL_DAYS = 30;
 const PORTAL_LINK_RENEW_AFTER_DAYS = 20;
-const PORTAL_RENEW_CHECK_KEY = "tutoria-portal-renew-check-date"; // fecha (YYYY-MM-DD) del último chequeo de renovación — uno por día, por dispositivo
+const PORTAL_RENEW_CHECK_KEY = "tutoria-portal-renew-check-date"; // fecha (YYYY-MM-DD) del último chequeo de renovación — uno por día, por dispositivo y namespaceada por uid (paso 194)
 // Sonidos discretos (paso 143): preferencia local del dispositivo, mismo criterio que THEME_KEY
 // más abajo (no viaja en el catalog sincronizado — un dispositivo compartido/de aula puede querer
 // mutearlos sin afectar a los demás). Activado por defecto (ausente en localStorage = "on").
@@ -66,8 +74,9 @@ function applyBg(on){ document.body.classList.toggle("bg-off", !on); }
 function setBgOn(on){ localStorage.setItem(BG_KEY, on?"on":"off"); applyBg(on); }
 applyBg(bgOn()); // igual que el tema/densidad, aplicada de entrada para evitar parpadeo
 // Primera reserva directa recibida desde el portal (paso 179): flag de una sola vez, por
-// dispositivo — gatea el festejo (confetti + soundReserva) de la PRIMERA reserva que llega
-// alguna vez, no las siguientes. Ver el bloque agregado en refreshSolicitudesClase() en sync.js.
+// dispositivo y por cuenta (namespaceada por uid, paso 194) — gatea el festejo (confetti +
+// soundReserva) de la PRIMERA reserva que llega alguna vez, no las siguientes. Ver el bloque
+// agregado en refreshSolicitudesClase() en sync.js.
 const FIRST_RESERVA_KEY = "tutoria-primera-reserva-festejada";
 const THEME_KEY = "tutoria-theme"; // "light" | "dark" | "system" (default)
 function getTheme(){ return localStorage.getItem(THEME_KEY) || "system"; }

@@ -46,17 +46,26 @@ async function syncNow(force){
   try{
     const s=await ensureToken();
     const uid_=jwtSub(s.access);
+    // Guarda anti-fusión (paso 194): el cuaderno en memoria (state.students/catalog) tiene que
+    // pertenecer a la MISMA cuenta cuyo token se acaba de renovar — si no coincide (un bug de
+    // otro lado rompió el namespacing, o quedó en memoria de una cuenta que ya no es la logueada)
+    // se aborta el ciclo entero sin mergear ni subir nada, en vez de arriesgar fusionar cuadernos.
+    if(state.ownerUid && state.ownerUid!==uid_){
+      console.error("syncNow: abortado — el cuaderno en memoria pertenece a otra cuenta ("+state.ownerUid+") que la sesión activa ("+uid_+")");
+      setStatus("idle"); syncing=false; return;
+    }
+    state.ownerUid=uid_;
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
     maybeHeartbeat(uid_, s);
     const dirty=isDirty();
 
     if(!force && !dirty){
-      const rc=await fetch(SUPA_URL+"/rest/v1/cuaderno?select=updated_at",{headers:h});
+      const rc=await fetch(SUPA_URL+"/rest/v1/cuaderno?select=updated_at&user_id=eq."+encodeURIComponent(uid_),{headers:h});
       if(!rc.ok) throw new Error("chequeo "+rc.status);
       const rows=await rc.json();
       if(rows.length){
         const remoteUpdatedAt=rows[0].updated_at;
-        if(remoteUpdatedAt===localStorage.getItem(LAST_REMOTE_KEY)){
+        if(remoteUpdatedAt===localStorage.getItem(nsKey(LAST_REMOTE_KEY,uid_))){
           // nada cambió ni acá ni en la nube: ni bajamos data ni escribimos nada
           state.lastSync=Date.now();
           setStatus("ok");
@@ -72,7 +81,7 @@ async function syncNow(force){
     }
 
     const before=JSON.stringify({a:state.students,b:state.catalog});
-    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno?select=data,updated_at",{headers:h});
+    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno?select=data,updated_at&user_id=eq."+encodeURIComponent(uid_),{headers:h});
     if(!r.ok) throw new Error("lectura "+r.status);
     const rows=await r.json();
     const row=rows[0];
@@ -102,8 +111,8 @@ async function syncNow(force){
     }
 
     state.students=merged; state.catalog=catalog;
-    try{ localStorage.setItem(KEY, JSON.stringify({students:merged, catalog:catalog})); }catch(e){}
-    if(remoteUpdatedAt) localStorage.setItem(LAST_REMOTE_KEY, remoteUpdatedAt);
+    try{ localStorage.setItem(nsKey(KEY,uid_), JSON.stringify({owner:uid_, students:merged, catalog:catalog})); }catch(e){}
+    if(remoteUpdatedAt) localStorage.setItem(nsKey(LAST_REMOTE_KEY,uid_), remoteUpdatedAt);
     state.lastSync=Date.now();
     setStatus("ok");
     pendingSyncs++;
@@ -287,13 +296,13 @@ async function setNotifClasesDia(v){
 // Un snapshot completo por día (primera sync exitosa del día), silencioso; se guardan hasta
 // MAX_BACKUPS y se recortan los más viejos. Vive aparte de la exportación manual (.json).
 async function maybeSnapshotBackup(uid_, s){
-  if(localStorage.getItem(BACKUP_DATE_KEY) === today()) return;
+  if(localStorage.getItem(nsKey(BACKUP_DATE_KEY,uid_)) === today()) return;
   try{
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
     const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos", {method:"POST", headers:h,
       body:JSON.stringify([{user_id:uid_, data:{students:state.students, catalog:state.catalog}}])});
     if(!r.ok) return; // se reintenta en la próxima sync, sin avisar al usuario
-    localStorage.setItem(BACKUP_DATE_KEY, today());
+    localStorage.setItem(nsKey(BACKUP_DATE_KEY,uid_), today());
     await trimBackups(uid_, s);
   }catch(e){ /* silencioso */ }
 }
@@ -688,7 +697,7 @@ async function fetchPortalRow(select){
   const s=await ensureToken();
   const uid_=jwtSub(s.access);
   const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
-  const r=await fetch(SUPA_URL+"/rest/v1/portales?select="+select, {headers:h});
+  const r=await fetch(SUPA_URL+"/rest/v1/portales?select="+select+"&user_id=eq."+encodeURIComponent(uid_), {headers:h});
   if(!r.ok) throw new Error("error "+r.status);
   const row=(await r.json())[0];
   return {s, uid_, h, row: row||{}};
@@ -793,7 +802,7 @@ async function maybeSyncHuecosPortal(uid_, s){
   if(IS_DEMO) return;
   try{
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
-    const r=await fetch(SUPA_URL+"/rest/v1/portales?select=habilitado,publicado", {headers:h});
+    const r=await fetch(SUPA_URL+"/rest/v1/portales?select=habilitado,publicado&user_id=eq."+encodeURIComponent(uid_), {headers:h});
     if(!r.ok) return;
     const row=(await r.json())[0];
     if(!row || !row.habilitado) return;
@@ -838,8 +847,8 @@ async function refreshSolicitudesClase(){
       // localStorage (no en catalog.updatedAt — no hace falta que viaje entre dispositivos, y así
       // restaurar un respaldo viejo no lo revive). No es "la primera fila de este heartbeat" sino
       // literalmente la primera vez que este dispositivo ve alguna reserva directa.
-      if(rows.length>0 && localStorage.getItem(FIRST_RESERVA_KEY)!=="1"){
-        localStorage.setItem(FIRST_RESERVA_KEY,"1");
+      if(rows.length>0 && localStorage.getItem(nsKey(FIRST_RESERVA_KEY))!=="1"){
+        localStorage.setItem(nsKey(FIRST_RESERVA_KEY),"1");
         if(typeof fireConfetti==="function") fireConfetti({colors:RESERVA_CONFETTI, n:36, duration:900});
         if(typeof soundReserva==="function") soundReserva();
       }
@@ -1124,11 +1133,11 @@ async function publicarPortal(){
 // en publicado.grupos[materiaId].biblioteca (llave grupal, firmada aparte por republishGrupoBlock)
 // — se junta por path antes de firmar para no pedirle a Storage dos URLs del mismo archivo.
 async function maybeRenewPortalLibrary(uid_, s){
-  if(localStorage.getItem(PORTAL_RENEW_CHECK_KEY) === today()) return;
-  localStorage.setItem(PORTAL_RENEW_CHECK_KEY, today());
+  if(localStorage.getItem(nsKey(PORTAL_RENEW_CHECK_KEY,uid_)) === today()) return;
+  localStorage.setItem(nsKey(PORTAL_RENEW_CHECK_KEY,uid_), today());
   try{
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
-    const r=await fetch(SUPA_URL+"/rest/v1/portales?select=habilitado,publicado", {headers:h});
+    const r=await fetch(SUPA_URL+"/rest/v1/portales?select=habilitado,publicado&user_id=eq."+encodeURIComponent(uid_), {headers:h});
     if(!r.ok) return;
     const row=(await r.json())[0];
     if(!row || !row.habilitado) return;
