@@ -329,42 +329,38 @@ function vTablero(){
 }
 
 
+// Una fila de pago pendiente en el tablero (paso 198): "etiqueta" individual, todas con la misma
+// forma (.hoy-row, igual criterio visual que "Clases de hoy") en vez de agrupadas por alumno —
+// una por clase/mensualidad/seña, más vieja arriba. El check de al lado reusa la misma acción que
+// Pagos → Resumen/ficha según el tipo (cobro-marcar-clase/pagos-check-pendiente/toggle-senia-estado,
+// ver events.js), con el mismo undo donde ya lo tienen.
+function vCobroPendienteRow(i){
+  const s = state.students.find(x=>x.id===i.studentId); if(!s) return "";
+  const kindLabel = i.kind==="clase" ? "Clase" : i.kind==="mensual" ? "Mensualidad" : "Seña";
+  const checkAttrs = i.kind==="clase" ? `data-a="cobro-marcar-clase" data-sid="${s.id}" data-id="${i.sessionId}"`
+    : i.kind==="mensual" ? `data-a="pagos-check-pendiente" data-id="${s.id}" data-mk="${currentMonthKey()}"`
+    : `data-a="toggle-senia-estado" data-sid="${s.id}" data-id="${i.puntualId}"`;
+  return `<div class="hoy-row">
+    <div class="hoy-row-main">
+      <span class="hoy-row-time">${esc(fmtDate(i.date))}</span>
+      <span class="hoy-row-name">${esc(s.name)}</span>
+      <span class="pill" style="color:var(--status-desaprobo-fg);background:var(--redbg)">${kindLabel} · ${fmtMoney(i.monto)}</span>
+    </div>
+    <button class="chip" title="Marcar pagado" aria-label="Marcar pagado" ${checkAttrs}>✓</button>
+  </div>`;
+}
+
 /* ============ aviso de cobros atrasados: clases sin cobrar + mensualidades vencidas + señas
-   pendientes, agrupado por alumno y desplegable (ver cobrosAtrasadosSummary en helpers.js) ============ */
+   pendientes, TODAS como filas sueltas ordenadas por fecha (paso 198, ver cobrosAtrasadosSummary
+   en helpers.js) — con scroll propio y un límite de alto para no empujar el resto del tablero
+   cuando hay muchas. ============ */
 function vCobrosBanner(){
   const rec = recordatoriosFor();
   if(!rec.activo) return "";
   const sum = cobrosAtrasadosSummary(rec.diasAtraso);
   if(sum.count===0) return "";
-  const nClase = sum.items.filter(i=>i.kind==="clase").length;
-  const nMensual = sum.items.filter(i=>i.kind==="mensual").length;
-  const nSenia = sum.items.filter(i=>i.kind==="senia").length;
-  const parts = [];
-  if(nClase) parts.push(`${nClase} clase${nClase===1?"":"s"} sin cobrar`);
-  if(nMensual) parts.push(`${nMensual} mensualidad${nMensual===1?"":"es"} vencida${nMensual===1?"":"s"}`);
-  if(nSenia) parts.push(`${nSenia} seña${nSenia===1?"":"s"} pendiente${nSenia===1?"":"s"}`);
-  let h = `<button class="alert" data-a="cobros-toggle" style="cursor:pointer">
-    <span class="dot"></span><span class="t">Tenés ${parts.join(", ")} — ${fmtMoney(sum.total)}</span></button>`;
-  if(state.cobrosBannerOpen){
-    h += `<div class="formcard" style="margin-top:-8px">` +
-      Object.keys(sum.byStudent).map(sid=>{
-        const s = state.students.find(x=>x.id===sid); if(!s) return "";
-        const items = sum.byStudent[sid];
-        const subtotal = items.reduce((a,i)=>a+i.monto,0);
-        return `<div class="log" style="align-items:flex-start;flex-wrap:wrap">
-          <div class="body">
-            <div style="font-weight:600">${esc(s.name)}${s.subject?` <span class="hint">· ${esc(s.subject)}</span>`:""}</div>
-            ${items.map(i=>vCobroItemRow(s,i)).join("")}
-          </div>
-          <div style="text-align:right;flex-shrink:0">
-            <div style="font-weight:600;font-family:var(--mono)">${fmtMoney(subtotal)}</div>
-            ${hasPhone(s)?`<a class="wa-quick" style="margin-top:4px" title="WhatsApp: recordatorio de pago" target="_blank" rel="noopener" href="${waLink(s,waMsgCobro(s))}">${ICON_CHAT}</a>`:""}
-            ${hasPhone(s)?mensajesPropiasFor().map(p=>`<a class="wa-quick" style="margin-top:4px" title="WhatsApp: ${esc(p.nombre||"")}" target="_blank" rel="noopener" href="${waLink(s,waMsgPropia(s,p))}">${ICON_CHAT}</a>`).join(""):""}
-          </div>
-        </div>`;
-      }).join("") + `</div>`;
-  }
-  return h;
+  const ordenados = [...sum.items].sort((a,b)=>a.date.localeCompare(b.date));
+  return `<div class="hoy-cobros-scroll">${ordenados.map(vCobroPendienteRow).join("")}</div>`;
 }
 
 function vCobroItemRow(s,i){

@@ -132,7 +132,7 @@ let state = { students:[], catalog:defaultCatalog(), ownerUid:null, editSubjectI
               sessionManualEntry:false, sessionPrefillOcurrenciaDate:null,
               agendaViewMode:"semana", agendaMonthOffset:0, agendaSelectedDay:null, agendaQuickAddOpen:false,
               agendaGridQuick:null, agendaDispEdit:false,
-              puntualCancelAskId:null, cobrosBannerOpen:false, registrarClaseTipo:null,
+              puntualCancelAskId:null, registrarClaseTipo:null,
               portal:null, portalLoaded:false, portalError:"",
               portalSaving:false, portalSaveMsg:"", portalCopyMsg:"",
               portalGrupoBusy:null, portalGrupoError:"", portalGrupoCopyMsg:"",

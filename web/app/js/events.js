@@ -1747,7 +1747,6 @@ document.addEventListener("click", (e)=>{
     }
     return;
   }
-  else if(a==="cobros-toggle"){ state.cobrosBannerOpen = !state.cobrosBannerOpen; }
   else if(a==="cobro-marcar-clase"){
     const sid=el.dataset.sid, st=state.students.find(x=>x.id===sid); if(!st) return;
     const sessionEl = st.sessions.find(x=>x.id===el.dataset.id); if(!sessionEl) return;

@@ -650,6 +650,11 @@
   .hoy-row-click:hover{color:var(--accent-dark)}
   .hoy-total{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--ink)}
   .hoy-card-action{margin-top:auto;padding-top:10px;border-top:1px solid var(--soft)}
+  /* "Para cobrar" (paso 198): límite de alto propio con scroll — con muchos pendientes, no
+     empuja el resto del tablero para abajo; ~15% menos que lo que ocupaban antes 4-5 filas sin
+     tope, así que con varias entradas queda contenido para desplazar dentro de la tarjeta. */
+  .hoy-cobros-scroll{max-height:150px;overflow-y:auto}
+  .hoy-cobros-scroll .hoy-row{padding:6px 0}
 
   /* ============ búsqueda global (paso 72): botón en el nav + overlay con resultados
      agrupados; navitem-search separado del resto de appnav-list para que quede siempre
