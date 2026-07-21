@@ -249,6 +249,10 @@ function vHoyProximo(){
     if(manana.length){
       body += `<div class="hoy-subhead">Mañana</div>` + manana.map(e=>vHoyRow(e,"mañana")).join("");
     }
+    // paso 199: mismo límite de alto con scroll que "Para cobrar" — "Mañana" no tiene tope propio
+    // (puede ser un día con muchas clases) y sin esto estiraba TODA la fila del grid (ver comentario
+    // de .hoy-scroll en styles.css).
+    body = `<div class="hoy-scroll">${body}</div>`;
   }
   return hoyCard("Próximo", total, body, {a:"nav-agenda", label:"Ver agenda"});
 }
@@ -360,18 +364,7 @@ function vCobrosBanner(){
   const sum = cobrosAtrasadosSummary(rec.diasAtraso);
   if(sum.count===0) return "";
   const ordenados = [...sum.items].sort((a,b)=>a.date.localeCompare(b.date));
-  return `<div class="hoy-cobros-scroll">${ordenados.map(vCobroPendienteRow).join("")}</div>`;
-}
-
-function vCobroItemRow(s,i){
-  if(i.kind==="clase") return `<div class="note">${esc(fmtDate(i.date))} · ${fmtMoney(i.monto)}
-    <button class="chip" style="margin-left:6px" data-a="cobro-marcar-clase" data-sid="${s.id}" data-id="${i.sessionId}">✓ Marcar cobrada</button></div>`;
-  // paso 197: mismo check rápido que Pagos → Resumen (pagos-check-pendiente) en vez de mandar a
-  // "Ver en Pagos" a registrar el pago a mano.
-  if(i.kind==="mensual") return `<div class="note">Mensualidad de ${esc(monthLabel(currentMonthKey()))} · ${fmtMoney(i.monto)} pendiente
-    <button class="chip" style="margin-left:6px" data-a="pagos-check-pendiente" data-id="${s.id}" data-mk="${currentMonthKey()}">✓ Marcar pagada</button></div>`;
-  return `<div class="note">Seña de la clase del ${esc(fmtDate(i.date))} · ${fmtMoney(i.monto)}
-    <button class="chip" style="margin-left:6px" data-a="toggle-senia-estado" data-sid="${s.id}" data-id="${i.puntualId}">✓ Marcar cobrada</button></div>`;
+  return `<div class="hoy-scroll">${ordenados.map(vCobroPendienteRow).join("")}</div>`;
 }
 
 // Festejo transitorio al marcar "Aprobó" (paso 162) — mismo patrón que vGoalClosure/goalCelebrate,
