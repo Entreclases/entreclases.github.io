@@ -132,9 +132,12 @@ function vCatalog(){
     <button class="chip" data-a="cat-add-career" style="margin-bottom:2px">+ Agregar carrera</button></div>
   <div class="hint" style="margin-top:6px">Quitar una carrera no afecta a los alumnos que ya la tienen (conservan el texto en su ficha) ni desvincula del todo lo demás — sólo sale de las materias que la tenían enlazada. Vinculá materias con carreras desde el editor de cada materia, más abajo.</div></div>`;
   if(c.subjects.filter(m=>m.id!=="materia-ejemplo").length===0){
+    // Sin botón propio a propósito (paso 204, fix): el formulario real de "+ Agregar materia"
+    // ya está a la vista un poco más abajo — un segundo botón con el mismo texto pero sin
+    // data-a confundía al que hacía el tour guiado (parecía el mismo botón resaltado).
     h += emptyState(ICON_BOOK, "Armá tu primera materia",
-      "Una materia con sus unidades es lo que arma solo la grilla de temas de cada alumno que la curse.",
-      `<button class="btn btn-primary" onclick="document.getElementById('new-subject').focus()">+ Agregar materia</button>`, "catalog");
+      "Una materia con sus unidades es lo que arma solo la grilla de temas de cada alumno que la curse — escribí el nombre acá abajo.",
+      "", "catalog");
   }
   h += `<div class="formcard"><div class="ftitle">Materias y sus unidades</div>`;
   const groupBy = state.catMateriasGroupBy||"todas";
