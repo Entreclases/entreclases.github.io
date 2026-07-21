@@ -22,12 +22,12 @@ const TOUR_STEPS = [
   {id:"bienvenida", title:"¡Bienvenido a Entreclases!",
     text:"Te mostramos lo esencial en unos pasos cortos, haciendo cada cosa sobre la marcha. Podés omitir cuando quieras."},
   {id:"alumno", title:"Registrá tu primer estudiante",
-    text:"Cargá el nombre y la tarifa habitual — el resto de la ficha lo completás después.",
+    text:"Cargá el nombre y, un poco más abajo, la tarifa y el modo de cobro (por clase/hora/mensual) — la vas a necesitar en el paso de cobro.",
     navView:"tablero", target:"[data-a=\"new\"]",
     wait:()=>alive().some(s=>!s.sample)},
   {id:"materia", title:"Armá tu primera materia",
     text:"Escribí un nombre en el cuadro y tocá «+ Agregar materia» (o Enter) — después sumale un par de unidades.",
-    navView:"catalog", target:"[data-a=\"cat-add-subject\"]",
+    navView:"catalog", target:["#new-subject","[data-a=\"cat-add-subject\"]"],
     wait:()=>state.catalog.subjects.some(m=>m.id!=="materia-ejemplo")},
   {id:"agenda", title:"Agendá una clase",
     text:"Elegí un día en el calendario, tocá «Programar clase acá» y guardá.",
@@ -74,7 +74,11 @@ function enterTourStep(idx){
   if(step.group) state.cuentaOpenGroupId=step.group;
   if(step.agendaMonth) state.agendaViewMode="mes";
   if(step.selectRealStudent){
-    const st=alive().find(s=>!s.sample);
+    // El más reciente (por updatedAt), no el primero del array (paso 204, fix): si ya había
+    // alumnos reales de pruebas anteriores del tour, ".find()" caía siempre en el más viejo —
+    // acá importa el que se acaba de crear/tocar AHORA, en esta pasada.
+    const reales=alive().filter(s=>!s.sample);
+    const st=[...reales].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
     if(st) state.selId=st.id;
   }
   if(step.loadPortal){ state.portalLoaded=false; state.portalError=""; loadPortal(); }
@@ -158,8 +162,20 @@ function renderTourOverlay(){
   if(!step){ tourFinish(); return; }
   if(step.wait && step.wait()){ tourAdvance(); return; }
 
-  const targetEl = step.target ? document.querySelector(step.target) : null;
-  const rect = targetEl ? targetEl.getBoundingClientRect() : null;
+  // step.target puede ser un selector (un solo elemento) o un array de selectores — en ese
+  // caso el hueco es la UNIÓN de todos los que existan ahora (paso 204, fix): el paso
+  // "materia" necesita el input Y el botón resaltados juntos, si no el input queda tapado
+  // por el mask y no se puede escribir nada ahí (el bug reportado).
+  const targetSelectors = Array.isArray(step.target) ? step.target : (step.target ? [step.target] : []);
+  const rects = targetSelectors.map(sel=>{
+    const el = document.querySelector(sel);
+    return el ? el.getBoundingClientRect() : null;
+  }).filter(r=>r && r.width>0 && r.height>0);
+  const rect = rects.length ? rects.reduce((u,r)=>({
+    left:Math.min(u.left,r.left), top:Math.min(u.top,r.top),
+    right:Math.max(u.right,r.right), bottom:Math.max(u.bottom,r.bottom),
+  }), {left:rects[0].left, top:rects[0].top, right:rects[0].right, bottom:rects[0].bottom}) : null;
+  if(rect){ rect.width=rect.right-rect.left; rect.height=rect.bottom-rect.top; }
   const vw=window.innerWidth, vh=window.innerHeight;
   const reduced = (typeof prefersReducedMotion==="function") && prefersReducedMotion();
 
