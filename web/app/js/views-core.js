@@ -139,8 +139,11 @@ function docenteMiniHtml(){
 function navShell(isAdmin){
   const items = isAdmin ? [...NAV_ITEMS,{view:"panel",action:"nav-panel",label:"Panel",icon:ICON_SHIELD}] : NAV_ITEMS;
   const isOn = (it) => state.view===it.view || (it.altViews||[]).includes(state.view);
-  const badgeFor = (it) => it.view==="panel" && state.reportesPendingCount
-    ? `<span class="navbadge">${state.reportesPendingCount>99?"99+":state.reportesPendingCount}</span>` : "";
+  const badgeFor = (it) => {
+    if(it.view!=="panel") return "";
+    const total = (state.reportesPendingCount||0) + (state.usersPendingCount||0);
+    return total ? `<span class="navbadge">${total>99?"99+":total}</span>` : "";
+  };
   const itemsHtml = items.map(it=>
     `<button class="navitem ${isOn(it)?"on":""}" data-a="${it.action}">${it.icon}<span class="navitem-label">${esc(it.label)}</span>${badgeFor(it)}</button>`
   ).join("");

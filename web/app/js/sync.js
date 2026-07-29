@@ -179,6 +179,7 @@ async function maybeHeartbeat(uid_, s){
     }catch(e){ /* silencioso */ }
   }
   refreshReportesBadge();
+  refreshUsersPendingBadge();
   refreshSolicitudesClase();
 }
 
@@ -435,6 +436,7 @@ async function loadUsuarios(){
     if(!r.ok) throw new Error("error "+r.status);
     state.users=await r.json();
     state.usersLoaded=true; state.usersError="";
+    state.usersPendingCount = state.users.filter(x=>x.estado==="pendiente").length;
   }catch(e){
     state.usersError = !navigator.onLine ? "Sin conexión a internet." : "No se pudieron cargar los usuarios.";
   }
@@ -478,6 +480,7 @@ async function setUsuarioEstado(id, estado){
     state.usersEstadoError = !navigator.onLine ? "Sin conexión a internet." : (e.message||"No se pudo actualizar la cuenta.");
   }
   render();
+  refreshUsersPendingBadge();
 }
 // Listado crudo de una "carpeta" del bucket materiales (mismo endpoint que loadMateriales,
 // generalizado a cualquier prefijo). Entradas sin "id" son subcarpetas, no archivos.
@@ -664,6 +667,20 @@ async function refreshReportesBadge(){
     if(!r.ok) return;
     const total = Number((r.headers.get("content-range")||"").split("/")[1])||0;
     state.reportesPendingCount = total;
+    render();
+  }catch(e){ /* silencioso, se reintenta en el próximo heartbeat */ }
+}
+// Mismo patrón que refreshReportesBadge() pero para cuentas nuevas esperando aprobación
+// (perfiles.estado="pendiente", paso 213) — antes sólo se veían entrando al Panel.
+async function refreshUsersPendingBadge(){
+  if(!sesIsAdmin(getSes())) return;
+  try{
+    const s=await ensureToken();
+    const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, Prefer:"count=exact"};
+    const r=await fetch(SUPA_URL+"/rest/v1/perfiles?select=id&estado=eq.pendiente&limit=1",{headers:h});
+    if(!r.ok) return;
+    const total = Number((r.headers.get("content-range")||"").split("/")[1])||0;
+    state.usersPendingCount = total;
     render();
   }catch(e){ /* silencioso, se reintenta en el próximo heartbeat */ }
 }
