@@ -24,6 +24,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
+- Paso 218 (Scripts con defer): los `<script>` de `index.html` (16), `portal.html` y `aprobar.html` suman `defer` — dejan de bloquear el parseo del HTML mientras se descargan y ejecutan, sin cambiar el orden de ejecución (`defer` preserva el orden de documento, igual que antes). `CACHE` sube a `cuaderno-v204` en `sw.js` porque `index.html` está en el precache y cambió de contenido.
 - Paso 217 (Recorte de respaldos): `MAX_BACKUPS` (`config.js`) baja de 15 a 10 — sigue siendo más de una semana y media de respaldos diarios, de sobra para restaurar por un desastre reciente. `trimBackups()` (`sync.js`) ya recorta contra el valor de la constante en cada snapshot diario exitoso (no sólo para cuentas nuevas), así que las cuentas existentes con más de 10 respaldos se recortan solas en su próximo sync. Sin migración.
 
 ## [2.6.2] - 2026-07-29
