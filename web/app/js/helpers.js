@@ -341,12 +341,16 @@ function normalizeCareers(raw){
 // Además de normalizar el formato, recupera cualquier texto de carrera que ya esté cargado en
 // s.career de algún alumno y todavía no exista en el catálogo (comparando sin mayúsculas/espacios
 // de más, como normName()) — así ningún cuaderno viejo pierde una carrera sólo porque nunca se
-// había agregado a la lista, sólo escrita a mano en una ficha.
+// había agregado a la lista, sólo escrita a mano en una ficha. Excepción: nombres en
+// catalog.careersDeleted (tombstone de carreras borradas a propósito desde Materias → Carreras)
+// no se recrean — el alumno conserva su texto libre igual, sólo no vuelve al catálogo compartido.
 function normalizeCatalogCareers(catalog, students){
   catalog.careers = normalizeCareers(catalog.careers);
+  const deleted=new Set(catalog.careersDeleted||[]);
   (students||[]).forEach(s=>{
     const name=(s.career||"").trim(); if(!name) return;
     const n=normName(name);
+    if(deleted.has(n)) return;
     if(!catalog.careers.some(c=>normName(c.nombre)===n)) catalog.careers.push({id:uid(), nombre:name});
   });
   return catalog;

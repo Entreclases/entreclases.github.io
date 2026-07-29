@@ -634,8 +634,14 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="cat-del-career"){
     const id=el.dataset.id;
-    state.catalog.careers=state.catalog.careers.filter(c=>c.id!==id);
+    const c=careerById(id);
+    state.catalog.careers=state.catalog.careers.filter(x=>x.id!==id);
     state.catalog.subjects.forEach(m=>{ if(m.careerIds) m.careerIds=m.careerIds.filter(x=>x!==id); });
+    if(c){
+      if(!state.catalog.careersDeleted) state.catalog.careersDeleted=[];
+      const n=normName(c.nombre);
+      if(!state.catalog.careersDeleted.includes(n)) state.catalog.careersDeleted.push(n);
+    }
     if(state.editCareerId===id) state.editCareerId=null;
     touchCatalog(); return;
   }
