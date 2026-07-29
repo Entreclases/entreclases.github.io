@@ -103,6 +103,13 @@ async function syncNow(force){
     if(rd.catalog && Array.isArray(rd.catalog.subjects) &&
        (rd.catalog.updatedAt||0) > (state.catalog.updatedAt||0))
       catalog=rd.catalog;
+    // careersDeleted (paso 214/219) es un tombstone, no un dato de "última edición gana" como el
+    // resto del catálogo: si un dispositivo offline borra una carrera mientras otro sincroniza
+    // primero un cambio no relacionado con updatedAt más nuevo, el catalog completo de ESE otro
+    // dispositivo gana arriba y el tombstone de la carrera borrada desaparecería, resucitándola en
+    // el próximo normalizeCatalogCareers(). Se unen ambas listas sin importar cuál catalog ganó.
+    const careersDeletedUnion=[...new Set([...(state.catalog.careersDeleted||[]), ...((rd.catalog&&rd.catalog.careersDeleted)||[])])];
+    if(careersDeletedUnion.length) catalog.careersDeleted=careersDeletedUnion;
     if(!Array.isArray(catalog.packs)) catalog.packs=[];
     if(!Array.isArray(catalog.trash)) catalog.trash=[];
     normalizeCatalogUnits(catalog); // el catálogo remoto puede venir de un dispositivo con un cuaderno viejo (units como strings)
