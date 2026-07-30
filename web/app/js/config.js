@@ -379,6 +379,7 @@ function defaultCatalog(){
     docente: defaultDocente(),
     reciboSeq: {},
     tourStep:null, tourDismissed:false, // paso 204: progreso del tour guiado, ver tour.js
+    tombstones:{}, // paso 222: ids borrados de packs/gruposClase/interesados/packsCatalogo/mensajesPropios, ver tombstoneAdd() en helpers.js
     updatedAt:0 };
 }
 const TAREA_META = {hecha:{label:"hecha",fg:"var(--tarea-hecha-fg)"},intentada:{label:"intentada",fg:"var(--tarea-intentada-fg)"},no:{label:"no hecha",fg:"var(--tarea-no-fg)"}};

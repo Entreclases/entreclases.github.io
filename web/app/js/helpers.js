@@ -501,6 +501,23 @@ function careerChip(career, on){
   return `<button class="chip ${on?"on":""}" data-a="cat-toggle-career" data-id="${esc(career.id)}">${esc(career.nombre)}</button>`;
 }
 function touchCatalog(){ state.catalog.updatedAt=Date.now(); save(); render(); }
+// Tombstones unificados (paso 222): ids borrados a propósito de colecciones del catálogo sin
+// papelera propia (packs, gruposClase, interesados, packsCatalogo, mensajesPropios) — evitan que
+// mergeCatalog() (sync.js) resucite un ítem borrado en ESTE dispositivo cuando el otro lado
+// todavía lo tiene (nunca sincronizó el borrado). subjects usa su propia papelera (catalog.trash,
+// paso 76) y careers su propio tombstone por nombre normalizado (careersDeleted, paso 214/219) —
+// ninguno de los dos necesita este mecanismo aparte. Llamar SIEMPRE junto con el filter() que saca
+// el ítem de su colección, antes de touchCatalog(); si la acción tiene undo, el callback de
+// deshacer llama a tombstoneRemove() para que el ítem pueda volver a existir.
+function tombstoneAdd(collection, id){
+  const t = state.catalog.tombstones || (state.catalog.tombstones={});
+  const arr = t[collection] || (t[collection]=[]);
+  if(!arr.includes(id)) arr.push(id);
+}
+function tombstoneRemove(collection, id){
+  const t = state.catalog.tombstones; if(!t || !Array.isArray(t[collection])) return;
+  t[collection]=t[collection].filter(x=>x!==id);
+}
 // Feedback breve y no intrusivo tras una acción (ver .toast-wrap en styles.css) — se apila en
 // state.toasts y se autodescarta solo pasado TOAST_MS (TOAST_UNDO_MS si tiene botón "Deshacer",
 // para dar más tiempo a reaccionar), sin bloquear ni pedir click. Patrón único de borrado (paso
@@ -1295,6 +1312,7 @@ function convertirInteresado(id){
   st.name = it.nombre; st.phone = it.contacto||""; st.subject = it.materia||""; st.notes = it.nota||"";
   state.students = [...state.students, st];
   state.catalog.interesados = interesadosFor().filter(x=>x.id!==id);
+  tombstoneAdd("interesados", id);
   touchCatalog();
   return {error:null, student:st};
 }
@@ -2179,6 +2197,7 @@ function actualizarMiembrosGrupoClase(grupoId, studentIds){
 // como quedaron, historial intacto).
 function borrarGrupoClase(grupoId){
   state.catalog.gruposClase = gruposClaseAll().filter(g=>g.id!==grupoId);
+  tombstoneAdd("gruposClase", grupoId);
   delHorarioGrupal(grupoId);
   delPuntualClaseGrupal(grupoId);
   touchCatalog();

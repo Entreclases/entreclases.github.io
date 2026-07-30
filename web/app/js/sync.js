@@ -8,6 +8,92 @@ function mergeStudents(local,remote){
   });
   return [...m.values()];
 }
+// Merge del catálogo por colección (paso 222) — antes el catálogo entero se reemplazaba por el
+// que ganara una sola comparación de updatedAt (mergeStudents, arriba, siempre unió alumno por
+// alumno; el catálogo en cambio se jugaba entero a ese único campo, así que el lado perdedor podía
+// perder materias/tags/packs/etc. que el ganador nunca llegó a ver). Ahora cada colección con id
+// propio se une por id, ítem por ítem, y sólo se pisa un ítem cuando el MISMO id existe en los dos
+// lados (conflicto real) — ahí, sin updatedAt por ítem, gana la versión del lado cuyo catálogo
+// entero es más nuevo (localWins), igual criterio que antes pero acotado a ESE id. Un id que sólo
+// tiene un lado (el otro nunca lo vio, o SÍ lo vio pero decidió borrarlo) nunca se pierde por las
+// buenas: mergeConIdYBaja() (de abajo) trata "está borrado" como un estado más del ítem — no como
+// una lista aparte que sólo crece — así que un borrado real se respeta (el otro lado nunca lo tuvo
+// vivo después de enterarse del borrado) pero una restauración post-borrado (ej. sacar una materia
+// de la papelera) también se respeta si es la versión más nueva, en vez de quedar pisoteada para
+// siempre por un tombstone que ya no correspondía. Los campos escalares (cancelPolicy,
+// recordatorios, costos, docente, cobrosDocente, reciboSeq, disponibilidad, tourStep/tourDismissed,
+// racha, escalaObjetivo, tarifaDefault, examRecordatorios, semanasCompletas, mensajes…) siguen con
+// el criterio viejo tal cual: como `catalog` arranca como copia completa del lado ganador, esos
+// campos ya quedan resueltos sin tocarlos acá — sólo se pisan después las colecciones con id.
+// Unión simple por id (mergeById): "careers" tiene su propio tombstone preexistente por nombre
+// normalizado (careersDeleted, ver más abajo, sin cambios) en vez del genérico de acá; "tags" no
+// tiene ninguna operación de borrado todavía (sólo agregar o desvincular de un alumno puntual).
+const ID_COLLECTIONS = ["careers","tags"];
+// Colecciones con borrado real, mergeadas con mergeConIdYBaja(): "vivo" vs "borrado" es un estado
+// más del ítem (no una lista aparte que sólo crece), así que tanto un borrado real como una
+// restauración posterior se respetan según cuál lado es más nuevo.
+const TOMBSTONE_COLLECTIONS = ["packs","gruposClase","interesados","packsCatalogo","mensajesPropios"];
+function mergeById(localArr, remoteArr, localWins){
+  const lm=new Map((localArr||[]).map(x=>[x.id,x]));
+  const rm=new Map((remoteArr||[]).map(x=>[x.id,x]));
+  const out=[];
+  new Set([...lm.keys(), ...rm.keys()]).forEach(id=>{
+    if(lm.has(id) && rm.has(id)) out.push(localWins ? lm.get(id) : rm.get(id));
+    else out.push(lm.has(id) ? lm.get(id) : rm.get(id));
+  });
+  return out;
+}
+// Merge genérico para una colección donde un ítem puede estar "vivo" (en el Map `lm`/`rm`, id→ítem)
+// o "borrado" (su id en el Set `ld`/`rd`) de cada lado. Si SÓLO un lado conoce el id (el otro nunca
+// lo tuvo, ni vivo ni borrado), se usa el estado de ese lado tal cual. Si LOS DOS lados conocen el
+// id — coincidan o no en si está vivo o borrado — gana el estado del lado más nuevo (localWins):
+// esto es lo que permite que un borrado real se sostenga (el otro lado lo tenía vivo pero ESTE ya
+// lo sabía borrado y es más nuevo) y también que una restauración posterior no quede pisoteada por
+// un tombstone viejo del otro lado (mismo id conocido en los dos, pero el más nuevo ya no lo tiene
+// borrado). Recibe Maps/Sets ya armados (no arrays) porque la clave de "vivo" no siempre es el
+// mismo campo que la clave de "borrado" — ver el merge de catalog.trash más abajo, indexado por
+// subject.id en vez de por un id propio de la entrada.
+function mergeConIdYBaja(lm, ld, rm, rd, localWins){
+  const ids=new Set([...lm.keys(), ...rm.keys(), ...ld, ...rd]);
+  const out=[];
+  ids.forEach(id=>{
+    const lKnown=lm.has(id)||ld.has(id), rKnown=rm.has(id)||rd.has(id);
+    const useLocal = (lKnown && rKnown) ? localWins : lKnown;
+    if(useLocal ? lm.has(id) : rm.has(id)) out.push(useLocal ? lm.get(id) : rm.get(id));
+  });
+  return out;
+}
+const byId = arr => new Map((arr||[]).map(x=>[x.id,x]));
+function mergeCatalog(local, remote){
+  local = local || defaultCatalog();
+  const hasRemote = remote && Array.isArray(remote.subjects);
+  const r = hasRemote ? remote : {}; // nada remoto todavía (cuenta nueva del otro lado): se mergea contra vacío, la unión da el local tal cual
+  const localWins = (local.updatedAt||0) >= (r.updatedAt||0);
+  const catalog = {...(localWins ? local : r)};
+  ID_COLLECTIONS.forEach(key=>{ catalog[key]=mergeById(local[key], r[key], localWins); });
+  // subjects/trash: la papelera (paso 76) ES el tombstone de una materia — "vivo" es estar en
+  // catalog.subjects, "borrado" es tener una entrada en catalog.trash con ese subject.id.
+  const localTrashByStudent=new Map((local.trash||[]).map(t=>[t.subject&&t.subject.id, t]));
+  const remoteTrashByStudent=new Map((r.trash||[]).map(t=>[t.subject&&t.subject.id, t]));
+  catalog.subjects = mergeConIdYBaja(byId(local.subjects), new Set(localTrashByStudent.keys()),
+                                      byId(r.subjects), new Set(remoteTrashByStudent.keys()), localWins);
+  catalog.trash = mergeConIdYBaja(localTrashByStudent, new Set((local.subjects||[]).map(s=>s.id)),
+                                   remoteTrashByStudent, new Set((r.subjects||[]).map(s=>s.id)), localWins);
+  // tombstones unificados (paso 222): packs/gruposClase/interesados/packsCatalogo/mensajesPropios
+  const tombstones={};
+  TOMBSTONE_COLLECTIONS.forEach(key=>{
+    const localDead=(local.tombstones||{})[key]||[], remoteDead=(r.tombstones||{})[key]||[];
+    catalog[key] = mergeConIdYBaja(byId(local[key]), new Set(localDead), byId(r[key]), new Set(remoteDead), localWins);
+    tombstones[key]=[...new Set([...localDead, ...remoteDead])].filter(id=>!catalog[key].some(x=>x.id===id));
+  });
+  catalog.tombstones=tombstones;
+  // careersDeleted (paso 214/219): mismo criterio, aplicado por nombre normalizado en vez de id —
+  // ya preexistente (no cambia), se mantiene igual.
+  catalog.careersDeleted=[...new Set([...(local.careersDeleted||[]), ...(r.careersDeleted||[])])];
+  const deletedNames=new Set(catalog.careersDeleted);
+  catalog.careers=catalog.careers.filter(c=>!deletedNames.has(normName(c.nombre||"")));
+  return catalog;
+}
 // Serialización estable (arrays de estudiantes ordenados por id, objetos con claves ordenadas)
 // para comparar contenido sin que un orden distinto dispare una escritura innecesaria.
 function stableStringify(v){
@@ -99,17 +185,7 @@ async function syncNow(force){
     const rd=(row&&row.data)?row.data:{};
     const remote=Array.isArray(rd.students)?rd.students:[];
     const merged=mergeStudents(state.students,remote);
-    let catalog=state.catalog;
-    if(rd.catalog && Array.isArray(rd.catalog.subjects) &&
-       (rd.catalog.updatedAt||0) > (state.catalog.updatedAt||0))
-      catalog=rd.catalog;
-    // careersDeleted (paso 214/219) es un tombstone, no un dato de "última edición gana" como el
-    // resto del catálogo: si un dispositivo offline borra una carrera mientras otro sincroniza
-    // primero un cambio no relacionado con updatedAt más nuevo, el catalog completo de ESE otro
-    // dispositivo gana arriba y el tombstone de la carrera borrada desaparecería, resucitándola en
-    // el próximo normalizeCatalogCareers(). Se unen ambas listas sin importar cuál catalog ganó.
-    const careersDeletedUnion=[...new Set([...(state.catalog.careersDeleted||[]), ...((rd.catalog&&rd.catalog.careersDeleted)||[])])];
-    if(careersDeletedUnion.length) catalog.careersDeleted=careersDeletedUnion;
+    const catalog=mergeCatalog(state.catalog, rd.catalog); // merge por colección, ver mergeCatalog() más arriba (paso 222)
     if(!Array.isArray(catalog.packs)) catalog.packs=[];
     if(!Array.isArray(catalog.trash)) catalog.trash=[];
     normalizeCatalogUnits(catalog); // el catálogo remoto puede venir de un dispositivo con un cuaderno viejo (units como strings)

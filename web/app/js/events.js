@@ -780,9 +780,11 @@ document.addEventListener("click", (e)=>{
     state.catConfirmDelId=null;
     const removed=(state.catalog.packs||[]).find(p=>p.id===el.dataset.id); if(!removed) return;
     state.catalog.packs=(state.catalog.packs||[]).filter(p=>p.id!==el.dataset.id);
+    tombstoneAdd("packs", removed.id);
     touchCatalog();
     toast("Pack eliminado", "ok", ()=>{
       state.catalog.packs=[...(state.catalog.packs||[]), removed];
+      tombstoneRemove("packs", removed.id);
       touchCatalog();
       toast("Pack restaurado");
     }); return;
@@ -1609,9 +1611,12 @@ document.addEventListener("click", (e)=>{
     const id=el.dataset.id;
     const removed=interesadosFor().find(x=>x.id===id);
     state.catalog.interesados=interesadosFor().filter(x=>x.id!==id);
+    tombstoneAdd("interesados", id);
     touchCatalog();
     toast("Interesado eliminado", "ok", ()=>{
-      state.catalog.interesados=[...interesadosFor(), removed]; touchCatalog();
+      state.catalog.interesados=[...interesadosFor(), removed];
+      tombstoneRemove("interesados", id);
+      touchCatalog();
     });
     return;
   }
@@ -1904,6 +1909,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="propia-del-confirm"){
     const id=el.dataset.id;
     state.catalog.mensajesPropios=mensajesPropiasFor().filter(p=>p.id!==id);
+    tombstoneAdd("mensajesPropios", id);
     state.propiaDelConfirmId=null;
     if(state.mensajeAbierto==="propia:"+id) state.mensajeAbierto=null;
     touchCatalog(); toast("Plantilla borrada"); return;
@@ -1925,6 +1931,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="pack-cat-del-confirm"){
     const id=el.dataset.id;
     state.catalog.packsCatalogo=packsCatalogoFor().filter(p=>p.id!==id);
+    tombstoneAdd("packsCatalogo", id);
     state.packCatalogoDelConfirmId=null;
     if(state.mensajeAbierto==="pack:"+id) state.mensajeAbierto=null;
     if(state.packClasesCatalogId===id) state.packClasesCatalogId="";
