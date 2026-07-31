@@ -1061,6 +1061,59 @@ function shouldSuggestFinCuatrimestre(){
   return true;
 }
 
+/* ============ Reactivación de temporada (paso 236) ============
+   Contracara del cierre de cuatrimestre de arriba: en vez de a quién despedir, a quién volver a
+   buscar. Candidato = alumno con clases en el período anterior (mismo corte de 4 meses que
+   "Resumen del período", paso 163: recentMonthKeys(4) vs. recentMonthKeys(8).slice(4,8)) y
+   ninguna en el actual — sin filtrar por status a propósito: entran tanto los que quedaron
+   "dejo"/"pausado" como un "activo" que en rigor no dio ni una clase este período. "Cuánto
+   valía" es sólo una heurística de orden (clases históricas dictadas × tarifa vigente, nunca un
+   monto cobrado real) para escribirle primero a quien más representaba. reactivacionMarcados()
+   vive en localStorage (namespaced, nunca en el JSON del cuaderno): marcar "ya le escribí" o "no
+   vuelve" vacía la lista sin tocar s.status ni sincronizar nada — es un dismiss de UI, no una
+   decisión sobre el alumno. */
+function periodoActualYAnterior(){
+  return { curKeys: recentMonthKeys(4), prevKeys: recentMonthKeys(8).slice(4,8) };
+}
+function reactivacionMarcados(){
+  try{ const k=nsKey(REACTIVACION_MARCADOS_KEY); return (k && JSON.parse(localStorage.getItem(k)||"{}"))||{}; }
+  catch(e){ return {}; }
+}
+function marcarReactivacion(id, accion){
+  const k=nsKey(REACTIVACION_MARCADOS_KEY); if(!k) return;
+  const m=reactivacionMarcados(); m[id]={accion, at:Date.now()};
+  try{ localStorage.setItem(k, JSON.stringify(m)); }catch(e){}
+}
+function desmarcarReactivacion(id){
+  const k=nsKey(REACTIVACION_MARCADOS_KEY); if(!k) return;
+  const m=reactivacionMarcados(); delete m[id];
+  try{ localStorage.setItem(k, JSON.stringify(m)); }catch(e){}
+}
+function reactivacionCandidatos(){
+  const {curKeys, prevKeys} = periodoActualYAnterior();
+  const marcados = reactivacionMarcados();
+  return alive().filter(s=>{
+    if(marcados[s.id]) return false;
+    const sesiones = s.sessions||[];
+    const tuvoPrev = sesiones.some(c=>!isAusente(c) && prevKeys.includes(monthKeyOf(c.date)));
+    if(!tuvoPrev) return false;
+    const tieneActual = sesiones.some(c=>!isAusente(c) && curKeys.includes(monthKeyOf(c.date)));
+    return !tieneActual;
+  }).map(s=>{
+    const clasesHistoricas = (s.sessions||[]).filter(c=>!isAusente(c)).length;
+    return { s, valor: clasesHistoricas*(Number(s.tarifa)||0) };
+  }).sort((a,b)=>b.valor-a.valor || a.s.name.localeCompare(b.s.name));
+}
+function dismissReactivacion(){ const k=nsKey(REACTIVACION_DISMISS_KEY); if(k) localStorage.setItem(k, String(Date.now())); }
+function shouldSuggestReactivacion(){
+  if(!finCuatrimestreTemporada()) return false;
+  if(reactivacionCandidatos().length===0) return false;
+  const k=nsKey(REACTIVACION_DISMISS_KEY);
+  const dismissedAt = parseInt((k&&localStorage.getItem(k))||"0",10);
+  if(dismissedAt && (Date.now()-dismissedAt)/86400000 < REACTIVACION_SNOOZE_DAYS) return false;
+  return true;
+}
+
 /* ============ banner de bienvenida post-registro (paso 147) ============
    Arranca al crear la cuenta (ver auth-signup en events.js) y se muestra en el tablero durante
    FEEDBACK_BANNER_DAYS — nunca en modo demo, que no pasa por auth-signup. Se apaga sola pasado

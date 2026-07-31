@@ -36,6 +36,14 @@ const BACKUP_REMINDER_SNOOZE_DAYS = 7; // cada cuánto reaparece el aviso si se 
 const FIN_CUATRIMESTRE_DISMISS_KEY = "tutoria-fin-cuatrimestre-dismissed-at"; // namespaceada por uid (paso 194)
 const FIN_CUATRIMESTRE_SNOOZE_DAYS = 14;
 const FIN_CUATRIMESTRE_DIAS_SIN_CLASE = 30; // umbral por defecto ("30/60 días" del paso 163)
+// Reactivación de temporada (paso 236): contracara del cierre de cuatrimestre — misma temporada
+// (finCuatrimestreTemporada() en helpers.js), mismo patrón de descartar/reaparecer que el aviso
+// de respaldo/cierre. REACTIVACION_MARCADOS_KEY guarda, por alumno, si ya se le escribió o se
+// decidió que no vuelve — un dismiss local (localStorage, no viaja al cuaderno sincronizado ni
+// toca s.status) para que la lista se vacíe sin marcar nada permanente en los datos del alumno.
+const REACTIVACION_DISMISS_KEY = "tutoria-reactivacion-dismissed-at"; // namespaceada por uid
+const REACTIVACION_SNOOZE_DAYS = 14;
+const REACTIVACION_MARCADOS_KEY = "tutoria-reactivacion-marcados"; // namespaceada por uid
 const LOGIN_ATTEMPTS_KEY = "tutoria-login-attempts"; // {count, lockUntil} — freno local a intentos de login seguidos, aparte del rate-limit propio de Supabase
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCK_MS = 5*60*1000;
@@ -539,6 +547,8 @@ const MENSAJES_META = [
     default:"¡Felicitaciones {alumno}! 🎉 Aprobaste{materia}{nota}. ¡Muy bien merecido, seguimos así!" },
   { key:"despedida", label:"Despedida de fin de cuatrimestre (paso 163)", vars:"{alumno}, {mail}",
     default:"¡Éxitos con la cursada, {alumno}! Fue un gusto acompañarte. Cualquier cosa, acá estoy." },
+  { key:"reactivacion", label:"Volver a empezar (paso 236)", vars:"{alumno}, {materia}, {mail}",
+    default:"¡Hola {alumno}! Empezó el cuatrimestre y me acordé de vos — ¿arrancamos de nuevo con {materia}?" },
 ];
 function defaultMensajes(){ const o={}; MENSAJES_META.forEach(m=>{ o[m.key]=m.default; }); return o; }
 // Grupos acordeón de Cuenta → Mensajes (paso 175): sólo agrupan visualmente las MENSAJES_META de
@@ -549,7 +559,7 @@ const MENSAJES_GRUPOS = [
   { id:"clases", label:"Clases y recordatorios", keys:["proximaClase","recordatorioClase","tarea","examen"] },
   { id:"llaves", label:"Llaves y portal", keys:["compartirLlave","compartirLlaveGrupal"] },
   { id:"celebraciones", label:"Celebraciones", keys:["cumpleanos","felicitarAprobo","despedida"] },
-  { id:"otros", label:"Otros", keys:["packAgotado"] },
+  { id:"otros", label:"Otros", keys:["packAgotado","reactivacion"] },
 ];
 // Plantillas propias (paso 175, state.catalog.mensajesPropios): además de las MENSAJES_META fijas
 // de arriba, el docente puede crear las suyas con nombre + texto libre (mismas variables genéricas

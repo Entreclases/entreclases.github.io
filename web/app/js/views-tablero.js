@@ -53,6 +53,61 @@ function vBackupReminder(){
   </div>`;
 }
 
+// Reactivación de temporada (paso 236): contracara del cierre de cuatrimestre — arranca sola en
+// la misma temporada (finCuatrimestreTemporada(), helpers.js) cuando hay algún alumno con clases
+// el período anterior y ninguna en el actual. "Descartar" la posterga REACTIVACION_SNOOZE_DAYS,
+// mismo criterio que el resto de los avisos de temporada.
+function vReactivacionBanner(){
+  if(!shouldSuggestReactivacion()) return "";
+  const n = reactivacionCandidatos().length;
+  return `<div class="formcard" style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap">
+    <div style="font-size:13px;color:var(--muted)">Arrancó el cuatrimestre — ${n} alumno${n===1?"":"s"} que no volvió todavía. Buen momento para escribirle, uno por uno.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+      <button class="chip" data-a="reactivacion-open">Volver a empezar</button>
+      <button class="del" style="font-size:20px" data-a="dismiss-reactivacion" title="Descartar" aria-label="Descartar">×</button>
+    </div>
+  </div>`;
+}
+
+// Fila de un candidato a reactivar: valor histórico (heurística de orden, no un cobro real),
+// cómo terminó la relación, si quedó deuda y el último resultado de examen que rindió — todo lo
+// que hace falta para decidir si vale la pena escribirle antes de mandar el mensaje.
+function vReactivacionRow(c){
+  const s = c.s;
+  const clasesHistoricas = (s.sessions||[]).filter(x=>!isAusente(x)).length;
+  const deuda = pendienteTotalFor(s);
+  const ultimoExamen = (s.examResults||[]).slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
+  return `<div class="log">
+    <div class="body"><b>${esc(s.name)}</b>
+      <div class="note">${esc(s.subject||"materia s/d")} · ${clasesHistoricas} clase${clasesHistoricas===1?"":"s"} dada${clasesHistoricas===1?"":"s"} en total${c.valor>0?` · valía ~${fmtMoney(c.valor)}`:""}</div>
+      <div class="note">Cómo quedó: <b style="color:${STATUS_META[s.status].fg}">${esc(STATUS_META[s.status].label)}</b>
+        ${deuda>0?` · <span style="color:var(--red)">debe ${fmtMoney(deuda)}</span>`:" · sin deuda"}
+        ${ultimoExamen?` · último examen: ${esc(EXAM_RESULT_META[ultimoExamen.result].label)}${ultimoExamen.grade?` (${esc(ultimoExamen.grade)})`:""}`:""}</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${hasPhone(s)?`<a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgReactivacion(s))}">Escribirle</a>`:""}
+      <button class="chip" data-a="reactivacion-escribi" data-id="${s.id}">Ya le escribí</button>
+      <button class="chip" data-a="reactivacion-no-vuelve" data-id="${s.id}">No vuelve</button>
+    </div>
+  </div>`;
+}
+
+function vReactivacionOverlay(){
+  if(!state.reactivacionOpen) return "";
+  const candidatos = reactivacionCandidatos();
+  let h = `<div class="overlay no-print" data-a="reactivacion-close">
+    <div class="modal" data-a="fincuatri-modal-noop" style="max-width:560px;max-height:85vh;overflow:auto">
+      <div class="ftitle" style="font-size:16px">Volver a empezar</div>
+      <div class="hint" style="margin-bottom:10px">Alumnos que tuvieron clases el período anterior y todavía ninguna este cuatrimestre, ordenados por cuánto valían. Escribile uno por uno — nunca un mensaje masivo.</div>`;
+  h += candidatos.length===0
+    ? `<div class="empty">Nadie pendiente por ahora.</div>`
+    : candidatos.map(vReactivacionRow).join("");
+  h += `<div style="margin-top:14px;text-align:right"><button class="chip" data-a="reactivacion-close">Cerrar</button></div>
+    </div>
+  </div>`;
+  return h;
+}
+
 // Cumpleaños de hoy/mañana (paso 115) — fecha de nacimiento opcional (s.birthDate, ficha →
 // Resumen); sólo compara mes-día (isBirthday en helpers.js), el año no importa. Arriba del todo
 // del tablero, con saludo pre-armado por WhatsApp si tiene teléfono cargado.
@@ -304,6 +359,7 @@ function vTablero(){
   h += vTourResumeBanner();
   h += vFeedbackBanner();
   h += vBackupReminder();
+  h += vReactivacionBanner();
   h += vCumpleanosBanner();
   h += vTuDia();
   h += vSolicitudesClaseCard();

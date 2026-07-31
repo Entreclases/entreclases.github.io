@@ -697,6 +697,11 @@ function waMsgDespedida(s){
   return mensajeTexto("despedida", {alumno:studentFirstName(s), mail:s.email||""});
 }
 
+// Volver a empezar (paso 236) — ver "reactivacion-open" en events.js.
+function waMsgReactivacion(s){
+  return mensajeTexto("reactivacion", {alumno:studentFirstName(s), materia:s.subject||"la materia", mail:s.email||""});
+}
+
 // Aviso de pack de clases agotado (paso 158, alerta "pack" de studentAlerts en helpers.js) — usa
 // el último pack vendido (ya en 0) para completar {clases} con la cantidad que tenía, aunque para
 // entonces ya no cuente como "activo".
@@ -1204,6 +1209,7 @@ function render(){
   if(state.agendaSolicitudOpen) m += vAgendaSolicitudOverlay();
   if(state.grupalForm) m += vGrupalForm();
   if(state.finCuatrimestreOpen) m += vFinCuatrimestreOverlay();
+  if(state.reactivacionOpen) m += vReactivacionOverlay();
   if(state.tutOpen) m += vTutPanel();
   if(state.importCsv) m += vImportCsvOverlay();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;

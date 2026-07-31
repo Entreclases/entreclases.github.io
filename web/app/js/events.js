@@ -2260,6 +2260,19 @@ document.addEventListener("click", (e)=>{
   }
   else if(a==="dismiss-backup-reminder"){ dismissBackupReminder(); }
   else if(a==="dismiss-fin-cuatrimestre"){ dismissFinCuatrimestre(); }
+  else if(a==="dismiss-reactivacion"){ dismissReactivacion(); }
+  else if(a==="reactivacion-open"){ state.reactivacionOpen=true; }
+  else if(a==="reactivacion-close"){ state.reactivacionOpen=false; }
+  else if(a==="reactivacion-escribi"){
+    const id=el.dataset.id;
+    marcarReactivacion(id,"escribi");
+    toast("Marcado — ya le escribiste", "ok", ()=>desmarcarReactivacion(id));
+  }
+  else if(a==="reactivacion-no-vuelve"){
+    const id=el.dataset.id;
+    marcarReactivacion(id,"no_vuelve");
+    toast("Marcado — no vuelve", "ok", ()=>desmarcarReactivacion(id));
+  }
   else if(a==="fincuatri-open"){
     state.finCuatrimestreOpen=true; state.finCuatrimestreSkipped=[];
     state.finCuatrimestreDays = state.finCuatrimestreDays || FIN_CUATRIMESTRE_DIAS_SIN_CLASE;
