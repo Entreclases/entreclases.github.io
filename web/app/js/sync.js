@@ -1,10 +1,25 @@
 "use strict";
 /* ============ sincronización con Supabase (prioridad offline), merge ============ */
-function mergeStudents(local,remote){
+// localTomb/remoteTomb (paso 226): tombstones de alumnos purgados de la papelera (catalog.
+// tombstones.students, ver load() en helpers.js) — sin esto, un id que un lado ya purgó pero el
+// otro nunca sincronizó volvía a entrar acá con su copia (todavía viva) del otro lado. Se aplican
+// DESPUÉS de la unión de siempre por updatedAt: si el sobreviviente es más viejo o igual que el
+// tombstone, gana el purgado (se lo saca); si es más nuevo, es una restauración real posterior al
+// purge y se respeta.
+function mergeStudents(local,remote,localTomb,remoteTomb){
   const m=new Map();
   [...local,...remote].forEach(s=>{
     const prev=m.get(s.id);
     if(!prev || (s.updatedAt||0)>(prev.updatedAt||0)) m.set(s.id,s);
+  });
+  const tombMap=new Map();
+  [...(localTomb||[]),...(remoteTomb||[])].forEach(t=>{
+    const prev=tombMap.get(t.id);
+    if(!prev || (t.deletedAt||0)>(prev.deletedAt||0)) tombMap.set(t.id,t);
+  });
+  tombMap.forEach((t,id)=>{
+    const s=m.get(id);
+    if(s && (s.updatedAt||0)<=(t.deletedAt||0)) m.delete(id);
   });
   return [...m.values()];
 }
@@ -190,10 +205,24 @@ async function syncNow(force){
     const row=rows[0];
     const rd=(row&&row.data)?row.data:{};
     const remote=Array.isArray(rd.students)?rd.students:[];
-    const merged=mergeStudents(state.students,remote);
+    const localTombStudents=(state.catalog.tombstones||{}).students||[];
+    const remoteTombStudents=(rd.catalog&&rd.catalog.tombstones&&rd.catalog.tombstones.students)||[];
+    const merged=mergeStudents(state.students,remote,localTombStudents,remoteTombStudents);
     const catalog=mergeCatalog(state.catalog, rd.catalog); // merge por colección, ver mergeCatalog() más arriba (paso 222)
     if(!Array.isArray(catalog.packs)) catalog.packs=[];
     if(!Array.isArray(catalog.trash)) catalog.trash=[];
+    // tombstones.students (paso 226): mergeCatalog() sólo arma catalog.tombstones con las
+    // TOMBSTONE_COLLECTIONS (packs/gruposClase/etc.) — students se resuelve acá porque su "vivo"
+    // vive en state.students, no en catalog. Unión de ambos lados quedándose con el deletedAt más
+    // nuevo por id, sacando los ids que sobrevivieron el merge de arriba (restaurados de verdad).
+    const tombStudentsMap=new Map();
+    [...localTombStudents,...remoteTombStudents].forEach(t=>{
+      const prev=tombStudentsMap.get(t.id);
+      if(!prev || (t.deletedAt||0)>(prev.deletedAt||0)) tombStudentsMap.set(t.id,t);
+    });
+    merged.forEach(s=>tombStudentsMap.delete(s.id));
+    if(!catalog.tombstones) catalog.tombstones={};
+    catalog.tombstones.students=[...tombStudentsMap.values()];
     normalizeCatalogUnits(catalog); // el catálogo remoto puede venir de un dispositivo con un cuaderno viejo (units como strings)
     normalizeCatalogCareers(catalog, merged); // idem para careers, ver el comentario en helpers.js
 

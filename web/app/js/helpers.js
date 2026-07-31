@@ -582,10 +582,37 @@ function load(){
   // papelera (paso 76): alumnos y materias borrados quedan restaurables 7 días y se purgan solos
   // pasado ese plazo — students usa el mismo flag "deleted" que antes (ahora con ventana de 7
   // días en vez de 90), catalog.trash guarda materias enteras sacadas de catalog.subjects.
-  state.students = state.students.filter(s => !(s.deleted && (Date.now()-(s.deletedAt||s.updatedAt||0)) > TRASH_DAYS*86400000));
+  // Paso 226: sacar un alumno de state.students sin dejar rastro no alcanza — mergeStudents()
+  // (sync.js) une por id el estado local con el remoto, así que si el otro lado nunca sincronizó
+  // el borrado, su copia (todavía viva) volvía a entrar en la próxima sync. Antes de purgar, cada
+  // id se anota en catalog.tombstones.students (misma estructura unificada del paso 222) con el
+  // updatedAt que tenía al momento del borrado — mergeStudents() lo usa para no resucitarlo salvo
+  // que la copia ganadora sea más nueva que ESE momento (una restauración post-purga real).
+  if(!state.catalog.tombstones) state.catalog.tombstones={};
+  if(!Array.isArray(state.catalog.tombstones.students)) state.catalog.tombstones.students=[];
+  const purgar = state.students.filter(s => s.deleted && (Date.now()-(s.deletedAt||s.updatedAt||0)) > TRASH_DAYS*86400000);
+  if(purgar.length){
+    const tombMap = new Map(state.catalog.tombstones.students.map(t=>[t.id,t]));
+    purgar.forEach(s=>{
+      const prev=tombMap.get(s.id);
+      const deletedAt = s.deletedAt||s.updatedAt||Date.now();
+      if(!prev || deletedAt>prev.deletedAt) tombMap.set(s.id,{id:s.id, deletedAt});
+    });
+    state.catalog.tombstones.students=[...tombMap.values()];
+  }
+  state.students = state.students.filter(s => !purgar.includes(s));
+  // los tombstones también caducan (paso 226): un dispositivo apagado meses no debe revivir nada,
+  // pero tampoco tiene sentido guardar el rastro de un borrado para siempre — ventana bastante
+  // mayor a TRASH_DAYS para que cualquier dispositivo que estuvo offline llegue a enterarse.
+  state.catalog.tombstones.students = state.catalog.tombstones.students.filter(
+    t => (Date.now()-(t.deletedAt||0)) <= TOMBSTONE_STUDENTS_DAYS*86400000
+  );
   state.catalog.trash = state.catalog.trash.filter(t => (Date.now()-(t.deletedAt||0)) <= TRASH_DAYS*86400000);
 }
 const TRASH_DAYS = 7;
+// ventana de vida de un tombstone de alumno purgado (paso 226) — bastante mayor que TRASH_DAYS
+// para que un dispositivo apagado varios meses no traiga de vuelta a un alumno ya purgado.
+const TOMBSTONE_STUDENTS_DAYS = 180;
 // días restantes antes de que la papelera purgue algo sola, a partir de un ts en ms (deletedAt)
 function trashDaysLeft(deletedAt){ return Math.max(0, TRASH_DAYS - Math.floor((Date.now()-(deletedAt||0))/86400000)); }
 function setDirty(v){ const k=nsKey(DIRTY_KEY); if(!k) return; try{ v ? localStorage.setItem(k,"1") : localStorage.removeItem(k); }catch(e){} }
