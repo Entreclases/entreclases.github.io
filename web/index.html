@@ -548,7 +548,7 @@
         </span>
         <h3>App móvil</h3>
         <p>Versión para Android, para tenerla como una app instalada más, sin pasar por el navegador.</p>
-        <span class="badge badge-soon">Próximamente</span>
+        <span class="badge badge-live">● Disponible</span>
         <p style="margin-top:10px"><a href="./instalar.html#android" style="font-size:13px;font-weight:600">Cómo se instala →</a></p>
       </div>
 
@@ -558,7 +558,7 @@
         </span>
         <h3>App de escritorio</h3>
         <p>Versión para Windows, instalable como un programa más de tu compu.</p>
-        <span class="badge badge-soon">Próximamente</span>
+        <span class="badge badge-live">● Disponible</span>
         <p style="margin-top:10px"><a href="./instalar.html#windows" style="font-size:13px;font-weight:600">Cómo se instala →</a></p>
       </div>
     </div>
@@ -605,15 +605,13 @@
 </script>
 <script>
   // Botón "Descargar la app" (paso 230): detección simple por user agent — ofrece el instalador
-  // de Windows o el APK de Android según el visitante, y una tarjeta "Próximamente" sin botón
-  // para el resto (iPhone, Mac, etc). Los instaladores todavía no están publicados (ver
-  // cuaderno-desktop/cuaderno-android, ambos pausados) — mientras DOWNLOAD_URL_* esté vacío, el
-  // botón lleva a la guía de instalación en vez de a un link roto. Completar esas dos constantes
-  // (y el badge "Próximamente" de la sección "Usala donde quieras" más abajo) cuando se publique
-  // cada instalador.
+  // de Windows o el APK de Android según el visitante, y una tarjeta sin botón para el resto
+  // (iPhone, Mac, etc). Instaladores publicados desde el paso 232/233 (release v2.7.3 en este
+  // mismo repo) — DOWNLOAD_URL_* apunta al asset versionado; hay que actualizar el número de
+  // versión acá a mano en cada release nueva (el nombre del asset lo incluye).
   (function(){
-    var DOWNLOAD_URL_WINDOWS = "";
-    var DOWNLOAD_URL_ANDROID = "";
+    var DOWNLOAD_URL_WINDOWS = "https://github.com/Entreclases/entreclases.github.io/releases/download/v2.7.3/CuadernoSeguimiento-Setup-2.7.3.exe";
+    var DOWNLOAD_URL_ANDROID = "https://github.com/Entreclases/entreclases.github.io/releases/download/v2.7.3/CuadernoSeguimiento-2.7.3.apk";
     var el = document.getElementById("download-cta");
     if(!el) return;
     var ua = navigator.userAgent||"";
