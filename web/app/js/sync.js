@@ -148,6 +148,12 @@ async function syncNow(force){
       setStatus("idle"); syncing=false; return;
     }
     state.ownerUid=uid_;
+    // Paso 223: ¿este dispositivo ya sincronizó alguna vez con ESTA cuenta? Se calcula antes de
+    // tocar nada más porque abajo decide dos cosas: si el ciclo de este momento puede subir el
+    // catálogo mergeado (nunca en el primero, si ya hay algo en la nube — ver needsWrite más
+    // abajo) y si corresponde reevaluar tour/racha recién ahora que el catálogo en memoria por fin
+    // refleja la cuenta real (ver el bloque post-escritura).
+    const firstSyncEver = !primerSyncHecho(uid_);
     // Multi-pestaña, misma cuenta (paso 194 bis): antes de mergear, ponerse al día con lo último
     // que haya guardado localStorage — puede ser más fresco que la copia en memoria de ESTA
     // pestaña si otra pestaña guardó algo mientras tanto (ver refreshStateFromLocalStorage()).
@@ -192,8 +198,16 @@ async function syncNow(force){
     normalizeCatalogCareers(catalog, merged); // idem para careers, ver el comentario en helpers.js
 
     let remoteUpdatedAt=row?row.updated_at:null;
-    const needsWrite = dirty || !row || !sameStudents(merged,remote) ||
-      stableStringify(catalog)!==stableStringify(rd.catalog||{});
+    // Paso 223: si este dispositivo nunca sincronizó y YA hay algo en la nube (row existe), el
+    // primer ciclo es sólo de bajada — nunca sube el catálogo/alumnos en memoria, gane o pierda la
+    // comparación de updatedAt del merge de arriba (podría ser sólo el placeholder de load(), o
+    // traer de arrastre algo que se alcanzó a tocar en la ventana entre load() y este momento).
+    // Si en cambio no hay row todavía (cuenta realmente nueva, este es el primer dispositivo que
+    // sincroniza en su vida), sí corresponde escribir como siempre — es la única forma de que la
+    // fila llegue a existir. A partir del segundo ciclo (primerSyncHecho()===true) el criterio
+    // vuelve a ser el de siempre, bidireccional.
+    const needsWrite = !(firstSyncEver && row) && (dirty || !row || !sameStudents(merged,remote) ||
+      stableStringify(catalog)!==stableStringify(rd.catalog||{}));
     if(needsWrite){
       const up=await fetch(SUPA_URL+"/rest/v1/cuaderno?select=updated_at",{method:"POST",
         headers:{...h, Prefer:"resolution=merge-duplicates,return=representation"},
@@ -210,8 +224,18 @@ async function syncNow(force){
     state.lastSync=Date.now();
     setStatus("ok");
     pendingSyncs++;
+    if(firstSyncEver){
+      // Paso 223: recién ahora state.catalog refleja la cuenta real (antes era sólo lo que dejó
+      // load()) — recién acá tiene sentido reevaluar checkTourAutoStart()/checkRachaDiaria(), que
+      // ya se habían llamado desde el render() de arranque pero se autobloquearon (ver el guard
+      // primerSyncHecho() en cada una). Si esta es una cuenta realmente nueva (sin row remota
+      // todavía), primerSyncHecho() ya queda true igual apenas se sube el JSON vacío arriba —
+      // el tour arranca igual, sólo demorado los segundos que tardó este primer ciclo.
+      checkTourAutoStart();
+      checkRachaDiaria();
+    }
     // re-dibujar solo si la nube trajo cambios (para no interrumpir si estás escribiendo)
-    if(JSON.stringify({a:state.students,b:state.catalog})!==before && state.view!=="cuenta" && state.view!=="catalog") render();
+    if((firstSyncEver || JSON.stringify({a:state.students,b:state.catalog})!==before) && state.view!=="cuenta" && state.view!=="catalog") render();
     maybeSnapshotBackup(uid_, s);
     maybeRenewPortalLibrary(uid_, s);
     maybeSyncHuecosPortal(uid_, s);

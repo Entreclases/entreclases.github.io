@@ -587,6 +587,16 @@ const TRASH_DAYS = 7;
 function trashDaysLeft(deletedAt){ return Math.max(0, TRASH_DAYS - Math.floor((Date.now()-(deletedAt||0))/86400000)); }
 function setDirty(v){ const k=nsKey(DIRTY_KEY); if(!k) return; try{ v ? localStorage.setItem(k,"1") : localStorage.removeItem(k); }catch(e){} }
 function isDirty(){ const k=nsKey(DIRTY_KEY); return k ? localStorage.getItem(k)==="1" : false; }
+// Paso 223: ¿este dispositivo ya completó alguna vez un ciclo de syncNow() con la cuenta activa?
+// Antes de eso, state.catalog/students es sólo lo que dejó load() (localStorage vacío en un
+// navegador nuevo, o el defaultCatalog() de config.js) — evaluar cualquier condición del tipo "no
+// hay ningún alumno todavía" contra ESE estado daría un falso "cuenta recién nacida" aunque la
+// cuenta real ya tenga años de datos en la nube (ver checkTourAutoStart() en tour.js y
+// checkRachaDiaria() más abajo, y el guard de syncNow() en sync.js). Reusa LAST_REMOTE_KEY
+// (config.js): sólo se escribe al cerrar con éxito un ciclo de sync (ver syncNow()), nunca antes,
+// y sobrevive al logout (no está en LEGACY_CONTENT_KEYS con remoción, sólo con migración) — así que
+// "existe" es un marcador fiel de "este navegador ya vio la nube de esta cuenta alguna vez".
+function primerSyncHecho(uid_){ const k=nsKey(LAST_REMOTE_KEY, uid_); return !!k && localStorage.getItem(k)!=null; }
 function save(){
   if(IS_DEMO) return; // en modo demo nada se persiste — ni localStorage ni sync (ver IS_DEMO en config.js)
   // Sin dueño conocido no hay dónde guardar contenido de cuaderno (paso 194): nunca escribir a la
@@ -1612,12 +1622,17 @@ function rachaBacklogAyer(){
   if(shouldShowBackupReminder()) n++;
   return n;
 }
-// Chequeo diario de la racha (paso 155) — se llama una vez al arrancar (ver events.js) y se
-// autolimita a una vez por día vía racha.ultimoCheck. Los días sin nada pendiente cuentan como
-// "al día" igual que los días con pendientes resueltos (freeze automático, sin castigo). No corre
-// en modo demo (rachaFor() ya devuelve un valor fijo ahí) ni sin sesión iniciada.
+// Chequeo diario de la racha (paso 155) — se llama una vez al arrancar (ver events.js) y de nuevo
+// al cerrar el primer sync exitoso de este dispositivo (ver syncNow() en sync.js), y se autolimita
+// a una vez por día vía racha.ultimoCheck. Los días sin nada pendiente cuentan como "al día" igual
+// que los días con pendientes resueltos (freeze automático, sin castigo). No corre en modo demo
+// (rachaFor() ya devuelve un valor fijo ahí), sin sesión iniciada, ni ANTES de que este
+// dispositivo haya sincronizado por primera vez con la cuenta activa (paso 223): antes de eso,
+// rachaBacklogAyer() miraría alive()/agendaRangeEvents() contra un cuaderno todavía vacío —
+// reiniciaría a mano la racha real de una cuenta con historial sólo porque este navegador nuevo
+// nunca vio la nube todavía.
 function checkRachaDiaria(){
-  if(IS_DEMO || !getSes()) return;
+  if(IS_DEMO || !getSes() || !primerSyncHecho()) return;
   const r = rachaFor();
   if(r.ultimoCheck===today()) return;
   let {actual,mejor,hitos,historial} = r; hitos = hitos||[]; historial = historial||[];

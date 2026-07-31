@@ -57,9 +57,18 @@ const TOUR_STEPS = [
 // sin sesión demo y con el cuaderno realmente vacío (ver alive() en helpers.js — sample no
 // cuenta). catalog.tourStep!=null cubre tanto "ya la completó" como "la omitió" como "la tiene
 // en curso" — en los tres casos no hay que auto-arrancarla de nuevo.
+// Paso 223: tampoco arranca ANTES de que este dispositivo haya sincronizado por primera vez con
+// la cuenta activa — se llama desde CADA render() (ver views-core.js), incluido el primerísimo al
+// arrancar la app, antes de que syncNow() haya bajado nada. Sin este guard, un navegador nuevo
+// entrando a una cuenta real ya usada en otro lado ve un cuaderno vacío por unos instantes
+// (load() todavía no tiene nada en localStorage) y "alive().some(s=>!s.sample)" da falso — arranca
+// el tour de cero para una cuenta que ya lo tiene terminado o descartado hace rato. Se reevalúa
+// solo al cerrar el primer sync exitoso (ver syncNow() en sync.js) — para una cuenta realmente
+// nueva esto sólo demora el arranque los pocos segundos que tarda ese primer sync.
 function checkTourAutoStart(){
   if(IS_DEMO || state.tourActive) return;
   if(state.catalog.tourStep!=null || state.catalog.tourDismissed) return;
+  if(!primerSyncHecho()) return;
   if(alive().some(s=>!s.sample)) return;
   state.catalog.tourStep=0; state.catalog.updatedAt=Date.now(); save();
   state.tourActive=true;
