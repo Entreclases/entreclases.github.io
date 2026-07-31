@@ -352,10 +352,11 @@ function vTablero(){
 
   if(alive().length===0)
     h += emptyState(ICON_USERS, "Todavía no cargaste a nadie",
-      "Elegí por dónde arrancar: probá la app con un alumno de ejemplo o sumá directamente a los tuyos.",
+      "Elegí por dónde arrancar: probá la app con un alumno de ejemplo, sumá directamente a los tuyos, o traelos de una planilla que ya tengas.",
       `<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" data-a="load-sample">Cargar un alumno de ejemplo</button>
         <button class="btn btn-secondary" data-a="new">Empezar con mis alumnos</button>
+        <button class="btn btn-secondary" data-a="import-csv-open">Importar desde Excel/CSV</button>
       </div>`);
 
   h += `<div class="stitle">Respaldo</div>
@@ -363,6 +364,8 @@ function vTablero(){
       <button class="chip" data-a="export">Descargar copia (.json)</button>
       <label class="chip" style="cursor:pointer">Restaurar desde archivo
         <input type="file" id="importFile" accept="application/json" style="display:none"></label>
+      <button class="chip" data-a="import-csv-open">Importar alumnos (CSV/Excel)</button>
+      ${state.importUndo?`<button class="chip" data-a="import-undo">Deshacer última importación (${state.importUndo.studentIds.length})</button>`:""}
       <span class="hint">Restaurar reemplaza todos los datos actuales por los del archivo.</span></div>`;
   return h;
 }

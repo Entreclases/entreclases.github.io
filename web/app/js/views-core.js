@@ -301,6 +301,89 @@ function vShareOverlayGrupo(m, o){
   ${state.portalGrupoError?`<div class="saveerr" style="margin-top:8px">${esc(state.portalGrupoError)}</div>`:""}`;
 }
 
+/* ============ importar alumnos desde CSV/TSV (paso 235): wizard de tres pasos sobre
+   state.importCsv — subir archivo → mapear columnas → vista previa y confirmar. Toda la lógica
+   (parseo, adivinar mapeo, armar preview, crear todo junto) vive en helpers.js; acá sólo se pinta.
+   Mismo patrón de overlay/modal que vShareOverlay: click afuera cierra, click adentro no propaga. */
+function vImportCsvOverlay(){
+  const ic = state.importCsv; if(!ic) return "";
+  const body = ic.step==="map" ? vImportCsvMap(ic)
+    : ic.step==="preview" ? vImportCsvPreviewStep(ic)
+    : vImportCsvUpload(ic);
+  return `<div class="overlay no-print" data-a="import-csv-close">
+    <div class="modal" data-a="import-modal-noop" style="max-width:720px;max-height:86vh;overflow:auto">
+      <div class="ftitle" style="font-size:16px;margin-bottom:10px">Importar alumnos desde planilla</div>
+      ${body}
+    </div>
+  </div>`;
+}
+
+function vImportCsvUpload(ic){
+  return `<div class="hint" style="margin-bottom:12px">Subí un .csv o .tsv exportado desde Excel, Google Sheets o Drive — primera fila con encabezados, una fila por alumno.</div>
+    ${ic.error?`<div class="saveerr" style="margin-bottom:10px">${esc(ic.error)}</div>`:""}
+    <label class="chip" style="cursor:pointer">Elegir archivo…
+      <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain" style="display:none" onchange="handleImportCsvFile(this)"></label>
+    <div style="margin-top:14px;text-align:right"><button class="chip" data-a="import-csv-close">Cancelar</button></div>`;
+}
+
+const IMPORT_FIELD_LABEL = {name:"Nombre (obligatorio)", subject:"Materia", career:"Carrera", phone:"Teléfono (WhatsApp)", email:"Mail", tarifa:"Tarifa", modalidad:"Modalidad"};
+function vImportCsvMap(ic){
+  const headers = ic.headers;
+  const selects = IMPORT_FIELDS.map(f=>`
+    <div class="field"><div class="flabel">${IMPORT_FIELD_LABEL[f]}</div>
+      <select data-cf="import-map-${f}">
+        <option value="">— no importar —</option>
+        ${headers.map((h,i)=>`<option value="${i}" ${ic.mapping[f]===i?"selected":""}>${esc(h||("Columna "+(i+1)))}</option>`).join("")}
+      </select>
+    </div>`).join("");
+  const rowsHtml = ic.dataRows.slice(0,5).map(r=>
+    `<div class="frow" style="font-size:12px;color:var(--faint);gap:4px">${headers.map((h,i)=>esc((r[i]||"—").slice(0,24))).join(" · ")}</div>`
+  ).join("");
+  return `<div class="hint" style="margin-bottom:10px">${esc(ic.fileName||"")} — ${ic.dataRows.length} fila${ic.dataRows.length===1?"":"s"} de datos. Elegí qué columna de tu archivo corresponde a cada dato:</div>
+    <div class="frow" style="flex-wrap:wrap">${selects}</div>
+    <div class="hint" style="margin:12px 0 4px">Primeras filas de tu archivo, para confirmar que mapeaste bien:</div>
+    <div style="overflow-x:auto;border:1px solid var(--soft);border-radius:8px;padding:8px">
+      <div class="frow" style="font-weight:600;font-size:12px;gap:4px">${headers.map(h=>esc(h||"—")).join(" · ")}</div>
+      ${rowsHtml}
+    </div>
+    ${ic.error?`<div class="saveerr" style="margin-top:10px">${esc(ic.error)}</div>`:""}
+    <div style="margin-top:14px;display:flex;justify-content:space-between">
+      <button class="chip" data-a="import-csv-close">Cancelar</button>
+      <button class="chip on" data-a="import-csv-preview">Ver vista previa</button>
+    </div>`;
+}
+
+function vImportCsvPreviewStep(ic){
+  const p = ic.preview;
+  const crear = p.rows.filter(r=>r.status==="crear");
+  const descartadas = p.rows.filter(r=>r.status!=="crear");
+  const rowLine = r => `<div class="frow" style="font-size:12px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--soft);padding:4px 0;gap:8px">
+    <span>${esc(r.name||("(fila "+(r.idx+2)+")"))}${r.subjectName?" — "+esc(r.subjectName):""}</span>
+    ${r.status==="crear"
+      ? `<span class="pill" style="background:var(--greenbg);color:var(--status-activo-fg)">Se crea</span>`
+      : `<span class="pill" style="background:var(--redbg);color:var(--status-desaprobo-fg)">${esc(r.reason||"Descartada")}</span>`}
+  </div>`;
+  const newSubjectsHtml = p.newSubjects.length ? `<div class="formcard" style="padding:10px 12px;margin-bottom:10px">
+    <div class="ftitle" style="font-size:13px;margin-bottom:6px">Materias nuevas a crear</div>
+    <div class="hint" style="margin-bottom:6px">Tildadas por defecto — destildá la que no quieras crear (el alumno se crea igual, sin esa materia).</div>
+    ${p.newSubjects.map(ns=>`<button class="chip ${ns.checked?"on":""}" data-a="import-toggle-newsubject" data-name="${esc(ns.name)}">${ns.checked?"✓ ":""}${esc(ns.name)}</button>`).join(" ")}
+  </div>` : "";
+  const newCareersHtml = p.newCareers.length ? `<div class="formcard" style="padding:10px 12px;margin-bottom:10px">
+    <div class="ftitle" style="font-size:13px;margin-bottom:6px">Carreras nuevas a crear</div>
+    ${p.newCareers.map(nc=>`<button class="chip ${nc.checked?"on":""}" data-a="import-toggle-newcareer" data-name="${esc(nc.name)}">${nc.checked?"✓ ":""}${esc(nc.name)}</button>`).join(" ")}
+  </div>` : "";
+  return `<div class="hint" style="margin-bottom:10px"><b>${crear.length}</b> alumno${crear.length===1?"":"s"} se van a crear · <b>${descartadas.length}</b> se descarta${descartadas.length===1?"":"n"} (sin nombre o duplicado).</div>
+    ${newCareersHtml}${newSubjectsHtml}
+    <div style="max-height:280px;overflow-y:auto;margin-top:4px">${p.rows.map(rowLine).join("")}</div>
+    <div style="margin-top:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:8px">
+        <button class="chip" data-a="import-csv-close">Cancelar</button>
+        <button class="chip" data-a="import-csv-back-map">← Volver al mapeo</button>
+      </div>
+      <button class="chip on" data-a="import-csv-confirm" ${crear.length===0?"disabled":""}>Importar ${crear.length} alumno${crear.length===1?"":"s"}</button>
+    </div>`;
+}
+
 // Enviar la llave grupal a varios a la vez (paso 140): WhatsApp no deja mandar a varios de una
 // desde la web, así que esto es el máximo asistido posible — un botón de WhatsApp por alumno con
 // mensaje pre-armado (editable acá mismo, misma plantilla que Cuenta → Mensajes) y un "enviado"
@@ -1122,6 +1205,7 @@ function render(){
   if(state.grupalForm) m += vGrupalForm();
   if(state.finCuatrimestreOpen) m += vFinCuatrimestreOverlay();
   if(state.tutOpen) m += vTutPanel();
+  if(state.importCsv) m += vImportCsvOverlay();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;
   const viewKey = state.view;
   const viewChanged = viewKey!==_prevViewKey;

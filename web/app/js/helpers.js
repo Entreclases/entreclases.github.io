@@ -149,7 +149,8 @@ let state = { students:[], catalog:defaultCatalog(), ownerUid:null, editSubjectI
               searchOpen:false, searchQuery:"", searchSel:0,
               helpOpen:null, faqOpenIdx:null, alertMsgFor:null,
               tourActive:false,
-              tutOpen:null, tutSubOpen:{}, tutSpot:null };
+              tutOpen:null, tutSubOpen:{}, tutSpot:null,
+              importCsv:null, importUndo:null };
 
 const subjById = (id) => state.catalog.subjects.find(m=>m.id===id) || null;
 // Color por materia (paso 73): key estable de SUBJECT_COLOR_KEYS. Si la materia ya tiene
@@ -770,6 +771,198 @@ function normName(s){ return (s||"").trim().toLowerCase().normalize("NFD").repla
 function findDuplicateStudent(name, subjectId, excludeId){
   const n = normName(name); if(!n) return null;
   return alive().find(x => x.id!==excludeId && normName(x.name)===n && (x.subjectId||"")===(subjectId||"")) || null;
+}
+
+/* ============ importar alumnos desde CSV/TSV (paso 235) ============
+   Wizard de tres pasos guardado en state.importCsv (transitorio, no viaja en save()/sync — se
+   pierde solo al recargar, que es justo el criterio pedido para "deshacer mientras no se haya
+   cerrado la sesión"): "map" (mapeo de columnas) → "preview" (altas/duplicados/descartes + qué
+   materias/carreras nuevas crear) → confirmación, que recién ahí toca state.students/state.catalog
+   de una sola vez (ver commitImportCsv). state.importUndo guarda los ids creados en la última
+   importación para poder deshacerla (mismo criterio de "vive sólo en memoria"). */
+// Delimitador por conteo en la primera línea (más tabs que comas → TSV, típico de pegar desde
+// Excel/Sheets) y parser con comillas (RFC4180-ish): soporta comas/tabs y saltos de línea DENTRO
+// de un campo entre comillas, y comillas escapadas como "" — necesario porque una planilla real
+// de verdad trae campos con comas adentro (notas, direcciones).
+function parseDelimitedText(text){
+  text = String(text||"").replace(/^﻿/, "");
+  const firstLine = text.split(/\r\n|\r|\n/, 1)[0] || "";
+  const tabs = (firstLine.match(/\t/g)||[]).length;
+  const commas = (firstLine.match(/,/g)||[]).length;
+  const delim = tabs > commas ? "\t" : ",";
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+      continue;
+    }
+    if(c === '"'){ inQuotes = true; }
+    else if(c === delim){ row.push(field.trim()); field = ""; }
+    else if(c === "\n" || c === "\r"){
+      if(c === "\r" && text[i+1] === "\n") i++;
+      row.push(field.trim()); field = "";
+      if(row.some(f=>f!=="")) rows.push(row);
+      row = [];
+    } else field += c;
+  }
+  if(field !== "" || row.length){ row.push(field.trim()); if(row.some(f=>f!=="")) rows.push(row); }
+  return { delim, rows };
+}
+// Campos del alumno que el mapeo puede completar — "name" es el único obligatorio.
+const IMPORT_FIELDS = ["name","subject","career","phone","email","tarifa","modalidad"];
+// Adivina qué columna corresponde a cada campo por el texto del encabezado (normName saca
+// tildes/mayúsculas) — el docente confirma o corrige a mano en el paso de mapeo, nunca se asume
+// sin mostrarle las columnas reales primero.
+function guessImportMapping(headers){
+  const norm = (headers||[]).map(h=>normName(h));
+  const find = (...keys) => { for(const k of keys){ const i=norm.findIndex(h=>h.includes(k)); if(i>=0) return i; } return null; };
+  return {
+    name: find("nombre","alumno","apellido"),
+    subject: find("materia","asignatura","curso"),
+    career: find("carrera"),
+    phone: find("telefono","celular","whatsapp"),
+    email: find("mail","correo"),
+    tarifa: find("tarifa","precio","monto","valor","arancel"),
+    modalidad: find("modalidad"),
+  };
+}
+function normalizeImportModalidad(raw){
+  const n = normName(raw); if(!n) return "";
+  if(n.includes("hora")) return "hora";
+  if(n.includes("mensual")) return "mensual";
+  if(n.includes("clase")) return "clase";
+  return "";
+}
+// Plata en texto libre de planilla ("$ 15.000,50", "15000", "u$s 20") — sin asumir un único
+// formato de miles/decimales: si aparecen los dos separadores, el que está más a la derecha es el
+// decimal (criterio AR/US más común); con uno solo, se asume separador de miles salvo que deje
+// sólo 1-2 dígitos después (ahí es decimal).
+function parseImportMoney(raw){
+  const cleaned = String(raw||"").replace(/[^\d,.\-]/g,"");
+  if(!cleaned) return "";
+  let n;
+  const lastComma = cleaned.lastIndexOf(","), lastDot = cleaned.lastIndexOf(".");
+  if(lastComma>=0 && lastDot>=0){
+    n = lastComma>lastDot ? parseFloat(cleaned.replace(/\./g,"").replace(",",".")) : parseFloat(cleaned.replace(/,/g,""));
+  } else if(lastComma>=0){
+    n = cleaned.length-lastComma<=3 ? parseFloat(cleaned.replace(",",".")) : parseFloat(cleaned.replace(/,/g,""));
+  } else if(lastDot>=0){
+    n = cleaned.length-lastDot<=3 ? parseFloat(cleaned) : parseFloat(cleaned.replace(/\./g,""));
+  } else n = parseFloat(cleaned);
+  return isNaN(n) ? "" : n;
+}
+// Arma la vista previa de la importación: por cada fila de datos resuelve materia/carrera contra
+// el catálogo existente (por nombre normalizado) o las suma a "materias/carreras nuevas" (tildadas
+// por defecto, ver vImportPreview en views-core.js), y descarta sin nombre o duplicado — tanto
+// contra un alumno ya vivo en esa materia (findDuplicateStudent) como contra otra fila anterior de
+// la MISMA planilla (alumno repetido dos veces en el archivo).
+function buildImportPreview(headers, dataRows, mapping){
+  const get = (r, key) => { const i = mapping[key]; return (i==null || i<0 || i>=r.length) ? "" : (r[i]||"").trim(); };
+  const seenInFile = new Set();
+  const newSubjectsMap = new Map(), newCareersMap = new Map();
+  const rows = dataRows.map((r, idx) => {
+    const name = get(r,"name");
+    if(!name) return {idx, name:"", status:"descartada", reason:"Sin nombre"};
+    const subjectName = get(r,"subject"), careerName = get(r,"career");
+    const phone = get(r,"phone"), email = get(r,"email");
+    const tarifa = parseImportMoney(get(r,"tarifa"));
+    const modalidad = normalizeImportModalidad(get(r,"modalidad"));
+    let subjectId = "";
+    if(subjectName){
+      const existing = state.catalog.subjects.find(m=>normName(m.name)===normName(subjectName));
+      if(existing) subjectId = existing.id;
+      else if(!newSubjectsMap.has(normName(subjectName))) newSubjectsMap.set(normName(subjectName), {name:subjectName, checked:true});
+    }
+    if(careerName && !(state.catalog.careers||[]).some(c=>normName(c.nombre)===normName(careerName))
+      && !newCareersMap.has(normName(careerName))) newCareersMap.set(normName(careerName), {name:careerName, checked:true});
+    if(subjectId || !subjectName){
+      const dup = findDuplicateStudent(name, subjectId, null);
+      if(dup) return {idx, name, subjectName, status:"duplicado", reason:`Ya tenés a ${dup.name} en esa materia`};
+    }
+    const dupKey = normName(name)+"|"+(subjectId || ("nueva:"+normName(subjectName||"")));
+    if(seenInFile.has(dupKey)) return {idx, name, subjectName, status:"duplicado", reason:"Repetido en la misma planilla"};
+    seenInFile.add(dupKey);
+    return {idx, name, subjectName, subjectId, careerName, phone, email, tarifa, modalidad, status:"crear"};
+  });
+  return { rows, newSubjects:[...newSubjectsMap.values()], newCareers:[...newCareersMap.values()] };
+}
+// Confirma la importación: crea primero las carreras/materias nuevas que sigan tildadas (si se
+// destildó alguna, esa fila igual crea el alumno pero sin esa materia/carrera puntual — nunca se
+// descarta el alumno entero por eso), después los alumnos, y guarda todo junto con un solo
+// save()/render() (ver touchCatalog) — no hay paso intermedio que deje el cuaderno a medias.
+function commitImportCsv(){
+  const ic = state.importCsv; if(!ic || !ic.preview) return;
+  const createdCareerIds=[], createdSubjectIds=[], createdStudentIds=[];
+  const careerIdByNorm = new Map((state.catalog.careers||[]).map(c=>[normName(c.nombre), c.id]));
+  ic.preview.newCareers.forEach(nc=>{
+    if(!nc.checked || careerIdByNorm.has(normName(nc.name))) return;
+    const c={id:uid(), nombre:nc.name};
+    state.catalog.careers.push(c); careerIdByNorm.set(normName(nc.name), c.id); createdCareerIds.push(c.id);
+  });
+  const subjectIdByNorm = new Map(state.catalog.subjects.map(m=>[normName(m.name), m.id]));
+  ic.preview.newSubjects.forEach(ns=>{
+    if(!ns.checked || subjectIdByNorm.has(normName(ns.name))) return;
+    const m={id:uid(), name:ns.name, units:[], color:nextSubjectColor(), careerIds:[]};
+    state.catalog.subjects.push(m); subjectIdByNorm.set(normName(ns.name), m.id); createdSubjectIds.push(m.id);
+  });
+  ic.preview.rows.filter(r=>r.status==="crear").forEach(r=>{
+    let subjectId = r.subjectId;
+    if(!subjectId && r.subjectName) subjectId = subjectIdByNorm.get(normName(r.subjectName)) || "";
+    const careerOk = !r.careerName || careerIdByNorm.has(normName(r.careerName));
+    const m = subjectId ? subjById(subjectId) : null;
+    const st = emptyStudent();
+    st.name = r.name;
+    st.career = careerOk ? (r.careerName||"") : "";
+    st.subjectId = subjectId||""; st.subject = m?m.name:"";
+    st.topics = m ? Object.fromEntries((m.units||[]).map(u=>[u.nombre,"pendiente"])) : {};
+    st.phone = r.phone||""; st.email = r.email||"";
+    st.tarifa = r.tarifa!==""&&r.tarifa!=null ? String(r.tarifa) : ""; st.modalidad = r.modalidad||"";
+    state.students.push(st); createdStudentIds.push(st.id);
+  });
+  touchCatalog();
+  state.importUndo = {studentIds:createdStudentIds, subjectIds:createdSubjectIds, careerIds:createdCareerIds};
+  state.importCsv = null;
+  const n = createdStudentIds.length;
+  toast(`${n} alumno${n===1?"":"s"} importado${n===1?"":"s"}`);
+}
+// Deshacer (paso 235): sólo disponible en memoria durante esta sesión (state.importUndo no viaja
+// en save()) — saca a los alumnos creados y las materias/carreras que se crearon junto con ellos.
+// No suma tombstone de carrera/materia borrada (cat-del-career sí lo hace): al ser un undo
+// inmediato de algo recién creado en este mismo dispositivo, el caso de que ya haya sincronizado a
+// otro antes de deshacerlo es marginal.
+function undoImportCsv(){
+  const u = state.importUndo; if(!u) return;
+  const sids = new Set(u.studentIds);
+  state.students = state.students.filter(s=>!sids.has(s.id));
+  if(u.subjectIds.length){ const set=new Set(u.subjectIds); state.catalog.subjects = state.catalog.subjects.filter(m=>!set.has(m.id)); }
+  if(u.careerIds.length){ const set=new Set(u.careerIds); state.catalog.careers = state.catalog.careers.filter(c=>!set.has(c.id)); }
+  state.importUndo = null;
+  touchCatalog();
+  toast("Importación deshecha");
+}
+// Wireado desde el <input type=file> del wizard (onchange inline, mismo patrón que
+// durationPresetChanged más arriba) — lee el archivo, arma headers/filas y adivina el mapeo antes
+// de mostrar el paso de mapeo.
+function handleImportCsvFile(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    const {rows} = parseDelimitedText(r.result);
+    if(rows.length<2){
+      state.importCsv = {step:"upload", error:"No se encontraron filas de datos — ¿el archivo tiene encabezado y al menos un alumno?"};
+      render(); return;
+    }
+    const headers = rows[0], dataRows = rows.slice(1);
+    state.importCsv = {step:"map", fileName:f.name, headers, dataRows, mapping:guessImportMapping(headers), error:""};
+    render();
+  };
+  r.onerror = () => { state.importCsv = {step:"upload", error:"No se pudo leer el archivo."}; render(); };
+  r.readAsText(f);
 }
 
 /* ============ alumno de ejemplo (onboarding) ============ */

@@ -1153,6 +1153,27 @@ document.addEventListener("click", (e)=>{
   else if(a==="share-open"){ openShareOverlay(el.dataset.kind, el.dataset.id); return; }
   else if(a==="share-close"){ state.shareOverlay=null; }
   else if(a==="share-modal-noop"){ return; }
+  else if(a==="import-csv-open"){ state.importCsv={step:"upload", error:""}; }
+  else if(a==="import-csv-close"){ state.importCsv=null; }
+  else if(a==="import-modal-noop"){ return; }
+  else if(a==="import-csv-back-map"){ state.importCsv.step="map"; state.importCsv.preview=null; }
+  else if(a==="import-csv-preview"){
+    const ic=state.importCsv; if(!ic) return;
+    if(ic.mapping.name==null){ ic.error="Elegí al menos qué columna es el nombre."; return; }
+    ic.error="";
+    ic.preview=buildImportPreview(ic.headers, ic.dataRows, ic.mapping);
+    ic.step="preview";
+  }
+  else if(a==="import-toggle-newsubject"){
+    const ns=(state.importCsv.preview.newSubjects||[]).find(x=>x.name===el.dataset.name);
+    if(ns) ns.checked=!ns.checked;
+  }
+  else if(a==="import-toggle-newcareer"){
+    const nc=(state.importCsv.preview.newCareers||[]).find(x=>x.name===el.dataset.name);
+    if(nc) nc.checked=!nc.checked;
+  }
+  else if(a==="import-csv-confirm"){ commitImportCsv(); return; }
+  else if(a==="import-undo"){ undoImportCsv(); return; }
   else if(a==="share-copy"){
     const o=state.shareOverlay; if(!o) return;
     const token = o.kind==="alumno" ? tokenForStudent(o.id) : tokenForGrupo(o.id);
@@ -2736,6 +2757,11 @@ function handleFormChange(e){
         if(c) careerInput.value=c.nombre;
       }
     }
+    return;
+  }
+  if(cf && cf.dataset.cf && cf.dataset.cf.startsWith("import-map-") && state.importCsv){
+    const field = cf.dataset.cf.slice("import-map-".length);
+    state.importCsv.mapping[field] = cf.value===""?null:parseInt(cf.value,10);
     return;
   }
   const lf=e.target.closest("[data-lf]");
