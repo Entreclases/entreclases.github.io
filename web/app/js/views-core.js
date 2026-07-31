@@ -1056,6 +1056,15 @@ function render(){
   const ses = getSes();
   const isAdmin = sesIsAdmin(ses);
   let m = "";
+  // Paso 227: el único dato irreemplazable de la app vive entero en una clave de localStorage —
+  // si save() no pudo escribirla (ver saveErr en helpers.js), el aviso no puede ser un detalle
+  // discreto que se pierda scrolleando. Banner sticky, más arriba en el orden que cualquier otro
+  // aviso (z-index más alto que el modo demo/actualización de abajo) y con un botón directo a
+  // bajar la copia (misma acción "export" que "Descargar copia ahora" del Tablero).
+  if(state.saveErr) m += `<div class="saveerr" role="alert">
+    <span><b>No se pudo guardar el último cambio.</b> Descargá una copia de respaldo por las dudas.</span>
+    <button class="chip on" data-a="export">Descargar copia de respaldo</button>
+  </div>`;
   if(IS_DEMO){
     m += `<div class="no-print" style="position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;
       background:var(--bluebg);border:1px solid var(--blueline);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px;color:var(--status-aprobo-fg)">
@@ -1077,7 +1086,6 @@ function render(){
       <button class="chip on" data-a="sw-update-apply" style="margin:0">Actualizar</button>
     </div>`;
   }
-  if(state.saveErr) m += `<div class="saveerr">No se pudo guardar el último cambio. Descargá una copia de respaldo por las dudas.</div>`;
   if(state.view==="tablero") m += vTablero();
   if(state.view==="lista") m += vLista();
   if(state.view==="detalle") m += vDetalle();

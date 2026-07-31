@@ -428,7 +428,13 @@
   }
   .qr-modal svg{width:100%;height:auto;display:block;margin:0 auto}
   .footer{text-align:center;font-size:11px;color:var(--gray2);margin-top:30px;font-family:var(--mono)}
-  .saveerr{background:var(--redbg);color:var(--status-desaprobo-fg);padding:8px 12px;border-radius:8px;font-size:14px;margin-bottom:14px}
+  /* paso 227: sticky y con z-index por encima de los demás avisos (modo demo/actualización, 50)
+     para que nunca pase desapercibido ni quede tapado al scrollear */
+  .saveerr{position:sticky;top:0;z-index:55;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    justify-content:space-between;background:var(--redbg);color:var(--status-desaprobo-fg);
+    padding:10px 14px;border-radius:8px;font-size:14px;font-weight:600;margin-bottom:14px;
+    border:1px solid var(--status-desaprobo-fg)}
+  .saveerr button{flex-shrink:0}
   .hint{font-size:14px;color:var(--faint)}
   .tareatag{font-size:11px;font-family:var(--mono);margin-left:8px}
   .goaltag{color:var(--muted)}

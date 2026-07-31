@@ -109,6 +109,7 @@ let state = { students:[], catalog:defaultCatalog(), ownerUid:null, editSubjectI
               statsSubjectId:null, statsMode:"normal", compareA:null, compareB:null,
               showNew:false, newStudentError:"", newStudentAdvancedOpen:false, newStudentSeniaActiva:false,
               confirmDel:false, catConfirmDelId:null, trashPurgeConfirmKey:null, fichaError:"", saveErr:false,
+              saveSizeBytes:0,
               syncStatus:"idle", syncMsg:"", lastSync:null,
               authMode:"login", authEmail:"", recovery:null,
               pendingConfirmEmail:null, confirmStatus:"idle", confirmError:"",
@@ -608,6 +609,9 @@ function load(){
     t => (Date.now()-(t.deletedAt||0)) <= TOMBSTONE_STUDENTS_DAYS*86400000
   );
   state.catalog.trash = state.catalog.trash.filter(t => (Date.now()-(t.deletedAt||0)) <= TRASH_DAYS*86400000);
+  // paso 227: calculado ya en load() (no sólo en el próximo save()) para que Cuenta → Respaldos
+  // muestre el peso real desde el primer render, sin esperar a que el docente toque algo.
+  if(uid_) try{ state.saveSizeBytes = new Blob([JSON.stringify({owner:uid_, students:state.students, catalog:state.catalog})]).size; }catch(e){}
 }
 const TRASH_DAYS = 7;
 // ventana de vida de un tombstone de alumno purgado (paso 226) — bastante mayor que TRASH_DAYS
@@ -627,6 +631,12 @@ function isDirty(){ const k=nsKey(DIRTY_KEY); return k ? localStorage.getItem(k)
 // y sobrevive al logout (no está en LEGACY_CONTENT_KEYS con remoción, sólo con migración) — así que
 // "existe" es un marcador fiel de "este navegador ya vio la nube de esta cuenta alguna vez".
 function primerSyncHecho(uid_){ const k=nsKey(LAST_REMOTE_KEY, uid_); return !!k && localStorage.getItem(k)!=null; }
+// Cupo típico de localStorage por origen: ~5MB en la mayoría de navegadores (algunos webviews
+// viejos de Android bajan a ~2.5MB) — un solo cuaderno que se acerca reventándolo pierde TODO
+// (students+catalog viven en una única clave, ver save()). Avisamos bastante antes de llegar,
+// para dar margen a limpiar la papelera o exportar/repartir datos, no cuando ya no entra más.
+const SAVE_SIZE_WARN_BYTES = 3*1024*1024; // 3MB, ~60% del cupo más chico esperable
+let _sizeWarnToastShown = false;
 function save(){
   if(IS_DEMO) return; // en modo demo nada se persiste — ni localStorage ni sync (ver IS_DEMO en config.js)
   // Sin dueño conocido no hay dónde guardar contenido de cuaderno (paso 194): nunca escribir a la
@@ -634,7 +644,16 @@ function save(){
   // desde la app ya logueada), pero es la última barrera contra fusionar cuentas.
   const k=nsKey(KEY, state.ownerUid);
   if(!k){ state.saveErr=true; return; }
-  try{ localStorage.setItem(k, JSON.stringify({owner:state.ownerUid, students:state.students, catalog:state.catalog})); state.saveErr=false; }
+  try{
+    const json = JSON.stringify({owner:state.ownerUid, students:state.students, catalog:state.catalog});
+    state.saveSizeBytes = new Blob([json]).size;
+    localStorage.setItem(k, json); state.saveErr=false;
+    if(state.saveSizeBytes>SAVE_SIZE_WARN_BYTES && !_sizeWarnToastShown){
+      _sizeWarnToastShown = true;
+      toast(`El cuaderno ya pesa ${fmtBytes(state.saveSizeBytes)} — se acerca al límite de espacio del navegador. Convendría vaciar la papelera o descargar una copia.`,
+        "error", null, {label:"Ver Respaldos", run:()=>{ state.view="cuenta"; state.cuentaOpenGroupId="datos"; loadBackups(); render(); }}, true);
+    }
+  }
   catch(e){ state.saveErr=true; }
   setDirty(true);
   scheduleSync();

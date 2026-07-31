@@ -600,6 +600,7 @@ function vCuenta(){
     "portal")}
   ${vCuentaGroup("gruposclase","Grupos de clase","Quiénes integran cada clase grupal (intensivos, grupitos de 2-3) — para no re-elegirlos cada vez. Distinto de las llaves grupales de portal, de arriba.", vGruposClaseCard())}
   ${vCuentaGroup("datos","Datos y respaldos","Copias automáticas, retención y la papelera de alumnos/materias borrados.", `
+    ${vEstadoDatosCard()}
     <div class="formcard"><div class="ftitle">Respaldos automáticos</div>
       <div class="hint" style="margin-bottom:10px">Se guarda una copia completa una vez por día, en la primera sincronización. Se conservan las últimas ${MAX_BACKUPS}. Esto no reemplaza la copia manual (.json), que se descarga desde Estudiantes — conviven.</div>
       ${vBackupsList()}
@@ -1054,6 +1055,26 @@ function vRestoreScopeResumen(b, scope){
   if(scope==="catalogo")
     return `Vas a pasar de ${materiasAct} materia${materiasAct===1?"":"s"} a ${b.n_materias||0}, y de ${carrerasAct} carrera${carrerasAct===1?"":"s"} a ${b.n_carreras||0}. Tus alumnos no cambian.`;
   return `Vas a pasar de ${materiasAct} materia${materiasAct===1?"":"s"} a ${b.n_materias||0}, de ${alumnosAct} alumno${alumnosAct===1?"":"s"} a ${b.n_alumnos||0}, y de ${carrerasAct} carrera${carrerasAct===1?"":"s"} a ${b.n_carreras||0}.`;
+}
+// Paso 227: tres datos que hoy sólo se podían inferir mirando toasts/consola — visibles siempre
+// en Cuenta → Respaldos. "Última sincronización exitosa" reusa LAST_REMOTE_KEY (el updated_at de
+// la fila remota que ya vimos, ver sync.js) en vez de state.lastSync porque ESE sí sobrevive a un
+// refresh de página; state.lastSync arranca en null en cada carga hasta la primera sync del rato.
+function vEstadoDatosCard(){
+  const uid_ = sesUid();
+  const lastRemote = uid_ ? localStorage.getItem(nsKey(LAST_REMOTE_KEY, uid_)) : null;
+  const dirty = isDirty();
+  const yaSincronizado = primerSyncHecho(uid_);
+  const sizeBytes = state.saveSizeBytes||0;
+  const sizeWarn = sizeBytes>SAVE_SIZE_WARN_BYTES;
+  return `<div class="formcard"><div class="ftitle">Estado de los datos</div>
+    <div class="hint" style="display:flex;flex-direction:column;gap:4px">
+      <span>Última sincronización exitosa: <b>${lastRemote?esc(fmtDateTime(lastRemote)):"nunca"}</b></span>
+      <span>Cambios locales sin subir todavía: <b style="${dirty?"color:var(--status-desaprobo-fg)":""}">${dirty?"sí":"no"}</b></span>
+      <span>Este dispositivo ya sincronizó alguna vez con esta cuenta: <b>${yaSincronizado?"sí":"no"}</b></span>
+      ${sizeBytes?`<span>Peso del cuaderno: <b style="${sizeWarn?"color:var(--status-desaprobo-fg)":""}">${esc(fmtBytes(sizeBytes))}</b>${sizeWarn?" — se acerca al límite de espacio del navegador, convendría vaciar la papelera o descargar una copia":""}</span>`:""}
+    </div>
+  </div>`;
 }
 function vBackupsList(){
   if(state.backupsError) return `<div class="saveerr">${esc(state.backupsError)}</div>`;
