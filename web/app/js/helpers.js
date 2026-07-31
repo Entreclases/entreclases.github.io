@@ -613,6 +613,23 @@ function load(){
   // muestre el peso real desde el primer render, sin esperar a que el docente toque algo.
   if(uid_) try{ state.saveSizeBytes = new Blob([JSON.stringify({owner:uid_, students:state.students, catalog:state.catalog})]).size; }catch(e){}
 }
+// Paso 229: lee (sin tocar `state` ni marcar nada dirty) el cuaderno guardado del último uid que
+// usó este dispositivo (LAST_UID_KEY, sobrevive al logout a propósito) — lo usa render() cuando
+// no hay sesión válida (venció) Y no hay conexión (no hay forma de loguearse de nuevo), para
+// mostrar algo en vez de cortar seco al login. Misma verificación de dueño que load() (p.owner
+// coincide con uid_): sin esa certeza no se muestra nada (mismo freno del paso 194).
+function loadOfflineReadonlyCuaderno(){
+  try{
+    const uid_ = localStorage.getItem(LAST_UID_KEY);
+    if(!uid_) return null;
+    const raw = localStorage.getItem(nsKey(KEY, uid_));
+    if(!raw) return null;
+    const p = JSON.parse(raw);
+    if(p.owner && p.owner!==uid_) return null;
+    if(!Array.isArray(p.students)) return null;
+    return {students:p.students, catalog:(p.catalog&&Array.isArray(p.catalog.careers))?p.catalog:defaultCatalog()};
+  }catch(e){ return null; }
+}
 const TRASH_DAYS = 7;
 // ventana de vida de un tombstone de alumno purgado (paso 226) — bastante mayor que TRASH_DAYS
 // para que un dispositivo apagado varios meses no traiga de vuelta a un alumno ya purgado.

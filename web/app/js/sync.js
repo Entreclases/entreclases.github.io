@@ -297,7 +297,11 @@ async function syncNow(force){
     else setStatus("error", friendlyAuthError(e));
   }finally{ syncing=false; }
 }
-window.addEventListener("online", ()=>syncNow());
+// Paso 229: si no había sesión válida y se venía mostrando el cuaderno de sólo lectura offline
+// (vOfflineCuaderno, sin esto nunca se enteraba de que volvió la señal), un render() acá lo saca
+// de ese modo y pide el login normal apenas hay con qué intentarlo — no hace nada si ya había
+// sesión (render() sólo redibuja la misma vista de siempre).
+window.addEventListener("online", ()=>{ render(); syncNow(); });
 window.addEventListener("offline", ()=>setStatus("offline"));
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && getSes()) syncNow(); });
 setInterval(()=>{ if(getSes() && !document.hidden) syncNow(); }, 10*60*1000);

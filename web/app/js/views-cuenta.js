@@ -96,6 +96,43 @@ function vCuentaEnRevision(estado){
   </div>`;
 }
 
+// Paso 229: se muestra en vez del login cuando la sesión venció (más de 24hs, ver SES_MAX_AGE_MS
+// en helpers.js) y no hay conexión para volver a entrar — antes de esto, un profe sin señal que
+// no abrió la app en más de un día se quedaba sin poder ver ni su propia agenda. Consulta pura:
+// no hay ni un solo data-a/data-f acá adentro, nada de editar/guardar/sincronizar/portal — sólo
+// lectura de lo que ya había en este dispositivo (loadOfflineReadonlyCuaderno(), helpers.js).
+function vOfflineCuaderno(data){
+  const students = (data.students||[]).filter(s=>!s.deleted);
+  const proximas=[];
+  students.forEach(s=>{
+    proximasClasesFor(s,14,10).forEach(c=>proximas.push({date:c.date, time:c.time, name:s.name, subject:s.subject}));
+  });
+  proximas.sort((a,b)=>(a.date+" "+(a.time||"")).localeCompare(b.date+" "+(b.time||"")));
+  return `<div style="max-width:420px;margin:32px auto;padding:0 14px">
+    <div style="text-align:center;margin-bottom:20px">
+      <div class="logo-mark" style="margin:0 auto 12px">${ICON_CHECK}</div>
+      <div class="eyebrow">Clases particulares</div>
+    </div>
+    <div style="background:var(--bluebg);border:1px solid var(--blueline);border-radius:8px;padding:10px 12px;margin-bottom:18px;font-size:13px;color:var(--status-aprobo-fg)">
+      Sin conexión y con la sesión vencida — estás viendo tu última copia guardada. Volvé a entrar cuando tengas internet para registrar cambios.
+    </div>
+    <div class="formcard">
+      <div class="ftitle" style="margin-bottom:8px">Tus próximas clases</div>
+      ${proximas.length ? proximas.slice(0,15).map(c=>`<div style="border-top:1px solid var(--line);padding:8px 0;font-size:13px">
+        <b>${esc(fmtDate(c.date))}${c.time?" · "+esc(c.time):""}</b> — ${esc(c.name)}${c.subject?" · "+esc(c.subject):""}
+      </div>`).join("") : `<div class="hint">No hay clases agendadas en los próximos 14 días.</div>`}
+    </div>
+    <div class="formcard" style="margin-top:14px">
+      <div class="ftitle" style="margin-bottom:8px">Tus alumnos</div>
+      ${students.length ? students.map(s=>`<div style="border-top:1px solid var(--line);padding:8px 0;font-size:13px">
+        <b>${esc(s.name)}</b>${s.subject?" · "+esc(s.subject):""}
+        ${s.phone?`<div class="hint">${esc(s.phone)}</div>`:""}
+        ${s.email?`<div class="hint">${esc(s.email)}</div>`:""}
+      </div>`).join("") : `<div class="hint">Sin alumnos guardados.</div>`}
+    </div>
+  </div>`;
+}
+
 
 function vConfirmEmail(){
   return `<div style="max-width:360px;margin:64px auto 0">

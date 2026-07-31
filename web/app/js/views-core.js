@@ -1017,6 +1017,16 @@ function render(){
       document.getElementById("app").innerHTML = `<div class="view-fade">${vConfirmEmail()}</div>`;
       return;
     }
+    // Paso 229: sin sesión válida y sin conexión no hay forma de volver a entrar — si este
+    // dispositivo tiene guardado el cuaderno del último uid que lo usó (LAST_UID_KEY, sobrevive
+    // al logout a propósito), se muestra en modo sólo lectura en vez de cortar seco al login.
+    if(!navigator.onLine){
+      const offlineData = loadOfflineReadonlyCuaderno();
+      if(offlineData){
+        document.getElementById("app").innerHTML = `<div class="view-fade">${vOfflineCuaderno(offlineData)}</div>`;
+        return;
+      }
+    }
     document.getElementById("app").innerHTML = `<div class="view-fade">${vAuth()}</div>`;
     const em=document.getElementById("auth-email"); if(em) em.focus();
     return;
