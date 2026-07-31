@@ -337,7 +337,7 @@ document.addEventListener("click", (e)=>{
   if(a==="nav-tablero"){ state.view="tablero"; state.selId=null; }
   else if(a==="nav-lista"){ state.view="lista"; state.selId=null; }
   else if(a==="nav-cuenta"){
-    state.view="cuenta"; state.selId=null; state.confirmRestoreId=null;
+    state.view="cuenta"; state.selId=null; state.confirmRestoreId=null; state.restoreScope=null;
     state.backupsLoaded=false; state.backupsError=""; loadBackups();
     state.portalLoaded=false; state.portalError=""; state.portalCopyMsg=""; loadPortal();
     state.portalGrupoEditing=null; state.portalGrupoDraftAlumnos=[]; state.portalGrupoError="";
@@ -1207,9 +1207,10 @@ document.addEventListener("click", (e)=>{
   else if(a==="dismiss-update-banner"){ state.updateBannerDismissed=true; }
   else if(a==="sw-update-apply"){ applySwUpdate(); return; }
   else if(a==="sw-check-update"){ checkSwUpdateNow(); return; }
-  else if(a==="restore-ask"){ state.confirmRestoreId=el.dataset.id; }
-  else if(a==="restore-cancel"){ state.confirmRestoreId=null; }
-  else if(a==="restore-confirm"){ restoreBackup(el.dataset.id); return; }
+  else if(a==="restore-ask"){ state.confirmRestoreId=el.dataset.id; state.restoreScope=null; }
+  else if(a==="restore-scope"){ state.restoreScope=el.dataset.scope; }
+  else if(a==="restore-cancel"){ state.confirmRestoreId=null; state.restoreScope=null; }
+  else if(a==="restore-confirm"){ restoreBackup(el.dataset.id, state.restoreScope); return; }
   else if(a==="send-report"){
     const msg=(document.getElementById("report-msg").value||"").trim();
     state.reportMsg=msg;

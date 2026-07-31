@@ -120,7 +120,7 @@ let state = { students:[], catalog:defaultCatalog(), ownerUid:null, editSubjectI
               metricasHorarias:[], metricasHorariasLoaded:false, metricasHorariasError:"",
               recursos:null, recursosLoaded:false, recursosError:"",
               backups:[], backupsLoaded:false, backupsError:"",
-              confirmRestoreId:null, restoreStatus:"idle", restoreError:"",
+              confirmRestoreId:null, restoreScope:null, restoreStatus:"idle", restoreError:"",
               materialesSubjectId:null, materialesList:[], materialesLoaded:false, materialesError:"",
               materialesUploading:false, materialesUploadError:"",
               materialesConfirmDelName:null, materialesDeleteStatus:"idle",

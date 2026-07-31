@@ -458,16 +458,17 @@ async function trimBackups(uid_, s){
       {method:"DELETE", headers:h});
   }catch(e){ /* silencioso */ }
 }
-// Freno de mano ante achiques grandes (paso 224): antes de escribir una versión con muchas menos
-// materias/alumnos vivos/carreras/grupos que la que HOY está en la nube, se sube un snapshot de
-// emergencia con esa data de la nube (no la local, que es la sospechosa) — marcado es_emergencia
-// para que trimBackups() nunca lo borre. No devuelve error al caller: si falla, igual se sigue
-// con la escritura (mejor escribir con un aviso que trabar la sincronización entera), pero no se
-// silencia — ver el toast en syncNow().
-async function snapshotEmergencia(uid_, s, cloudData){
+// Snapshot marcado es_emergencia (paso 224): trimBackups() nunca lo recorta, para que un rescate
+// no se pueda perder solo. Dos usos: (a) syncNow() lo sube con la data de la NUBE cuando detecta
+// un achique grande sospechoso, antes de escribir (achiquesSospechosos() más abajo); (b)
+// restoreBackup() lo sube con el estado ACTUAL antes de pisarlo con un respaldo viejo (paso 225)
+// — así restaurar nunca es irreversible. No devuelve error al caller: en (a) igual se sigue
+// escribiendo si falla (mejor escribir con un aviso que trabar la sync), pero nunca en silencio —
+// ver los toasts en syncNow()/vBackupsList().
+async function snapshotEmergencia(uid_, s, data){
   const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
   const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos", {method:"POST", headers:h,
-    body:JSON.stringify([{user_id:uid_, data:{students:cloudData.students||[], catalog:cloudData.catalog||defaultCatalog()}, es_emergencia:true}])});
+    body:JSON.stringify([{user_id:uid_, data:{students:data.students||[], catalog:data.catalog||defaultCatalog()}, es_emergencia:true}])});
   return r.ok;
 }
 // ¿la versión que está por escribirse (merged/catalog) tiene MUCHAS menos materias, alumnos
@@ -499,7 +500,7 @@ async function loadBackups(){
   try{
     const s=await ensureToken();
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
-    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?select=id,created_at,n_alumnos,es_emergencia&order=created_at.desc", {headers:h});
+    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?select=id,created_at,n_alumnos,n_materias,n_carreras,es_emergencia&order=created_at.desc", {headers:h});
     if(!r.ok) throw new Error("error "+r.status);
     state.backups=await r.json();
     state.backupsLoaded=true; state.backupsError="";
@@ -508,9 +509,16 @@ async function loadBackups(){
   }
   render();
 }
-async function restoreBackup(id){
+// Restaurar por partes (paso 225): scope "todo" (comportamiento de siempre), "catalogo" (sólo
+// materias/carreras/etiquetas/grupos del respaldo — deja alumnos, packs, papelera y la config de
+// cuenta tal como están) o "alumnos" (sólo el listado de alumnos del respaldo — deja el catálogo
+// intacto). El respaldo de seguridad del estado ACTUAL, antes de pisarlo, se sube SIEMPRE y
+// completo (no por partes) y marcado es_emergencia para que trimBackups() nunca lo recorte —
+// así restaurar nunca es irreversible, sea cual sea el scope elegido.
+async function restoreBackup(id, scope){
   const entry=(state.backups||[]).find(x=>String(x.id)===String(id));
   if(!entry) return;
+  scope = scope==="catalogo"||scope==="alumnos" ? scope : "todo";
   state.restoreStatus="restoring"; state.restoreError=""; render();
   try{
     const s=await ensureToken();
@@ -522,19 +530,26 @@ async function restoreBackup(id){
     const rows=await dr.json();
     const b=rows[0];
     if(!b || !b.data) throw new Error("respaldo vacío");
-    const hw={...h, "Content-Type":"application/json", Prefer:"return=minimal"};
-    // respaldo extra del estado actual antes de pisarlo
-    const safety=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos", {method:"POST", headers:hw,
-      body:JSON.stringify([{user_id:uid_, data:{students:state.students, catalog:state.catalog}}])});
-    if(!safety.ok) throw new Error("no se pudo guardar el respaldo de seguridad");
+    // respaldo extra del estado actual antes de pisarlo (paso 225: siempre completo, ver comentario arriba)
+    const safetyOk=await snapshotEmergencia(uid_, s, {students:state.students, catalog:state.catalog});
+    if(!safetyOk) throw new Error("no se pudo guardar el respaldo de seguridad");
     await trimBackups(uid_, s);
     // updatedAt fresco: es el campo que decide el merge en syncNow, así el restore
     // gana la próxima sincronización en vez de que el estado remoto (más reciente) lo pise.
     const now=Date.now();
-    state.students=(b.data.students||[]).map(x=>({...x, updatedAt:now}));
-    state.catalog=normalizeCatalogUnits({packs:[], trash:[], ...(b.data.catalog||defaultCatalog()), updatedAt:now});
-    normalizeCatalogCareers(state.catalog, state.students);
-    state.confirmRestoreId=null; state.restoreStatus="idle";
+    if(scope==="alumnos"){
+      state.students=(b.data.students||[]).map(x=>({...x, updatedAt:now}));
+    }else if(scope==="catalogo"){
+      const bc=normalizeCatalogUnits(b.data.catalog||defaultCatalog());
+      state.catalog={...state.catalog, subjects:bc.subjects||[], careers:bc.careers||[],
+        tags:bc.tags||[], gruposClase:bc.gruposClase||[], updatedAt:now};
+      normalizeCatalogCareers(state.catalog, state.students);
+    }else{
+      state.students=(b.data.students||[]).map(x=>({...x, updatedAt:now}));
+      state.catalog=normalizeCatalogUnits({packs:[], trash:[], ...(b.data.catalog||defaultCatalog()), updatedAt:now});
+      normalizeCatalogCareers(state.catalog, state.students);
+    }
+    state.confirmRestoreId=null; state.restoreScope=null; state.restoreStatus="idle";
     save(); syncNow(); render();
     loadBackups();
   }catch(e){

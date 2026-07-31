@@ -1041,24 +1041,51 @@ function vGrupoClaseRow(g){
   return h + `</div>`;
 }
 
+// Restaurar por partes (paso 225): elegir el respaldo ("Restaurar") arranca el selector de
+// alcance (todo/sólo catálogo/sólo alumnos) — recién con un scope elegido se muestra la
+// confirmación final, con los números concretos de lo que se va a pisar (materias/alumnos/
+// carreras actuales vs. los del respaldo), para que nunca sea una decisión a ciegas.
+function vRestoreScopeResumen(b, scope){
+  const materiasAct = (state.catalog.subjects||[]).length;
+  const alumnosAct = alive().length;
+  const carrerasAct = (state.catalog.careers||[]).length;
+  if(scope==="alumnos")
+    return `Vas a pasar de ${alumnosAct} alumno${alumnosAct===1?"":"s"} a ${b.n_alumnos||0}. Tus materias y carreras no cambian.`;
+  if(scope==="catalogo")
+    return `Vas a pasar de ${materiasAct} materia${materiasAct===1?"":"s"} a ${b.n_materias||0}, y de ${carrerasAct} carrera${carrerasAct===1?"":"s"} a ${b.n_carreras||0}. Tus alumnos no cambian.`;
+  return `Vas a pasar de ${materiasAct} materia${materiasAct===1?"":"s"} a ${b.n_materias||0}, de ${alumnosAct} alumno${alumnosAct===1?"":"s"} a ${b.n_alumnos||0}, y de ${carrerasAct} carrera${carrerasAct===1?"":"s"} a ${b.n_carreras||0}.`;
+}
 function vBackupsList(){
   if(state.backupsError) return `<div class="saveerr">${esc(state.backupsError)}</div>`;
   if(!state.backupsLoaded) return skeletonRows(3);
   const list = state.backups||[];
   if(list.length===0) return `<div class="empty">Todavía no hay respaldos guardados. El primero se crea en la próxima sincronización.</div>`;
   let h = list.map(b=>{
-    const n = b.n_alumnos||0;
+    const nAl = b.n_alumnos||0, nMat = b.n_materias||0, nCar = b.n_carreras||0;
     const bid = String(b.id);
     const confirming = state.confirmRestoreId===bid;
+    const scope = confirming ? state.restoreScope : null;
+    let accion;
+    if(!confirming){
+      accion = `<button class="chip" data-a="restore-ask" data-id="${esc(bid)}">Restaurar</button>`;
+    }else if(!scope){
+      accion = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:100%">
+        <span style="font-size:12.5px">¿Qué querés restaurar de este respaldo?</span>
+        <button class="chip" data-a="restore-scope" data-scope="todo" data-id="${esc(bid)}">Todo</button>
+        <button class="chip" data-a="restore-scope" data-scope="catalogo" data-id="${esc(bid)}">Sólo el catálogo</button>
+        <button class="chip" data-a="restore-scope" data-scope="alumnos" data-id="${esc(bid)}">Sólo los alumnos</button>
+        <button class="chip" data-a="restore-cancel">Cancelar</button>
+      </div>`;
+    }else{
+      accion = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:100%">
+        <span style="font-size:12.5px;color:var(--status-desaprobo-fg)">${esc(vRestoreScopeResumen(b, scope))} (antes se guarda una copia extra del estado de ahora). ¿Confirmás?</span>
+        <button class="danger" data-a="restore-confirm" data-id="${esc(bid)}" ${state.restoreStatus==="restoring"?"disabled":""}>Sí, restaurar</button>
+        <button class="chip" data-a="restore-cancel">Cancelar</button>
+      </div>`;
+    }
     return `<div class="log" style="align-items:center;flex-wrap:wrap">
-      <div class="body">${fmtDateTime(b.created_at)}${b.es_emergencia?` <span style="color:var(--status-desaprobo-fg)">· copia de seguridad automática</span>`:""}<div class="note">${n} estudiante${n===1?"":"s"}</div></div>
-      ${!confirming
-        ? `<button class="chip" data-a="restore-ask" data-id="${esc(bid)}">Restaurar</button>`
-        : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:100%">
-            <span style="font-size:12.5px;color:var(--status-desaprobo-fg)">Reemplaza tus datos actuales por los de este respaldo (antes se guarda uno extra del estado de ahora). ¿Confirmás?</span>
-            <button class="danger" data-a="restore-confirm" data-id="${esc(bid)}" ${state.restoreStatus==="restoring"?"disabled":""}>Sí, restaurar</button>
-            <button class="chip" data-a="restore-cancel">Cancelar</button>
-          </div>`}
+      <div class="body">${fmtDateTime(b.created_at)}${b.es_emergencia?` <span style="color:var(--status-desaprobo-fg)">· copia de seguridad automática</span>`:""}<div class="note">${nMat} materia${nMat===1?"":"s"} · ${nAl} estudiante${nAl===1?"":"s"} · ${nCar} carrera${nCar===1?"":"s"}</div></div>
+      ${accion}
     </div>`;
   }).join("");
   if(state.restoreStatus==="error") h += `<div class="saveerr" style="margin-top:8px">${esc(state.restoreError)}</div>`;
