@@ -28,14 +28,17 @@ function friendlyAuthError(err){
     return "La creación de cuentas está deshabilitada por ahora.";
   return "Ocurrió un error. Probá de nuevo en un momento.";
 }
-function storeSession(j,email){
+function storeSession(j,email,rememberOverride){
   const prev=getSes();
   const loginAt = (prev && prev.email===email && prev.loginAt) ? prev.loginAt : Date.now();
   // el rol cacheado sobrevive a un refresh de token de la misma cuenta; si es una cuenta
   // distinta (o nunca se leyó) arranca sin rol hasta que loadRole() lo confirme
   const role = (prev && prev.email===email) ? prev.role : undefined;
+  // "mantener sesión" (paso 228): en un login/signup nuevo manda el tilde del formulario; en un
+  // refresh de token (rememberOverride sin pasar) se mantiene lo que ya tenía la sesión guardada.
+  const remember = rememberOverride!==undefined ? !!rememberOverride : !!(prev && prev.email===email && prev.remember);
   setSes({access:j.access_token,refresh:j.refresh_token,
-          exp:Date.now()+((j.expires_in||3600)-60)*1000,email,loginAt,role});
+          exp:Date.now()+((j.expires_in||3600)-60)*1000,email,loginAt,role,remember});
   rememberEmail(email);
   // Aislamiento por cuenta (paso 194): si el uid que acaba de entrar (login/signup, o el mismo
   // de siempre en un refresh de token) no es el que ya estaba cargado en memoria, hay que
@@ -82,13 +85,13 @@ function isEmailNotConfirmedError(err){
 async function resendConfirmEmail(email){
   await authFetch("/auth/v1/resend",{type:"signup", email});
 }
-async function doLogin(email,pass){
+async function doLogin(email,pass,remember){
   const j=await authFetch("/auth/v1/token?grant_type=password",{email,password:pass});
-  storeSession(j,email);
+  storeSession(j,email,remember);
 }
-async function doSignup(email,pass){
+async function doSignup(email,pass,remember){
   const j=await authFetch("/auth/v1/signup",{email,password:pass});
-  if(j.access_token){ storeSession(j,email); return true; }
+  if(j.access_token){ storeSession(j,email,remember); return true; }
   return false; // el proyecto pide confirmar el correo
 }
 async function ensureToken(){

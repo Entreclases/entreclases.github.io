@@ -894,10 +894,11 @@ document.addEventListener("click", (e)=>{
     if(lockMs>0){ authMsgShow("Demasiados intentos. Probá de nuevo en "+fmtLockRemaining(lockMs)+"."); return; }
     const em=(document.getElementById("auth-email").value||"").trim();
     const pw=document.getElementById("auth-pass").value||"";
+    const remember=!!document.getElementById("auth-remember").checked;
     state.authEmail=em;
     if(!em||!pw){ authMsgShow("Completá correo y contraseña."); return; }
     authMsgShow("Iniciando sesión…",true);
-    doLogin(em,pw).then(()=>loadRole()).then(()=>{ resetLoginAttempts(); flushPendingTermsAccept(em); render(); syncNow(); })
+    doLogin(em,pw,remember).then(()=>loadRole()).then(()=>{ resetLoginAttempts(); flushPendingTermsAccept(em); render(); syncNow(); })
       .catch(err=>{
         if(isEmailNotConfirmedError(err)){
           state.pendingConfirmEmail=em; state.confirmStatus="idle"; state.confirmError=""; render();
@@ -914,12 +915,13 @@ document.addEventListener("click", (e)=>{
     const em=(document.getElementById("auth-email").value||"").trim();
     const pw=document.getElementById("auth-pass").value||"";
     const acceptedTerms=!!document.getElementById("auth-accept-terms").checked;
+    const remember=!!document.getElementById("auth-remember").checked;
     state.authEmail=em;
     if(!em){ authMsgShow("Ingresá tu correo."); return; }
     if(pw.length<6){ authMsgShow("La contraseña tiene que tener al menos 6 caracteres."); return; }
     if(!acceptedTerms){ authMsgShow("Tenés que aceptar los términos y la política de privacidad."); return; }
     authMsgShow("Creando cuenta…",true);
-    doSignup(em,pw).then(ok=>{
+    doSignup(em,pw,remember).then(ok=>{
       if(ok){
         // recién acá hay sesión (uid) para namespacear la clave (paso 194) — antes de storeSession()
         // (dentro de doSignup) startFeedbackBannerWindow() no tendría dueño y no guardaría nada.

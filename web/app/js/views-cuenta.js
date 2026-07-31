@@ -36,6 +36,10 @@ function vAuth(){
           <button type="button" class="auth-pass-toggle" data-a="auth-toggle-pass" aria-label="Mostrar contraseña" tabindex="-1">${ICON_EYE}</button>
         </div>
       </div>
+      <label class="auth-terms-row">
+        <input id="auth-remember" type="checkbox" ${locked?"disabled":""}>
+        <span>Mantener la sesión en este dispositivo. No lo actives en una compu compartida.</span>
+      </label>
       ${isLogin?"":`<label class="auth-terms-row">
         <input id="auth-accept-terms" type="checkbox" ${acceptedTerms?"checked":""} ${locked?"disabled":""}>
         <span>Leí y acepto los <button type="button" class="linklike" data-a="terminos-open">términos y la política de privacidad</button>.</span>

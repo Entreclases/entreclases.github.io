@@ -2574,9 +2574,10 @@ function clusterAgendaOverlaps(list){
 /* ============ sesión: cookies (web) / localStorage (nativo) ============ */
 // Cookies de sesión (solo web): sin Expires/Max-Age quedan como "cookie de sesión" del
 // navegador — sobreviven a cerrar la pestaña pero se borran al cerrar el navegador entero.
-function setCookie(name,value){
+function setCookie(name,value,maxAgeMs){
   const secure = location.protocol==="https:" ? "; Secure" : "";
-  document.cookie = name+"="+encodeURIComponent(value)+"; path=/; SameSite=Lax"+secure;
+  const maxAge = maxAgeMs ? "; Max-Age="+Math.floor(maxAgeMs/1000) : "";
+  document.cookie = name+"="+encodeURIComponent(value)+"; path=/; SameSite=Lax"+maxAge+secure;
 }
 function getCookie(name){
   const m = document.cookie.match(new RegExp("(?:^|; )"+name+"=([^;]*)"));
@@ -2590,6 +2591,10 @@ function delCookie(name){
 // Como eso escapa a lo que la página puede controlar, la propia app invalida la sesión
 // si pasó más de este tiempo desde el login, sin cambiar el resto del comportamiento.
 const SES_MAX_AGE_MS = 24*60*60*1000; // 24hs
+// Paso 228: si el docente tildó "mantener la sesión en este dispositivo" en el login, la cookie
+// se guarda con Max-Age (persiste al cerrar el navegador) y el techo propio de la app se estira
+// acorde — sin el tilde, todo sigue exactamente igual que antes (cookie de sesión, techo de 24hs).
+const SES_MAX_AGE_REMEMBER_MS = 30*24*60*60*1000; // 30 días
 function getSes(){
   try{
     if(IS_NATIVE) return JSON.parse(localStorage.getItem(SES_KEY))||null;
@@ -2601,7 +2606,8 @@ function getSes(){
     }
     if(!raw) return null;
     const ses = JSON.parse(raw);
-    if(ses.loginAt && (Date.now()-ses.loginAt) > SES_MAX_AGE_MS){ delCookie(SES_KEY); return null; }
+    const maxAge = ses.remember ? SES_MAX_AGE_REMEMBER_MS : SES_MAX_AGE_MS;
+    if(ses.loginAt && (Date.now()-ses.loginAt) > maxAge){ delCookie(SES_KEY); return null; }
     return ses;
   }catch(e){ return null; }
 }
@@ -2609,7 +2615,7 @@ function setSes(v){
   if(IS_NATIVE){
     v ? localStorage.setItem(SES_KEY,JSON.stringify(v)) : localStorage.removeItem(SES_KEY);
   }else{
-    v ? setCookie(SES_KEY,JSON.stringify(v)) : delCookie(SES_KEY);
+    v ? setCookie(SES_KEY,JSON.stringify(v), v.remember?SES_MAX_AGE_REMEMBER_MS:undefined) : delCookie(SES_KEY);
   }
 }
 // rol cacheado en la propia sesión (ver storeSession/loadRole) para que ande offline;
