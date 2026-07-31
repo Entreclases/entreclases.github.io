@@ -24,6 +24,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
 ## [Sin publicar]
+
+## [2.7.3] - 2026-07-31
 - Paso 229 (Cuaderno legible offline con sesión vencida): antes, sin conexión y con la sesión vencida (más de 24hs, `SES_MAX_AGE_MS` en `helpers.js`), `render()` (`views-core.js`) cortaba directo a la pantalla de login — un profe sin señal que no había abierto la app en más de un día no podía ver ni su propia agenda. Ahora, en ese caso, si este dispositivo tiene guardado el cuaderno del último uid que lo usó (`LAST_UID_KEY`, sobrevive al logout a propósito), se muestra en modo sólo lectura (`vOfflineCuaderno()`/`loadOfflineReadonlyCuaderno()`) con un banner explicando la situación: próximas clases (14 días) y lista de alumnos con contacto, sin un solo botón de editar/guardar/sincronizar — consulta pura, no toca `state` ni `localStorage`. Al volver la conexión (`window.addEventListener("online")`, `sync.js`) se dispara un `render()` que saca de este modo y pide el login normal.
 - Paso 228 (Mantener la sesión en este dispositivo): checkbox nuevo en el login/creación de cuenta ("Mantener la sesión en este dispositivo. No lo actives en una compu compartida."), apagado por defecto. Con el tilde activo, `storeSession()` (`auth.js`) guarda `remember:true` en la sesión y `setCookie()`/`getSes()` (`helpers.js`) usan una cookie persistente (`Max-Age`) con techo de 30 días (`SES_MAX_AGE_REMEMBER_MS`) en vez de la cookie de sesión de siempre con techo de 24hs; sin el tilde, cero cambios. El flag sobrevive a un refresh de token de la misma cuenta (no hay que re-tildarlo cada 24hs) y "Cerrar sesión" borra la cookie persistente igual que antes.
 
