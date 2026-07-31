@@ -811,7 +811,11 @@ function parseDelimitedText(text){
     } else field += c;
   }
   if(field !== "" || row.length){ row.push(field.trim()); if(row.some(f=>f!=="")) rows.push(row); }
-  return { delim, rows };
+  // Comilla sin cerrar (paso 238): si termina el archivo todavía "adentro" de una comilla, todo lo
+  // que vino después de esa comilla —comas, tabs y saltos de línea incluidos— quedó fusionado en un
+  // solo campo en vez de cortarse en filas. Sin este flag el wizard mostraba una vista previa con
+  // muchas menos filas de las reales, sin ningún aviso de que fue un problema de parseo.
+  return { delim, rows, unclosedQuote: inQuotes };
 }
 // Campos del alumno que el mapeo puede completar — "name" es el único obligatorio.
 const IMPORT_FIELDS = ["name","subject","career","phone","email","tarifa","modalidad"];
@@ -899,10 +903,16 @@ function commitImportCsv(){
   const ic = state.importCsv; if(!ic || !ic.preview) return;
   const createdCareerIds=[], createdSubjectIds=[], createdStudentIds=[];
   const careerIdByNorm = new Map((state.catalog.careers||[]).map(c=>[normName(c.nombre), c.id]));
+  // s.career es texto libre por alumno (paso 167) que se compara por igualdad exacta en el filtro
+  // de Estudiantes (views-alumnos.js) — sin esta canonicalización, "ingenieria" tal cual vino del
+  // CSV quedaba fuera del filtro aunque el catálogo ya tuviera "Ingeniería" (mismo nombre salvo
+  // tildes/mayúsculas, considerado la misma carrera para no duplicarla).
+  const careerNameByNorm = new Map((state.catalog.careers||[]).map(c=>[normName(c.nombre), c.nombre]));
   ic.preview.newCareers.forEach(nc=>{
     if(!nc.checked || careerIdByNorm.has(normName(nc.name))) return;
     const c={id:uid(), nombre:nc.name};
-    state.catalog.careers.push(c); careerIdByNorm.set(normName(nc.name), c.id); createdCareerIds.push(c.id);
+    state.catalog.careers.push(c); careerIdByNorm.set(normName(nc.name), c.id);
+    careerNameByNorm.set(normName(nc.name), c.nombre); createdCareerIds.push(c.id);
   });
   const subjectIdByNorm = new Map(state.catalog.subjects.map(m=>[normName(m.name), m.id]));
   ic.preview.newSubjects.forEach(ns=>{
@@ -917,7 +927,7 @@ function commitImportCsv(){
     const m = subjectId ? subjById(subjectId) : null;
     const st = emptyStudent();
     st.name = r.name;
-    st.career = careerOk ? (r.careerName||"") : "";
+    st.career = careerOk ? (careerNameByNorm.get(normName(r.careerName||"")) || r.careerName || "") : "";
     st.subjectId = subjectId||""; st.subject = m?m.name:"";
     st.topics = m ? Object.fromEntries((m.units||[]).map(u=>[u.nombre,"pendiente"])) : {};
     st.phone = r.phone||""; st.email = r.email||"";
@@ -952,7 +962,14 @@ function handleImportCsvFile(input){
   const f = input.files && input.files[0]; if(!f) return;
   const r = new FileReader();
   r.onload = () => {
-    const {rows} = parseDelimitedText(r.result);
+    const {rows, unclosedQuote} = parseDelimitedText(r.result);
+    // Paso 238: una comilla sin cerrar fusiona todo lo que sigue en un único campo — mostrar la
+    // vista previa igual sería mentirle al docente con menos alumnos de los que su planilla
+    // realmente tiene, sin ninguna señal de que fue un problema de parseo y no del contenido.
+    if(unclosedQuote){
+      state.importCsv = {step:"upload", error:"El archivo tiene una comilla (\") sin cerrar — a partir de ahí se pierden filas. Revisalo (buscá una \" suelta en alguna celda) y volvé a subirlo."};
+      render(); return;
+    }
     if(rows.length<2){
       state.importCsv = {step:"upload", error:"No se encontraron filas de datos — ¿el archivo tiene encabezado y al menos un alumno?"};
       render(); return;
@@ -2008,7 +2025,7 @@ function studentFirstName(s){ return (s.name||"").trim().split(/\s+/)[0] || s.na
    poder mandarse el aviso. */
 function hasAdultoPhone(s){ return !!(s.adultoTelefono && s.adultoTelefono.replace(/\D/g,"").length>=8); }
 function pagoContactFor(s){
-  if(s.avisosPlataAdulto && hasAdultoPhone(s)) return {phone:s.adultoTelefono, email:s.adultoEmail||""};
+  if(s.avisosPlataAdulto && hasAdultoPhone(s)) return {phone:s.adultoTelefono, email:s.adultoEmail||s.email||""};
   return {phone:s.phone||"", email:s.email||""};
 }
 function hasPagoPhone(s){ const p=pagoContactFor(s).phone||""; return p.replace(/\D/g,"").length>=8; }

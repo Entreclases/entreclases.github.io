@@ -337,6 +337,18 @@ function authMsgShow(t,ok){
   if(el){ el.textContent=t; el.style.color = ok ? "var(--green)" : "var(--red)"; }
 }
 
+// Paso 238: captura los checkboxes de auth (recordar sesión / aceptar términos) desde el DOM hacia
+// `state` antes de cualquier acción que dispare un render() de vAuth (cambiar de pestaña login/
+// signup, abrir la modal de términos) — sin esto, ese render() reconstruye el formulario entero y
+// los tildes ya marcados a mano se pierden en silencio (mismo problema que ya resolvía
+// state.authAcceptedTerms para el checkbox de términos, extendido acá al de "recordar sesión").
+function captureAuthCheckboxes(){
+  const rb=document.getElementById("auth-remember");
+  if(rb) state.authRemember=rb.checked;
+  const cb=document.getElementById("auth-accept-terms");
+  if(cb) state.authAcceptedTerms=cb.checked;
+}
+
 /* ============ eventos ============ */
 document.addEventListener("click", (e)=>{
   // Ayuda contextual (paso 74): un click afuera del popover abierto lo cierra, sin esperar
@@ -897,8 +909,8 @@ document.addEventListener("click", (e)=>{
   else if(a==="mat-del-ask"){ state.materialesConfirmDelName=el.dataset.name; }
   else if(a==="mat-del-cancel"){ state.materialesConfirmDelName=null; }
   else if(a==="mat-del-confirm"){ deleteMaterial(el.dataset.id, el.dataset.name); return; }
-  else if(a==="auth-mode-login"){ state.authMode="login"; }
-  else if(a==="auth-mode-signup"){ state.authMode="signup"; }
+  else if(a==="auth-mode-login"){ captureAuthCheckboxes(); state.authMode="login"; }
+  else if(a==="auth-mode-signup"){ captureAuthCheckboxes(); state.authMode="signup"; }
   else if(a==="auth-toggle-pass"){
     // Sin render() a propósito (paso 202): un re-render acá perdería lo que ya se tipeó en
     // #auth-pass, porque su value nunca se ató a `state` (nunca hizo falta antes de este toggle).
@@ -911,10 +923,10 @@ document.addEventListener("click", (e)=>{
     return;
   }
   else if(a==="terminos-open"){
-    // Capturar el checkbox ANTES de abrir (paso 202): abrir la modal hace render() y reconstruye
-    // el formulario entero, así que sin esto se perdería si el usuario ya lo había tildado a mano.
-    const cb=document.getElementById("auth-accept-terms");
-    if(cb) state.authAcceptedTerms=cb.checked;
+    // Capturar los checkboxes ANTES de abrir (paso 202/238): abrir la modal hace render() y
+    // reconstruye el formulario entero, así que sin esto se perderían si el usuario ya los había
+    // tildado a mano.
+    captureAuthCheckboxes();
     state.showTerminosModal=true;
   }
   else if(a==="terminos-close"){ state.showTerminosModal=false; }
@@ -926,6 +938,7 @@ document.addEventListener("click", (e)=>{
     const em=(document.getElementById("auth-email").value||"").trim();
     const pw=document.getElementById("auth-pass").value||"";
     const remember=!!document.getElementById("auth-remember").checked;
+    state.authRemember=remember;
     state.authEmail=em;
     if(!em||!pw){ authMsgShow("Completá correo y contraseña."); return; }
     authMsgShow("Iniciando sesión…",true);
@@ -947,6 +960,7 @@ document.addEventListener("click", (e)=>{
     const pw=document.getElementById("auth-pass").value||"";
     const acceptedTerms=!!document.getElementById("auth-accept-terms").checked;
     const remember=!!document.getElementById("auth-remember").checked;
+    state.authRemember=remember;
     state.authEmail=em;
     if(!em){ authMsgShow("Ingresá tu correo."); return; }
     if(pw.length<6){ authMsgShow("La contraseña tiene que tener al menos 6 caracteres."); return; }

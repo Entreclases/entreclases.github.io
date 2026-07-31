@@ -37,7 +37,7 @@ function vAuth(){
         </div>
       </div>
       <label class="auth-terms-row">
-        <input id="auth-remember" type="checkbox" ${locked?"disabled":""}>
+        <input id="auth-remember" type="checkbox" ${state.authRemember?"checked":""} ${locked?"disabled":""}>
         <span>Mantener la sesión en este dispositivo. No lo actives en una compu compartida.</span>
       </label>
       ${isLogin?"":`<label class="auth-terms-row">
