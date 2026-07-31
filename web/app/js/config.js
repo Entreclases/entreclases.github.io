@@ -267,6 +267,13 @@ const QR_TARGET_BYTES = 150*1024;
 // `npx web-push generate-vapid-keys`; la privada vive sólo como secreto de la Edge Function
 // enviar-push (cuaderno-supabase), nunca en este repo. Ver setNotifClasesDia() en sync.js.
 const VAPID_PUBLIC_KEY = "BGj8qOBjAkuPuXXqILsyhFC8sfSc1eJHCZi9-WcVbHlaM98LGPdPBnKdOZ0shIWjnLzvIvrpo1NlMBrz8ZDxsEE";
+// Push nativo por FCM (paso 231): el cliente (@capacitor/push-notifications, ver setNotifClasesDia
+// en sync.js) ya está armado, pero el envío real necesita un proyecto Firebase (google-services.json
+// en cuaderno-android/android/app/) y un secret nuevo en el Edge Function enviar-push
+// (cuaderno-supabase) — ninguna de las dos cosas existe todavía. Único interruptor: en false, el
+// toggle de notificaciones sigue oculto en apps nativas exactamente como hasta ahora (vNotifClasesCard
+// en views-cuenta.js). Flippear a true recién cuando ambas piezas de infraestructura estén listas.
+const FCM_READY = false;
 // Planes futuros (paso 164, perfiles.plan — ver 024_planes.sql en cuaderno-supabase):
 // terreno preparado sin ningún límite todavía. Mientras dure la beta, TODAS las cuentas
 // ven todo sea cual sea su plan — nada de precios ni menciones de planes de cara al

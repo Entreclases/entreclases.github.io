@@ -426,26 +426,66 @@ async function deletePushSubscriptionRow(endpoint){
   const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
   await fetch(SUPA_URL+"/rest/v1/push_subscriptions?endpoint=eq."+encodeURIComponent(endpoint), {method:"DELETE", headers:h});
 }
+// Rama nativa (paso 231, FCM) — sólo activa si FCM_READY (config.js). Misma tabla
+// push_subscriptions, columna fcm_token en vez de endpoint/p256dh/auth (ver migración pendiente
+// en cuaderno-supabase). No hay getSubscription() equivalente en el plugin: para desactivar se
+// vuelve a pedir el token (estable entre corridas, salvo reinstalación) y se borra esa fila.
+async function fcmRegisterToken(){
+  const Push = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+  if(!Push) throw new Error("PushNotifications no disponible");
+  return new Promise((resolve,reject)=>{
+    Push.addListener("registration", t=>resolve(t.value));
+    Push.addListener("registrationError", e=>reject(e));
+    Push.register();
+  });
+}
+async function saveFcmToken(token){
+  const s=await ensureToken();
+  const uid_=jwtSub(s.access);
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"resolution=merge-duplicates,return=minimal"};
+  const r=await fetch(SUPA_URL+"/rest/v1/push_subscriptions?on_conflict=fcm_token", {method:"POST", headers:h,
+    body:JSON.stringify([{user_id:uid_, fcm_token:token}])});
+  if(!r.ok) throw new Error("error "+r.status);
+}
+async function deleteFcmTokenRow(token){
+  const s=await ensureToken();
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
+  await fetch(SUPA_URL+"/rest/v1/push_subscriptions?fcm_token=eq."+encodeURIComponent(token), {method:"DELETE", headers:h});
+}
 async function setNotifClasesDia(v){
   const ses=getSes(); if(!ses) return;
   if(v){
     try{
-      if(typeof Notification==="undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)){
-        toast("Este dispositivo no soporta notificaciones push.", "error"); return;
+      if(IS_NATIVE){
+        if(!FCM_READY){ toast("Todavía no disponible en esta versión.", "error"); return; }
+        const Push = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+        if(!Push){ toast("Este dispositivo no soporta notificaciones push.", "error"); return; }
+        let perm=await Push.checkPermissions();
+        if(perm.receive==="prompt") perm=await Push.requestPermissions();
+        if(perm.receive!=="granted"){ toast("Necesitás permitir las notificaciones para activar esto.", "error"); return; }
+        await saveFcmToken(await fcmRegisterToken());
+      }else{
+        if(typeof Notification==="undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)){
+          toast("Este dispositivo no soporta notificaciones push.", "error"); return;
+        }
+        let perm=Notification.permission;
+        if(perm==="default") perm=await Notification.requestPermission();
+        if(perm!=="granted"){ toast("Necesitás permitir las notificaciones para activar esto.", "error"); return; }
+        const reg=await navigator.serviceWorker.ready;
+        let sub=await reg.pushManager.getSubscription();
+        if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+        await saveSubscription(sub);
       }
-      let perm=Notification.permission;
-      if(perm==="default") perm=await Notification.requestPermission();
-      if(perm!=="granted"){ toast("Necesitás permitir las notificaciones para activar esto.", "error"); return; }
-      const reg=await navigator.serviceWorker.ready;
-      let sub=await reg.pushManager.getSubscription();
-      if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
-      await saveSubscription(sub);
     }catch(e){ toast("No se pudo activar la notificación — probá de nuevo.", "error"); return; }
   }else{
     try{
-      const reg=await navigator.serviceWorker.ready;
-      const sub=await reg.pushManager.getSubscription();
-      if(sub){ await deletePushSubscriptionRow(sub.endpoint); await sub.unsubscribe(); }
+      if(IS_NATIVE){
+        if(FCM_READY) await deleteFcmTokenRow(await fcmRegisterToken());
+      }else{
+        const reg=await navigator.serviceWorker.ready;
+        const sub=await reg.pushManager.getSubscription();
+        if(sub){ await deletePushSubscriptionRow(sub.endpoint); await sub.unsubscribe(); }
+      }
     }catch(e){ /* silencioso: si falla el borrado local/remoto, apagar el opt-in ya corta el envío del lado del servidor */ }
   }
   setSes({...ses, notifClasesDia:v}); render();

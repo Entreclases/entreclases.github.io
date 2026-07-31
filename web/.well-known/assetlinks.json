@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.manugandini.cuadernoseguimiento",
+      "sha256_cert_fingerprints": [
+        "E4:15:1E:0E:9C:1E:8C:E5:23:22:5E:A7:CC:22:A4:97:07:06:4A:AA:EB:AE:B3:A6:47:F0:F2:43:1B:0B:BC:1A"
+      ]
+    }
+  }
+]

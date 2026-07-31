@@ -233,6 +233,37 @@ async function checkTauriUpdate(){
   }catch(e){ /* silencioso: sin internet, sin release firmado todavía, o falla puntual del endpoint */ }
 }
 
+/* ============ deep links (paso 231) ============
+   Portal y aprobación de cuenta hoy sólo se abren por URL propia (portal.html?k=..., aprobar.html?
+   token=...&accion=...). Compartidos por WhatsApp/mail, un click en esos links con la app nativa
+   instalada relanza la app a su pantalla normal SIN pasarle la URL al WebView (ni Android App Links
+   ni el protocolo custom de escritorio hacen eso solos) — routeDeepLink() toma la URL entrante
+   (https://.../app/portal.html?... en Android, entreclases://portal?... en escritorio) y navega el
+   WebView a la página empaquetada correspondiente, con el mismo querystring. */
+function routeDeepLink(url){
+  try{
+    const u = new URL(url);
+    let page = null;
+    if(u.protocol==="entreclases:"){
+      page = (u.hostname || u.pathname.replace(/^\/+/,"")).split("/")[0];
+    }else{
+      const m = u.pathname.match(/\/(portal|aprobar)\.html$/);
+      if(m) page = m[1];
+    }
+    if(page==="portal" || page==="aprobar") location.href = page+".html"+u.search;
+  }catch(e){}
+}
+if(IS_NATIVE){
+  if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App){
+    window.Capacitor.Plugins.App.addListener("appUrlOpen", ({url})=>routeDeepLink(url));
+  }
+  // tauri-plugin-deep-link (ver src-tauri/main.rs) — expuesto en window.__TAURI__.deepLink por
+  // withGlobalTauri; a verificar contra la versión instalada del plugin en el primer build real.
+  if(window.__TAURI__ && window.__TAURI__.deepLink){
+    window.__TAURI__.deepLink.onOpenUrl(urls=>{ (urls||[]).forEach(routeDeepLink); });
+  }
+}
+
 /* ============ notificación diaria de cobros atrasados (una por día, por dispositivo) ============
    El aviso EN el tablero (vCobrosBanner) se recalcula en cada render, siempre al día; esto
    sólo gobierna la notificación del SISTEMA, que sí necesita un tope de una vez por día para
@@ -2930,6 +2961,7 @@ checkForNewVersion();
 checkTauriUpdate();
 maybeNotifyCobros();
 checkRachaDiaria();
+adoptNativeStorage(); // paso 231: espejo/recuperación hacia el almacenamiento del contenedor (no-op fuera de apps nativas)
 
 /* PWA: registrar el service worker cuando la app está publicada (no en file://
    ni dentro de un contenedor nativo como Tauri o Capacitor, que ya resuelven

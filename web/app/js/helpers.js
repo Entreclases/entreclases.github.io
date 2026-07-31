@@ -665,6 +665,7 @@ function save(){
     const json = JSON.stringify({owner:state.ownerUid, students:state.students, catalog:state.catalog});
     state.saveSizeBytes = new Blob([json]).size;
     localStorage.setItem(k, json); state.saveErr=false;
+    if(IS_NATIVE) nativeStorageWrite(k, json); // espejo asíncrono, ver adoptNativeStorage() (paso 231)
     if(state.saveSizeBytes>SAVE_SIZE_WARN_BYTES && !_sizeWarnToastShown){
       _sizeWarnToastShown = true;
       toast(`El cuaderno ya pesa ${fmtBytes(state.saveSizeBytes)} — se acerca al límite de espacio del navegador. Convendría vaciar la papelera o descargar una copia.`,
@@ -2612,6 +2613,72 @@ const SES_MAX_AGE_MS = 24*60*60*1000; // 24hs
 // se guarda con Max-Age (persiste al cerrar el navegador) y el techo propio de la app se estira
 // acorde — sin el tilde, todo sigue exactamente igual que antes (cookie de sesión, techo de 24hs).
 const SES_MAX_AGE_REMEMBER_MS = 30*24*60*60*1000; // 30 días
+// Almacenamiento nativo (paso 231): en Tauri/Capacitor, localStorage vive dentro del WebView y el
+// sistema operativo puede llegar a limpiarlo bajo presión de espacio (a diferencia de Safari con
+// las PWAs, que lo borra directo a los 7 días de inactividad, acá no hay borrado automático por
+// tiempo — pero sigue siendo storage de WebView, no del contenedor). localStorage sigue siendo la
+// única fuente SÍNCRONA de lectura/escritura (save()/load()/getSes()/setSes() no cambian) — esto
+// es sólo un espejo asíncrono hacia el almacenamiento privado del contenedor (Capacitor Filesystem
+// en Directory.DATA, o un archivo bajo app_data_dir() en Tauri vía los comandos Rust
+// cuaderno_store_read/write) como respaldo de durabilidad, más una recuperación puntual al
+// arrancar (adoptNativeStorage(), llamada una sola vez desde events.js) si localStorage apareciera
+// vacío. Nunca debe romper el guardado normal: cualquier falla queda silenciosa.
+async function nativeStorageWrite(name, value){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem){
+      await window.Capacitor.Plugins.Filesystem.writeFile({path:name, data:value, directory:"DATA", encoding:"utf8"});
+    }else if(window.__TAURI__){
+      await window.__TAURI__.core.invoke("cuaderno_store_write", {name, value});
+    }
+  }catch(e){}
+}
+async function nativeStorageRead(name){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem){
+      const r = await window.Capacitor.Plugins.Filesystem.readFile({path:name, directory:"DATA", encoding:"utf8"});
+      return (r && r.data) ? r.data : null;
+    }else if(window.__TAURI__){
+      const r = await window.__TAURI__.core.invoke("cuaderno_store_read", {name});
+      return r || null;
+    }
+  }catch(e){ return null; }
+  return null;
+}
+// Se llama una sola vez al arrancar (events.js), sólo en apps nativas. Primero la sesión (SES_KEY):
+// hace falta recuperarla ANTES de saber qué uid mirar, porque sesUid()/getSes() sólo leen
+// localStorage. Recién después el cuaderno del uid activo. Si algo se recuperó desde el
+// contenedor, se vuelve a cargar y renderizar — es el único caso (localStorage vacío pero el
+// contenedor con datos) que representa una limpieza real del WebView, el bug de fondo del paso 221.
+async function adoptNativeStorage(){
+  if(!IS_NATIVE) return;
+  let needsReload = false;
+  let sesLocal; try{ sesLocal = localStorage.getItem(SES_KEY); }catch(e){ sesLocal = null; }
+  const sesNative = await nativeStorageRead(SES_KEY);
+  if(sesLocal && !sesNative){
+    nativeStorageWrite(SES_KEY, sesLocal);
+  }else if(!sesLocal && sesNative){
+    try{ localStorage.setItem(SES_KEY, sesNative); needsReload = true; }catch(e){}
+  }
+  const uid_ = sesUid();
+  if(uid_){
+    const k = nsKey(KEY, uid_);
+    let localRaw; try{ localRaw = localStorage.getItem(k); }catch(e){ localRaw = null; }
+    const nativeRaw = await nativeStorageRead(k);
+    if(localRaw && !nativeRaw){
+      nativeStorageWrite(k, localRaw);
+    }else if(!localRaw && nativeRaw){
+      try{ localStorage.setItem(k, nativeRaw); needsReload = true; }catch(e){}
+    }else if(localRaw && nativeRaw && localRaw!==nativeRaw){
+      try{
+        const lu = (JSON.parse(localRaw).catalog||{}).updatedAt||0;
+        const nu = (JSON.parse(nativeRaw).catalog||{}).updatedAt||0;
+        if(nu>lu){ localStorage.setItem(k, nativeRaw); needsReload = true; }
+        else nativeStorageWrite(k, localRaw);
+      }catch(e){}
+    }
+  }
+  if(needsReload){ load(); render(); }
+}
 function getSes(){
   try{
     if(IS_NATIVE) return JSON.parse(localStorage.getItem(SES_KEY))||null;
@@ -2630,7 +2697,8 @@ function getSes(){
 }
 function setSes(v){
   if(IS_NATIVE){
-    v ? localStorage.setItem(SES_KEY,JSON.stringify(v)) : localStorage.removeItem(SES_KEY);
+    if(v){ const json=JSON.stringify(v); localStorage.setItem(SES_KEY,json); nativeStorageWrite(SES_KEY,json); }
+    else{ localStorage.removeItem(SES_KEY); nativeStorageWrite(SES_KEY,""); } // "" = borrado, ver nativeStorageRead
   }else{
     v ? setCookie(SES_KEY,JSON.stringify(v), v.remember?SES_MAX_AGE_REMEMBER_MS:undefined) : delCookie(SES_KEY);
   }

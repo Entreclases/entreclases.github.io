@@ -228,12 +228,15 @@ function vRecordatoriosCard(){
 // suscribe el service worker a PushManager y guarda la suscripción en push_subscriptions
 // (setNotifClasesDia() en sync.js); el envío real corre del lado del servidor (cron matutino +
 // Edge Function enviar-push, ver 018_push_clases.sql en cuaderno-supabase), en modo simulacro
-// hasta activarlo a mano ahí. No disponible en Tauri/Capacitor (no registran service worker,
-// ver IS_NATIVE en config.js) ni en navegadores sin soporte de Push API.
+// hasta activarlo a mano ahí. En Tauri/Capacitor usa FCM en vez de Web Push (mismo setNotifClasesDia,
+// rama IS_NATIVE) — pero sigue oculto ahí hasta que FCM_READY (config.js, paso 231) pase a true,
+// que recién pasa cuando exista el proyecto Firebase y el secret del Edge Function.
 function vNotifClasesCard(){
   const ses=getSes();
-  const supported = !IS_NATIVE && typeof Notification!=="undefined" && "serviceWorker" in navigator && "PushManager" in window;
-  const denied = supported && Notification.permission==="denied";
+  const supportedWeb = !IS_NATIVE && typeof Notification!=="undefined" && "serviceWorker" in navigator && "PushManager" in window;
+  const supportedNative = IS_NATIVE && FCM_READY && !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications);
+  const supported = supportedWeb || supportedNative;
+  const denied = supportedWeb && Notification.permission==="denied";
   let h = `<div class="formcard"><div class="ftitle">Recordatorio de las clases del día</div>
     <div class="hint" style="margin-bottom:10px">Una notificación a la mañana con cuántas clases tenés hoy y a qué hora es la primera — llega aunque tengas la app cerrada.</div>`;
   h += supported
