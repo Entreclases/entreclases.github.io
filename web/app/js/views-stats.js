@@ -195,9 +195,15 @@ function vRentabilidad(){
     </select></div>`;
 
   const r = rentabilidadMes(mk);
+  const tieneTiempoReal = algunAlumnoConTiempoReal();
   h += `<div class="stats" style="margin-bottom:10px">
-    <div class="stat"><b style="font-size:34px;color:${r.horas>0?(r.ganancia>=0?"var(--green)":"var(--red)"):"var(--ink)"}">${r.horas>0?fmtMoneySigned(r.netoPorHora):"—"}</b><span>neto por hora real ${helpTip("rentabilidad")}</span></div>
+    <div class="stat"><b style="font-size:34px;color:${r.horas>0?(r.ganancia>=0?"var(--green)":"var(--red)"):"var(--ink)"}">${r.horas>0?fmtMoneySigned(r.netoPorHora):"—"}</b><span>${tieneTiempoReal?"neto por hora de clase":"neto por hora real"} ${helpTip("rentabilidad")}</span></div>
+    ${tieneTiempoReal?`<div class="stat"><b style="font-size:34px;color:${r.horasReales>0?(r.ganancia>=0?"var(--green)":"var(--red)"):"var(--ink)"}">${r.horasReales>0?fmtMoneySigned(r.netoPorHoraReal):"—"}</b><span>neto por hora REAL ${helpTip("rentabilidadReal")}</span></div>`:""}
   </div>`;
+  if(tieneTiempoReal){
+    const insight = rentabilidadInsightExtra();
+    if(insight) h += `<div class="hint" style="margin-bottom:14px">${esc(insight)}</div>`;
+  }
   h += `<div class="stats" style="margin-bottom:8px">
     <div class="stat"><b>${fmtMoney(r.ingresos)}</b><span>ingresos cobrados</span></div>
     <div class="stat"><b>${fmtMoney(r.costosTotal)}</b><span>costos del mes</span></div>
@@ -219,12 +225,18 @@ function vRentabilidad(){
   const porAlumno = rentabilidadPorAlumno(mk);
   h += porAlumno.length===0 ? `<div class="empty">Sin datos todavía este mes.</div>` : rentaRows(porAlumno);
 
+  if(tieneTiempoReal){
+    h += `<div class="stitle" style="margin-top:26px">Ranking por hora real (con traslado y preparación)</div>`;
+    const porAlumnoReal = [...porAlumno].filter(g=>g.horasReales>0).sort((a,b)=>b.netoPorHoraReal-a.netoPorHoraReal);
+    h += porAlumnoReal.length===0 ? `<div class="empty">Cargá minutos de traslado o preparación en algún alumno para ver este ranking.</div>` : rentaRowsReal(porAlumnoReal);
+  }
+
   h += `<div class="stitle" style="margin-top:26px">Histórico (últimos 12 meses)</div>`;
   const hist = rentabilidadHistorico();
   const axisLabels = hist.map(x=>x.label);
   h += `<div class="hint" style="margin-bottom:6px">Ganancia neta por mes — línea punteada: tendencia</div>`;
   h += signedBarChart(hist.map(x=>({label:x.mk,v:x.neto})), axisLabels, fmtMoney);
-  h += `<div class="hint" style="margin:18px 0 6px">Neto por hora real por mes — línea punteada: tendencia</div>`;
+  h += `<div class="hint" style="margin:18px 0 6px">Neto por hora de clase por mes — línea punteada: tendencia</div>`;
   h += signedBarChart(hist.map(x=>({label:x.mk,v:x.netoPorHora||0})), axisLabels, v=>v?fmtMoney(v):"—");
 
   h += vCostosConfig();
@@ -238,6 +250,16 @@ function rentaRows(groups){
       <div class="sub">${g.clases} clase${g.clases===1?"":"s"} · ${fmtMoney(g.ingresos)} ingresos${g.costos?` · ${fmtMoney(g.costos)} costos`:""}</div></div>
     <div class="right"><span style="color:${g.neto>=0?"var(--green)":"var(--red)"};font-weight:600">${fmtMoneySigned(g.neto)}</span>
       ${g.horas>0?`<div class="hint">${fmtMoneySigned(g.netoPorHora)}/h</div>`:""}</div>
+  </div>`).join("");
+}
+
+// ranking honesto por hora real (paso 237) — mismo formato de fila que rentaRows, pero contra
+// horasReales/netoPorHoraReal en vez de la hora de clase dictada.
+function rentaRowsReal(groups){
+  return groups.map(g=>`<div class="row" style="cursor:default">
+    <div class="main"><div class="name">${esc(g.label)}${g.subject?` <span class="hint">· ${esc(g.subject)}</span>`:""}</div>
+      <div class="sub">${g.clases} clase${g.clases===1?"":"s"} · ${g.horasReales.toFixed(1)}h reales (clase + traslado + preparación)</div></div>
+    <div class="right"><span style="color:${g.netoPorHoraReal>=0?"var(--green)":"var(--red)"};font-weight:600">${fmtMoneySigned(g.netoPorHoraReal)}/h</span></div>
   </div>`).join("");
 }
 

@@ -578,6 +578,11 @@ function vFichaPagos(s){
         <option value="clase" ${s.modalidad==="clase"?"selected":""}>Por clase</option>
         <option value="hora" ${s.modalidad==="hora"?"selected":""}>Por hora</option>
         <option value="mensual" ${s.modalidad==="mensual"?"selected":""}>Mensual</option></select></div></div>
+    <div class="frow">
+      <div class="field"><div class="flabel">Traslado ida y vuelta (minutos)</div><input type="number" min="0" data-f="traslado" placeholder="Opcional" value="${esc(s.traslado||"")}"></div>
+      <div class="field"><div class="flabel">Preparación por clase (minutos)</div><input type="number" min="0" data-f="preparacion" placeholder="Opcional" value="${esc(s.preparacion||"")}"></div>
+    </div>
+    <div class="hint" style="margin-top:2px">Para el $/hora REAL de Pagos → Rentabilidad, que suma el tiempo que te lleva viajar y preparar la clase además de la hora dictada.</div>
     ${hasPagos(s)&&s.modalidad==="clase"?`<div class="hint" style="margin-top:2px">Marcá cada clase como cobrada desde la pestaña «Clases».</div>`:""}
     ${hasPagos(s)&&s.modalidad==="hora"?`<div class="hint" style="margin-top:2px">Cada clase se cobra tarifa × horas dictadas (redondeado) y se marca como cobrada desde la pestaña «Clases» — si alguna clase vale distinto, cargale un monto manual ahí mismo al registrarla.</div>`:""}
     ${hasPagos(s)&&(s.modalidad==="clase"||s.modalidad==="hora")?vPackClasesCard(s):""}

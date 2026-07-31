@@ -2683,6 +2683,15 @@ function costoAppliesTo(costo, s){
   if(costo.studentId) return s.id===costo.studentId;
   return true;
 }
+// Hora real (paso 237): traslado (ida y vuelta) + preparación por clase, ambos opcionales y por
+// alumno (no por materia) — el traslado depende de dónde vive CADA alumno, no de la materia que
+// cursa, y la preparación también varía alumno a alumno aunque compartan materia (no es lo mismo
+// preparar para quien va bien que para quien necesita repasar todo desde cero); tarifa/modalidad
+// ya son por alumno en esta misma ficha, así que sigue el mismo criterio. Se suman en minutos y
+// se cargan una vez por clase (nunca por hora de esa clase) porque el viaje y la preparación no
+// escalan con la duración: una clase de 2 horas no implica el doble de traslado.
+function extraMinutosFor(s){ return (Number(s.traslado)||0)+(Number(s.preparacion)||0); }
+function algunAlumnoConTiempoReal(){ return alive().some(s=>extraMinutosFor(s)>0); }
 function rentabilidadMes(mk){
   const costos = costosFor();
   const clases = classesInMonth(mk);
@@ -2705,16 +2714,19 @@ function rentabilidadMes(mk){
   // sumar. Los desgloses por materia/alumno (rentabilidadPorMateria/PorAlumno más abajo) NO
   // deduplican a propósito: ahí la pregunta es cuántas horas de clase recibió cada alumno/materia,
   // y eso sí es una hora por cada uno.
-  let horas=0, sinDuracion=0;
+  let horas=0, horasReales=0, sinDuracion=0;
   const gruposContados = new Set();
-  clases.forEach(({c})=>{
+  clases.forEach(({s,c})=>{
     if(c.duration==null || c.duration==="") sinDuracion++;
     if(c.grupoClaseId){ if(gruposContados.has(c.grupoClaseId)) return; gruposContados.add(c.grupoClaseId); }
-    horas+=classDurationHours(c);
+    const dur = classDurationHours(c);
+    horas += dur;
+    horasReales += dur + extraMinutosFor(s)/60;
   });
   const netoPorHora = horas>0 ? ganancia/horas : null;
+  const netoPorHoraReal = horasReales>0 ? ganancia/horasReales : null;
 
-  return { mk, ingresos, costoFijoTotal, costoVarTotal, costosTotal, ganancia, horas, clasesCount:clases.length, sinDuracion, netoPorHora };
+  return { mk, ingresos, costoFijoTotal, costoVarTotal, costosTotal, ganancia, horas, horasReales, clasesCount:clases.length, sinDuracion, netoPorHora, netoPorHoraReal };
 }
 // Resumen de un mes puntual para "Comparar períodos" en Estadísticas (paso 104) — todo salido
 // del historial local (sesiones, pagos, objetivos), sin ningún campo nuevo en el JSON. "Alumnos
@@ -2758,7 +2770,7 @@ function periodSummaryRange(mks){
 // (sin materia ni alumno asignado) no entran acá, sólo los que se asignaron a esa materia puntual.
 function rentabilidadPorMateria(mk){
   const groups={};
-  const ensure=(key,label)=>{ if(!groups[key]) groups[key]={label,ingresos:0,costos:0,horas:0,clases:0}; return groups[key]; };
+  const ensure=(key,label)=>{ if(!groups[key]) groups[key]={label,ingresos:0,costos:0,horas:0,horasReales:0,clases:0}; return groups[key]; };
   const labelFor = key => key ? (subjById(key)?subjById(key).name:"Materia") : "Sin materia";
   alive().forEach(s=>{
     const key=s.subjectId||"";
@@ -2767,7 +2779,11 @@ function rentabilidadPorMateria(mk){
     (s.clasesPuntuales||[]).forEach(p=>{ if(monthKeyOf(p.date)===mk && p.seniaEstado==="retenida") g.ingresos+=Number(p.seniaMonto)||0; });
   });
   const clases = classesInMonth(mk);
-  clases.forEach(({s,c})=>{ const key=s.subjectId||""; const g=ensure(key,labelFor(key)); g.horas+=classDurationHours(c); g.clases++; });
+  clases.forEach(({s,c})=>{
+    const key=s.subjectId||""; const g=ensure(key,labelFor(key));
+    const dur=classDurationHours(c);
+    g.horas+=dur; g.horasReales+=dur+extraMinutosFor(s)/60; g.clases++;
+  });
   const costos=costosFor();
   costos.fijos.forEach(cf=>{ if(cf.subjectId && groups[cf.subjectId]) groups[cf.subjectId].costos+=Number(cf.monto)||0; });
   costos.variables.forEach(cv=>{
@@ -2776,7 +2792,9 @@ function rentabilidadPorMateria(mk){
     if(groups[cv.subjectId]) groups[cv.subjectId].costos+=(Number(cv.monto)||0)*n;
   });
   return Object.values(groups).filter(g=>g.ingresos>0||g.clases>0||g.costos>0)
-    .map(g=>({...g, neto:g.ingresos-g.costos, netoPorHora:g.horas>0?(g.ingresos-g.costos)/g.horas:null}))
+    .map(g=>({...g, neto:g.ingresos-g.costos,
+      netoPorHora:g.horas>0?(g.ingresos-g.costos)/g.horas:null,
+      netoPorHoraReal:g.horasReales>0?(g.ingresos-g.costos)/g.horasReales:null}))
     .sort((a,b)=>b.neto-a.neto);
 }
 // desglose por alumno — mismo criterio que por materia, pero atribuyendo también el nombre de
@@ -2784,12 +2802,16 @@ function rentabilidadPorMateria(mk){
 function rentabilidadPorAlumno(mk){
   const groups={};
   alive().forEach(s=>{
-    groups[s.id]={label:s.name, subject:s.subject, ingresos:0, costos:0, horas:0, clases:0};
+    groups[s.id]={label:s.name, subject:s.subject, ingresos:0, costos:0, horas:0, horasReales:0, clases:0};
     if(hasPagos(s)){ const r=pagoResumen(s,mk); if(r) groups[s.id].ingresos+=r.cobrado; }
     (s.clasesPuntuales||[]).forEach(p=>{ if(monthKeyOf(p.date)===mk && p.seniaEstado==="retenida") groups[s.id].ingresos+=Number(p.seniaMonto)||0; });
   });
   const clases = classesInMonth(mk);
-  clases.forEach(({s,c})=>{ const g=groups[s.id]; if(g){ g.horas+=classDurationHours(c); g.clases++; } });
+  clases.forEach(({s,c})=>{
+    const g=groups[s.id]; if(!g) return;
+    const dur=classDurationHours(c);
+    g.horas+=dur; g.horasReales+=dur+extraMinutosFor(s)/60; g.clases++;
+  });
   const costos=costosFor();
   costos.fijos.forEach(cf=>{ if(cf.studentId && groups[cf.studentId]) groups[cf.studentId].costos+=Number(cf.monto)||0; });
   costos.variables.forEach(cv=>{
@@ -2798,8 +2820,35 @@ function rentabilidadPorAlumno(mk){
     if(groups[cv.studentId]) groups[cv.studentId].costos+=(Number(cv.monto)||0)*n;
   });
   return Object.values(groups).filter(g=>g.ingresos>0||g.clases>0||g.costos>0)
-    .map(g=>({...g, neto:g.ingresos-g.costos, netoPorHora:g.horas>0?(g.ingresos-g.costos)/g.horas:null}))
+    .map(g=>({...g, neto:g.ingresos-g.costos,
+      netoPorHora:g.horas>0?(g.ingresos-g.costos)/g.horas:null,
+      netoPorHoraReal:g.horasReales>0?(g.ingresos-g.costos)/g.horasReales:null}))
     .sort((a,b)=>b.neto-a.neto);
+}
+// Insight de hora real (paso 237): un solo par, sin ranking completo ni sermón — el alumno con
+// más minutos extra (traslado+preparación) frente a otro que paga prácticamente lo mismo (±10%)
+// por clase, para que el contraste sea justo (no tiene sentido comparar a quien paga el doble).
+// Sólo considera modalidad "clase"/"hora" (tarifa ya expresada por sesión); "mensual" no es
+// comparable clase a clase. null si no hay ningún par así de parejo, en vez de forzar una
+// comparación que no diga nada.
+function rentabilidadInsightExtra(){
+  const cands = alive().filter(s=>(s.modalidad==="clase"||s.modalidad==="hora") && Number(s.tarifa)>0 && extraMinutosFor(s)>0);
+  let best=null;
+  for(let i=0;i<cands.length;i++) for(let j=i+1;j<cands.length;j++){
+    const a=cands[i], b=cands[j];
+    const ta=Number(a.tarifa), tb=Number(b.tarifa);
+    const diffPct = Math.abs(ta-tb)/Math.max(ta,tb);
+    if(diffPct>0.1) continue;
+    const extraA=extraMinutosFor(a), extraB=extraMinutosFor(b);
+    const diffMin=Math.abs(extraA-extraB);
+    if(diffMin<15) continue;
+    if(!best || diffMin>best.diffMin){
+      const [mas,menos] = extraA>extraB ? [a,b] : [b,a];
+      best={mas,menos,diffMin};
+    }
+  }
+  if(!best) return null;
+  return `${studentFirstName(best.mas)} te paga lo mismo que ${studentFirstName(best.menos)} pero te lleva ${Math.round(best.diffMin)} minutos más por clase.`;
 }
 // proyección del mes en curso al ritmo actual (regla de tres simple sobre los días ya
 // transcurridos) — no aplica a meses cerrados, que ya tienen su resultado real y completo.

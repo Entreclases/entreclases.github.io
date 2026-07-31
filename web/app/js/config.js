@@ -342,7 +342,7 @@ function detectPlatform(){
 // autosave al tocarlos (paso 136) — ver applyFichaDraftField/draftFor en helpers.js y la barra
 // fija "Tenés cambios sin guardar" en vDetalle (views-ficha.js). Todo lo demás (acciones como registrar
 // clase/cobrar, y el resto de data-f/data-cf de la app) sigue guardando al instante como siempre.
-const FICHA_DRAFT_FIELDS = new Set(["name","career","subjectId","chair","phone","email","status","examDate","startDate","birthDate","notes","tarifa","modalidad","seniaTipo","seniaValor","adultoNombre","adultoTelefono","adultoEmail","adultoVinculo"]);
+const FICHA_DRAFT_FIELDS = new Set(["name","career","subjectId","chair","phone","email","status","examDate","startDate","birthDate","notes","tarifa","modalidad","seniaTipo","seniaValor","adultoNombre","adultoTelefono","adultoEmail","adultoVinculo","traslado","preparacion"]);
 const GENERIC_TOPICS = ["Ejercicios","Teoría","Nivelación","Repaso / parciales viejos"];
 const TOPIC_CYCLE = ["pendiente","visto","practica","parcial","noentra"];
 const TOPIC_META = {
@@ -396,6 +396,7 @@ const HELP_TEXTS = {
   portal: "Un link propio, sin login, para que tus alumnos vean materiales compartidos y (si tienen llave individual) su próxima clase y avance — nunca notas, pagos ni comentarios privados.",
   portalGrupal: "Una llave por materia: el grupo que elijas ve la biblioteca de esa materia y las próximas clases/exámenes del grupo (fechas sueltas, sin nombres) — nunca notas, pagos ni avance de un alumno en particular.",
   rentabilidad: "Cuánto te queda de cada materia o alumno después de restar los costos que le asignaste (fijos y variables). Los costos sin materia ni alumno sólo entran en el total del mes.",
+  rentabilidadReal: "Lo mismo que el neto por hora de clase, pero sumando también el traslado (ida y vuelta) y la preparación que le cargaste a cada alumno — la hora que de verdad te insume, no sólo la que facturás.",
 };
 // Mini centro de ayuda (Cuenta, paso 74): preguntas frecuentes en español claro — qué hace
 // cada sección, sin tecnicismos. Ver vCentroAyuda() en views-cuenta.js.
