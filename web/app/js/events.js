@@ -1078,6 +1078,14 @@ document.addEventListener("click", (e)=>{
     update(s.id,{recordatorioMail: !s.recordatorioMail});
     return;
   }
+  else if(a==="toggle-avisos-plata-adulto" && s){
+    update(s.id,{avisosPlataAdulto: !s.avisosPlataAdulto});
+    return;
+  }
+  else if(a==="adulto-usar-contrato" && s){
+    applyFichaDraftField(s, "adultoNombre", s.contratoResponsable||"");
+    return;
+  }
   else if(a==="video-link-discard" && s){
     update(s.id,{videollamadaLink:""});
     toast("Link fijo descartado");

@@ -161,6 +161,32 @@ function vFichaResumenGlance(s){
 }
 
 
+// Adulto responsable (paso 234): opcional y colapsado por defecto (secundario/ingreso, donde paga
+// la madre/padre y no el alumno) — abierto solo si ya hay algo cargado. El tilde
+// "avisosPlataAdulto" redirige las plantillas de WhatsApp de cobro (ver pagoContactFor/waLinkCobro
+// en helpers.js); el resto de los mensajes sigue yendo siempre al alumno. Nunca se expone en el
+// portal (buildAlumnoBlock en sync.js no lee estos campos).
+function vAdultoResponsableCard(s){
+  const abierto = !!(s.adultoNombre||s.adultoTelefono||s.adultoEmail||s.adultoVinculo);
+  return `<details class="formcard" ${abierto?"open":""} style="padding:0">
+    <summary style="cursor:pointer;padding:14px 16px;font-weight:600">Adulto responsable (opcional)</summary>
+    <div style="padding:0 16px 16px">
+      <div class="hint" style="margin-bottom:10px">Para secundario o ingreso, cuando quien paga es la madre/padre y no el propio alumno.</div>
+      ${s.contratoResponsable && !s.adultoNombre ? `<button class="chip" data-a="adulto-usar-contrato" style="margin-bottom:10px">Usar «${esc(s.contratoResponsable)}» del contrato</button>` : ""}
+      <div class="frow">
+        <div class="field"><div class="flabel">Nombre y apellido</div><input data-f="adultoNombre" placeholder="Ej: Marisa Fernández" value="${esc(s.adultoNombre||"")}"></div>
+        <div class="field"><div class="flabel">Vínculo</div><input data-f="adultoVinculo" placeholder="Ej: madre, padre, tutor" value="${esc(s.adultoVinculo||"")}"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><div class="flabel">Teléfono (WhatsApp)</div><input data-f="adultoTelefono" placeholder="Ej: 11 2345-6789" value="${esc(s.adultoTelefono||"")}"></div>
+        <div class="field"><div class="flabel">Mail (opcional)</div><input type="email" autocomplete="off" data-f="adultoEmail" placeholder="mail@ejemplo.com" value="${esc(s.adultoEmail||"")}"></div>
+      </div>
+      <button class="chip ${s.avisosPlataAdulto?"on":""}" data-a="toggle-avisos-plata-adulto">${s.avisosPlataAdulto?"✓ Los avisos de plata van al adulto responsable":"Los avisos de plata van al adulto responsable"}</button>
+      ${s.avisosPlataAdulto && !hasAdultoPhone(s) ? `<div class="hint" style="margin-top:6px">Sin teléfono del adulto cargado todavía — los avisos de cobro le siguen llegando al alumno mientras tanto.</div>` : ""}
+    </div>
+  </details>`;
+}
+
 /* ============ ficha → Resumen: vistazo rápido, avance por unidades, datos de contacto,
    informe/contrato y borrar alumno — todo lo que no tiene pestaña propia ============ */
 function vFichaResumen(s){
@@ -220,6 +246,7 @@ function vFichaResumen(s){
       <button class="chip ${s.recordatorioMail?"on":""}" data-a="toggle-recordatorio-mail">${s.recordatorioMail?"✓ Recordatorio por mail activo":"Recordarle las clases por mail"}</button>
       <span class="hint">Le llega un mail ${(getSes()&&getSes().recordatorioClasesHorasAntes)||14}hs antes de cada clase, con fecha, hora, materia y el link si hay.</span>
     </div>`:""}
+    ${vAdultoResponsableCard(s)}
     <div class="frow">
       <div class="field"><div class="flabel">Estado</div><select data-f="status">
         ${Object.entries(STATUS_META).map(([k,m])=>opt(k,s.status,m.label)).join("")}</select></div>

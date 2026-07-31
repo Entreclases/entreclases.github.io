@@ -756,6 +756,7 @@ function emptyStudent(){
     horarios:[], clasesPuntuales:[], packsClases:[],
     seniaActiva:false, seniaTipo:"monto", seniaValor:"",
     contratoResponsable:"", contratoDni:"", contratoFechaInicio:"", contratoClausulas:"",
+    adultoNombre:"", adultoTelefono:"", adultoEmail:"", adultoVinculo:"", avisosPlataAdulto:false,
     tagIds:[] };
 }
 
@@ -1752,6 +1753,20 @@ function normalizeArPhone(raw){
 function hasPhone(s){ return !!(s.phone && s.phone.replace(/\D/g,"").length>=8); }
 function waLink(s, text){ return `https://wa.me/${normalizeArPhone(s.phone)}?text=${encodeURIComponent(text)}`; }
 function studentFirstName(s){ return (s.name||"").trim().split(/\s+/)[0] || s.name || ""; }
+
+/* ============ adulto responsable (paso 234): en secundario/ingreso, quien paga suele ser la
+   madre/padre y quien mira el portal es el alumno — s.avisosPlataAdulto (tilde en la ficha) hace
+   que las plantillas de WhatsApp de cobro usen el teléfono/mail del adulto en vez del alumno; el
+   resto de los mensajes (avance, tarea, próxima clase) sigue yendo siempre al alumno. Si el tilde
+   está prendido pero no hay teléfono de adulto cargado, cae solo al del alumno — nunca deja de
+   poder mandarse el aviso. */
+function hasAdultoPhone(s){ return !!(s.adultoTelefono && s.adultoTelefono.replace(/\D/g,"").length>=8); }
+function pagoContactFor(s){
+  if(s.avisosPlataAdulto && hasAdultoPhone(s)) return {phone:s.adultoTelefono, email:s.adultoEmail||""};
+  return {phone:s.phone||"", email:s.email||""};
+}
+function hasPagoPhone(s){ const p=pagoContactFor(s).phone||""; return p.replace(/\D/g,"").length>=8; }
+function waLinkCobro(s, text){ return `https://wa.me/${normalizeArPhone(pagoContactFor(s).phone)}?text=${encodeURIComponent(text)}`; }
 
 /* ============ agenda: horarios habituales + clases puntuales ============
    Los horarios habituales (s.horarios) son recurrentes por día de semana; las

@@ -334,7 +334,7 @@ function detectPlatform(){
 // autosave al tocarlos (paso 136) — ver applyFichaDraftField/draftFor en helpers.js y la barra
 // fija "Tenés cambios sin guardar" en vDetalle (views-ficha.js). Todo lo demás (acciones como registrar
 // clase/cobrar, y el resto de data-f/data-cf de la app) sigue guardando al instante como siempre.
-const FICHA_DRAFT_FIELDS = new Set(["name","career","subjectId","chair","phone","email","status","examDate","startDate","birthDate","notes","tarifa","modalidad","seniaTipo","seniaValor"]);
+const FICHA_DRAFT_FIELDS = new Set(["name","career","subjectId","chair","phone","email","status","examDate","startDate","birthDate","notes","tarifa","modalidad","seniaTipo","seniaValor","adultoNombre","adultoTelefono","adultoEmail","adultoVinculo"]);
 const GENERIC_TOPICS = ["Ejercicios","Teoría","Nivelación","Repaso / parciales viejos"];
 const TOPIC_CYCLE = ["pendiente","visto","practica","parcial","noentra"];
 const TOPIC_META = {

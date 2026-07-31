@@ -636,7 +636,10 @@ function waMsgForAlert(s, kind){
 function waMsgCobro(s){
   const total = pendienteTotalFor(s);
   const alumno = studentFirstName(s);
-  const mail = s.email||"";
+  // Paso 234: si el docente tildó "los avisos de plata van al adulto responsable" y hay teléfono
+  // de adulto cargado, el mail de la plantilla también es el suyo (ver pagoContactFor en
+  // helpers.js) — el link de WhatsApp en sí lo resuelve waLinkCobro donde se arma el botón.
+  const mail = pagoContactFor(s).email;
   // {link_pago}/{alias} (paso 141): datos de Cuenta → Cobros, disponibles para armar el mensaje a
   // mano; {link_pago_linea} es la versión ya compuesta ("Podés pagar acá: …") que usa el default
   // de "avisoDeuda" — se cae sola (fillTemplateLines) si el docente no cargó ningún link.
@@ -692,10 +695,10 @@ function vPlantillasPropiasChips(s){
 }
 
 function vAlertMsgPicker(s){
-  if(!hasPhone(s)) return `<div class="hint" style="margin:2px 0 8px 4px">Cargá el teléfono en la ficha para mandar WhatsApp.</div>`;
+  if(!hasPhone(s) && !hasPagoPhone(s)) return `<div class="hint" style="margin:2px 0 8px 4px">Cargá el teléfono en la ficha para mandar WhatsApp.</div>`;
   return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 8px 4px">
-    <a class="chip" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">Recordatorio</a>
-    <a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgCobro(s))}">Aviso de pago</a>
+    ${hasPhone(s)?`<a class="chip" target="_blank" rel="noopener" href="${waLink(s,waQuickMessage(s))}">Recordatorio</a>`:""}
+    ${hasPagoPhone(s)?`<a class="chip" target="_blank" rel="noopener" href="${waLinkCobro(s,waMsgCobro(s))}">Aviso de pago</a>`:""}
     <button class="chip" data-a="open" data-id="${s.id}">Mensaje libre (en la ficha)</button>
     ${vPlantillasPropiasChips(s)}
   </div>`;
@@ -708,7 +711,7 @@ function vWhatsApp(s){
       <a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgProximaClase(s))}">Recordatorio de próxima clase</a>
       <a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgTareaHoy(s))}">Tarea de la última clase</a>
       ${s.examDate?`<a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgExamen(s))}">Recordatorio de examen</a>`:""}
-      ${pendiente>0?`<a class="chip" target="_blank" rel="noopener" href="${waLink(s,waMsgCobro(s))}">Recordatorio de pago pendiente</a>`:""}
+      ${pendiente>0?`<a class="chip" target="_blank" rel="noopener" href="${waLinkCobro(s,waMsgCobro(s))}">Recordatorio de pago pendiente</a>`:""}
       ${vPlantillasPropiasChips(s)}
     </div>
     <div class="field"><div class="flabel">Mensaje libre</div>
