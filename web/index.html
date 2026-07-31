@@ -372,6 +372,7 @@
           Probá la demo
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
         </a>
+        <span id="download-cta"></span>
       </div>
       <div class="trust-row">
         <div class="trust-item">
@@ -548,6 +549,7 @@
         <h3>App móvil</h3>
         <p>Versión para Android, para tenerla como una app instalada más, sin pasar por el navegador.</p>
         <span class="badge badge-soon">Próximamente</span>
+        <p style="margin-top:10px"><a href="./instalar.html#android" style="font-size:13px;font-weight:600">Cómo se instala →</a></p>
       </div>
 
       <div class="feature-card fc-amber">
@@ -557,6 +559,7 @@
         <h3>App de escritorio</h3>
         <p>Versión para Windows, instalable como un programa más de tu compu.</p>
         <span class="badge badge-soon">Próximamente</span>
+        <p style="margin-top:10px"><a href="./instalar.html#windows" style="font-size:13px;font-weight:600">Cómo se instala →</a></p>
       </div>
     </div>
     <p class="section-note">Desde el navegador del celular podés tocar "Agregar a la pantalla de inicio" para tener la versión web como una app más, con su propio ícono.</p>
@@ -571,7 +574,7 @@
       </span>
       Entreclases
     </div>
-    <p>Contacto: <a href="mailto:contacto.entreclases@gmail.com">contacto.entreclases@gmail.com</a> · <a href="./terminos.html">Términos y privacidad</a></p>
+    <p>Contacto: <a href="mailto:contacto.entreclases@gmail.com">contacto.entreclases@gmail.com</a> · <a href="./terminos.html">Términos y privacidad</a> · <a href="./borrar-cuenta.html">Eliminar mi cuenta</a></p>
     <div class="copyright">© 2026 Entreclases</div>
   </div>
 </footer>
@@ -598,6 +601,35 @@
       });
     }, {threshold:.15});
     document.querySelectorAll(".fade-up").forEach(function(el){ io.observe(el); });
+  })();
+</script>
+<script>
+  // Botón "Descargar la app" (paso 230): detección simple por user agent — ofrece el instalador
+  // de Windows o el APK de Android según el visitante, y una tarjeta "Próximamente" sin botón
+  // para el resto (iPhone, Mac, etc). Los instaladores todavía no están publicados (ver
+  // cuaderno-desktop/cuaderno-android, ambos pausados) — mientras DOWNLOAD_URL_* esté vacío, el
+  // botón lleva a la guía de instalación en vez de a un link roto. Completar esas dos constantes
+  // (y el badge "Próximamente" de la sección "Usala donde quieras" más abajo) cuando se publique
+  // cada instalador.
+  (function(){
+    var DOWNLOAD_URL_WINDOWS = "";
+    var DOWNLOAD_URL_ANDROID = "";
+    var el = document.getElementById("download-cta");
+    if(!el) return;
+    var ua = navigator.userAgent||"";
+    var isAndroid = /Android/i.test(ua);
+    var isWindows = !isAndroid && /Windows/i.test(ua);
+    if(isWindows){
+      el.innerHTML = DOWNLOAD_URL_WINDOWS
+        ? '<a href="'+DOWNLOAD_URL_WINDOWS+'" class="btn btn-secondary">Descargar para Windows</a>'
+        : '<a href="./instalar.html#windows" class="btn btn-secondary">App de escritorio: muy pronto →</a>';
+    } else if(isAndroid){
+      el.innerHTML = DOWNLOAD_URL_ANDROID
+        ? '<a href="'+DOWNLOAD_URL_ANDROID+'" class="btn btn-secondary">Descargar el APK</a>'
+        : '<a href="./instalar.html#android" class="btn btn-secondary">App para Android: muy pronto →</a>';
+    } else {
+      el.outerHTML = '<span class="badge badge-soon">Próximamente en iPhone y Mac</span>';
+    }
   })();
 </script>
 <script>

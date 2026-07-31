@@ -669,6 +669,10 @@ function vCuenta(){
         <button class="chip" data-a="sync-now">Sincronizar ahora</button>
         <button class="danger" data-a="auth-logout">Cerrar sesión</button>
       </div>
+    </div>
+    <div class="formcard"><div class="ftitle">Eliminar mi cuenta</div>
+      <div class="hint" style="margin-bottom:10px">Borra tu cuenta y todos los datos asociados (alumnos, clases, cobros, materiales). Es permanente.</div>
+      <a class="danger" style="display:inline-flex" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Eliminar mi cuenta de Entreclases")}&body=${encodeURIComponent("Hola, quiero eliminar mi cuenta y todos mis datos de Entreclases.\n\nMail de la cuenta: "+(ses?ses.email:""))}">Solicitar la eliminación</a>
     </div>`)}`;
 }
 

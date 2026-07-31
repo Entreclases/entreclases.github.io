@@ -293,9 +293,30 @@ const IS_DEMO = new URLSearchParams(location.search).get("demo")==="1";
 initCookieBar();
 // Empaquetado nativo: Tauri inyecta window.__TAURI__, Capacitor inyecta window.Capacitor
 const IS_NATIVE = !!(window.__TAURI__ || window.Capacitor);
+// TODO (2026-07-31, paso 230): antes de publicar un APK de verdad, revisar si Google ya anunció
+// fecha para la verificación de desarrollador ("Full Distribution Account", US$25 único pago) en
+// Argentina — el rollout arranca en 09/2026 sólo en Brasil/Indonesia/Singapur/Tailandia y llega acá
+// recién "2027 en adelante" sin fecha fija todavía. Mientras no haya fecha, un APK sin registrar se
+// sigue instalando con "fuentes desconocidas" sin pagar nada — no hace falta registrarse todavía.
 function detectPlatform(){
-  if(window.__TAURI__) return "Windows";
-  if(window.Capacitor) return "Android";
+  // Capacitor.getPlatform() es sync y ya distingue Android de iOS.
+  if(window.Capacitor){
+    const p = window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : "";
+    if(p==="ios") return "iOS";
+    if(p==="android") return "Android";
+    return "Android";
+  }
+  // La API de plataforma de Tauri (os plugin) es async-only (invoke por IPC), y detectPlatform()
+  // se usa en contextos sync (ver sync.js) — por eso se lee el SO real desde navigator.userAgent,
+  // que en un webview de Tauri sigue reflejando el SO anfitrión. Con el alcance actual (sólo
+  // Windows) alcanzaba con devolver "Windows" a fuego, pero así queda bien también el día que se
+  // retome un build de Mac o Linux.
+  if(window.__TAURI__){
+    const ua = navigator.userAgent||"";
+    if(/Mac/i.test(ua)) return "Mac";
+    if(/Linux/i.test(ua)) return "Linux";
+    return "Windows";
+  }
   return "Web";
 }
 // Temas genéricos siempre disponibles al registrar/editar el "tema principal" de una clase (paso
