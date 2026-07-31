@@ -526,7 +526,9 @@ function tombstoneRemove(collection, id){
 const TOAST_MS = 2600, TOAST_UNDO_MS = 6000;
 // action: {label, run} — botón alternativo al de "Deshacer", para ofrecer un paso siguiente
 // opcional (ver recibo de pago, paso 81) en vez de revertir algo; nunca se usan los dos juntos.
-function toast(text, tone, undo, action){
+// sticky (paso 224): para avisos que no pueden pasar desapercibidos (achique grande de datos) —
+// no se autodescarta solo, queda hasta que el docente toque el botón de action/undo a propósito.
+function toast(text, tone, undo, action, sticky){
   const id = uid();
   state.toasts = [...state.toasts, {id, text, tone: tone||"ok", undo: undo||null, action: action||null}];
   render();
@@ -535,6 +537,7 @@ function toast(text, tone, undo, action){
   // cada call site suelto — ver soundError() en events.js, gateado igual que el resto por
   // prefersReducedMotion()/soundsOn().
   if(tone==="error" && typeof soundError==="function") soundError();
+  if(sticky) return;
   setTimeout(()=>{
     state.toasts = state.toasts.filter(t=>t.id!==id);
     render();
@@ -2216,6 +2219,7 @@ function borrarGrupoClase(grupoId){
   delHorarioGrupal(grupoId);
   delPuntualClaseGrupal(grupoId);
   touchCatalog();
+  bumpDeliberateRemoval("grupos");
 }
 // Aplica varios patches de estudiante de una — un solo save()/render() en vez de N (mismo
 // criterio que applyTarifaAjuste), para las escrituras "mirror" que tocan a todo un grupo a la vez.
@@ -2595,6 +2599,26 @@ function sesUid(ses){ ses = ses===undefined ? getSes() : ses; return (ses && ses
 function nsKey(base, uid){
   uid = uid===undefined ? sesUid() : uid;
   return uid ? base+":"+uid : null;
+}
+// Freno de mano ante achiques grandes (paso 224): cada borrado deliberado (alumno a la
+// papelera, materia a la papelera, carrera, grupo de clase) suma acá antes de que syncNow()
+// (sync.js) decida si una caída de materias/alumnos/carreras/grupos frente a la nube es
+// sospechosa o ya está explicada por algo que el propio docente acaba de hacer. Se limpia
+// después de cada escritura exitosa a la nube (esos borrados ya quedaron reflejados ahí).
+function getDeliberateRemovals(){
+  const k=nsKey(DELIBERATE_REMOVALS_KEY); if(!k) return {};
+  try{ return JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return {}; }
+}
+function bumpDeliberateRemoval(kind){
+  const k=nsKey(DELIBERATE_REMOVALS_KEY); if(!k) return;
+  try{
+    const cur=getDeliberateRemovals();
+    cur[kind]=(cur[kind]||0)+1;
+    localStorage.setItem(k, JSON.stringify(cur));
+  }catch(e){}
+}
+function clearDeliberateRemovals(uid_){
+  const k=nsKey(DELIBERATE_REMOVALS_KEY, uid_); if(k) try{ localStorage.removeItem(k); }catch(e){}
 }
 // Migración suave del cuaderno pre-paso-194 (una sola clave sin sufijo, compartida por
 // cualquier cuenta que hubiera usado este navegador): al conocer el uid que está por entrar,

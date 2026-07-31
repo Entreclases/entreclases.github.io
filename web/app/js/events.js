@@ -641,6 +641,7 @@ document.addEventListener("click", (e)=>{
       if(!state.catalog.careersDeleted) state.catalog.careersDeleted=[];
       const n=normName(c.nombre);
       if(!state.catalog.careersDeleted.includes(n)) state.catalog.careersDeleted.push(n);
+      bumpDeliberateRemoval("careers");
     }
     if(state.editCareerId===id) state.editCareerId=null;
     touchCatalog(); return;
@@ -2283,6 +2284,7 @@ document.addEventListener("click", (e)=>{
     state.view="lista"; state.confirmDel=false;
     const id=s.id; state.selId=null;
     update(id,{deleted:true, deletedAt:Date.now()});
+    bumpDeliberateRemoval("students");
     toast(s.sample?"Ejemplo eliminado":"Estudiante eliminado — va a la papelera por 7 días", "ok", ()=>{
       const st=state.students.find(x=>x.id===id); if(!st) return;
       update(id,{deleted:false, deletedAt:null});

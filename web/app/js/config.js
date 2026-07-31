@@ -13,6 +13,14 @@ const SES_KEY = "tutoria-sync-ses";   // sesión iniciada (tokens): cookie de se
 const EMAILS_KEY = "tutoria-remembered-emails"; // emails con los que se inició sesión con éxito en este dispositivo — no se borra al cerrar sesión
 const BACKUP_DATE_KEY = "tutoria-last-backup-date"; // fecha (YYYY-MM-DD) del último snapshot subido a cuaderno_respaldos, para hacer uno solo por día — namespaceada por uid (paso 194)
 const MAX_BACKUPS = 10;
+// Freno de mano ante achiques grandes (paso 224): cuenta de borrados deliberados (alumno,
+// materia, carrera, grupo de clase) hechos en ESTE dispositivo desde el último POST exitoso a
+// la nube — namespaceada por uid, ver bumpDeliberateRemoval()/clearDeliberateRemovals() en
+// helpers.js. Sirve para no confundir un borrado a propósito con una pérdida de datos real al
+// chequear la caída en syncNow() (sync.js).
+const DELIBERATE_REMOVALS_KEY = "tutoria-deliberate-removals";
+const ACHIQUE_PCT = 0.3; // caída de más del 30% sin explicar por borrados deliberados dispara el freno
+const ACHIQUE_MIN_A_CERO = 2; // caída de más de 2 ítems a exactamente 0 también lo dispara, aunque no llegue al 30%
 const DIRTY_KEY = "tutoria-sync-dirty"; // "1" mientras hay cambios locales sin confirmar por una escritura exitosa a la nube — namespaceada por uid (paso 194)
 const LAST_REMOTE_KEY = "tutoria-last-remote-updated"; // último updated_at de la fila remota que ya vimos, para el chequeo liviano — namespaceada por uid (paso 194)
 const VERSION_CHECK_KEY = "tutoria-last-version-check"; // timestamp del último chequeo de versión (apps nativas)

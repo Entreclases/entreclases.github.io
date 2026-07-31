@@ -209,6 +209,24 @@ async function syncNow(force){
     const needsWrite = !(firstSyncEver && row) && (dirty || !row || !sameStudents(merged,remote) ||
       stableStringify(catalog)!==stableStringify(rd.catalog||{}));
     if(needsWrite){
+      // Freno de mano (paso 224): si row existe (ya había algo en la nube) y lo que está por
+      // subirse achica sospechosamente materias/alumnos/carreras/grupos frente a eso, primero
+      // un respaldo de emergencia de lo que HOY hay en la nube (rd), después se sigue escribiendo
+      // igual (nunca se bloquea la sync) pero con un aviso que el docente no puede pasar por alto.
+      if(row){
+        const sospechas=achiquesSospechosos(remote, rd.catalog||{}, merged, catalog);
+        if(sospechas.length){
+          const okBackup=await snapshotEmergencia(uid_, s, rd);
+          toast(
+            `Se sincronizó una versión con muchas menos ${sospechas.join(", ")} que la anterior.`+
+            (okBackup ? " Guardamos una copia de seguridad — Cuenta → Respaldos." : " No pudimos guardar la copia de seguridad — avisale a soporte."),
+            "error",
+            null,
+            {label:"Ver Respaldos", run:()=>{ state.view="cuenta"; state.cuentaOpenGroupId="datos"; loadBackups(); render(); }},
+            true
+          );
+        }
+      }
       const up=await fetch(SUPA_URL+"/rest/v1/cuaderno?select=updated_at",{method:"POST",
         headers:{...h, Prefer:"resolution=merge-duplicates,return=representation"},
         body:JSON.stringify([{user_id:uid_, data:{students:merged, catalog:catalog}, updated_at:new Date().toISOString()}])});
@@ -216,6 +234,7 @@ async function syncNow(force){
       const upRows=await up.json().catch(()=>[]);
       if(upRows[0] && upRows[0].updated_at) remoteUpdatedAt=upRows[0].updated_at;
       setDirty(false);
+      clearDeliberateRemovals(uid_);
     }
 
     state.students=merged; state.catalog=catalog;
@@ -428,7 +447,9 @@ async function maybeSnapshotBackup(uid_, s){
 async function trimBackups(uid_, s){
   try{
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
-    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?select=id&order=created_at.desc", {headers:h});
+    // es_emergencia=eq.false (paso 224): los snapshots de emergencia de snapshotEmergencia() de
+    // abajo no cuentan para el recorte de MAX_BACKUPS — un rescate no se puede perder solo.
+    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?select=id&es_emergencia=eq.false&order=created_at.desc", {headers:h});
     if(!r.ok) return;
     const rows=await r.json();
     const toDelete=rows.slice(MAX_BACKUPS).map(x=>x.id);
@@ -437,6 +458,40 @@ async function trimBackups(uid_, s){
       {method:"DELETE", headers:h});
   }catch(e){ /* silencioso */ }
 }
+// Freno de mano ante achiques grandes (paso 224): antes de escribir una versión con muchas menos
+// materias/alumnos vivos/carreras/grupos que la que HOY está en la nube, se sube un snapshot de
+// emergencia con esa data de la nube (no la local, que es la sospechosa) — marcado es_emergencia
+// para que trimBackups() nunca lo borre. No devuelve error al caller: si falla, igual se sigue
+// con la escritura (mejor escribir con un aviso que trabar la sincronización entera), pero no se
+// silencia — ver el toast en syncNow().
+async function snapshotEmergencia(uid_, s, cloudData){
+  const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json", Prefer:"return=minimal"};
+  const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos", {method:"POST", headers:h,
+    body:JSON.stringify([{user_id:uid_, data:{students:cloudData.students||[], catalog:cloudData.catalog||defaultCatalog()}, es_emergencia:true}])});
+  return r.ok;
+}
+// ¿la versión que está por escribirse (merged/catalog) tiene MUCHAS menos materias, alumnos
+// vivos, carreras o grupos de clase que la que hoy está en la nube (rd, sin mergear)? Un id que
+// sólo bajó de cantidad porque el propio docente lo mandó a la papelera hace un rato (ver
+// bumpDeliberateRemoval() en helpers.js) no cuenta como sospechoso — sólo lo que la caída deja
+// SIN explicar. Ante la duda de si un caso está bien distinguido, este chequeo prefiere avisar
+// de más antes que de menos (paso 224).
+function achiquesSospechosos(remoteStudents, remoteCatalog, mergedStudents, mergedCatalog){
+  const removals=getDeliberateRemovals();
+  const vivos = arr => (arr||[]).filter(x=>!x.deleted).length;
+  const chequeos=[
+    {kind:"materias", before:(remoteCatalog.subjects||[]).length, after:(mergedCatalog.subjects||[]).length, explicado:removals.subjects||0},
+    {kind:"alumnos", before:vivos(remoteStudents), after:vivos(mergedStudents), explicado:removals.students||0},
+    {kind:"carreras", before:(remoteCatalog.careers||[]).length, after:(mergedCatalog.careers||[]).length, explicado:removals.careers||0},
+    {kind:"grupos de clase", before:(remoteCatalog.gruposClase||[]).length, after:(mergedCatalog.gruposClase||[]).length, explicado:removals.grupos||0},
+  ];
+  return chequeos.filter(c=>{
+    const caida=c.before-c.after;
+    if(caida<=0) return false;
+    const sospechoso = (c.after===0 && c.before>ACHIQUE_MIN_A_CERO) || (caida/c.before)>ACHIQUE_PCT;
+    return sospechoso && caida>c.explicado;
+  }).map(c=>c.kind);
+}
 // Lista liviana: solo id/created_at/n_alumnos (columna generada, migración 009) — nada de
 // "data". Bajar los N respaldos completos (uno puede ser el cuaderno entero) solo para
 // listarlos era el costo que había que eliminar; la data de uno solo se pide al restaurar.
@@ -444,7 +499,7 @@ async function loadBackups(){
   try{
     const s=await ensureToken();
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access};
-    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?select=id,created_at,n_alumnos&order=created_at.desc", {headers:h});
+    const r=await fetch(SUPA_URL+"/rest/v1/cuaderno_respaldos?select=id,created_at,n_alumnos,es_emergencia&order=created_at.desc", {headers:h});
     if(!r.ok) throw new Error("error "+r.status);
     state.backups=await r.json();
     state.backupsLoaded=true; state.backupsError="";
@@ -2033,6 +2088,7 @@ async function deleteSubjectAndMaybeMaterials(subjectId){
     state.catalog.packs=(state.catalog.packs||[]).map(p=>({...p, subjectIds:p.subjectIds.filter(id=>id!==subjectId)}));
     state.catalog.trash=[...(state.catalog.trash||[]), {type:"subject", subject:subj, packIds, deletedAt:Date.now()}];
     touchCatalog();
+    bumpDeliberateRemoval("subjects");
     compartidos.forEach(f=>removeFromPortalBiblioteca(subjectId, f.name));
     toast(`Materia eliminada — va a la papelera por 7 días`, "ok", ()=>restoreSubjectFromTrash(subjectId));
   };

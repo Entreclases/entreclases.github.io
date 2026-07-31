@@ -1051,7 +1051,7 @@ function vBackupsList(){
     const bid = String(b.id);
     const confirming = state.confirmRestoreId===bid;
     return `<div class="log" style="align-items:center;flex-wrap:wrap">
-      <div class="body">${fmtDateTime(b.created_at)}<div class="note">${n} estudiante${n===1?"":"s"}</div></div>
+      <div class="body">${fmtDateTime(b.created_at)}${b.es_emergencia?` <span style="color:var(--status-desaprobo-fg)">· copia de seguridad automática</span>`:""}<div class="note">${n} estudiante${n===1?"":"s"}</div></div>
       ${!confirming
         ? `<button class="chip" data-a="restore-ask" data-id="${esc(bid)}">Restaurar</button>`
         : `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:100%">
