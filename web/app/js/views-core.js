@@ -1210,6 +1210,7 @@ function render(){
   if(state.grupalForm) m += vGrupalForm();
   if(state.finCuatrimestreOpen) m += vFinCuatrimestreOverlay();
   if(state.reactivacionOpen) m += vReactivacionOverlay();
+  if(state.orphanRepairOpen) m += vOrphanRepairOverlay();
   if(state.tutOpen) m += vTutPanel();
   if(state.importCsv) m += vImportCsvOverlay();
   m += `<div class="footer">La app funciona siempre, con o sin internet. Con sincronización activa, los cambios se combinan solos entre tus dispositivos.</div>`;

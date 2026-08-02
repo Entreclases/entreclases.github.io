@@ -596,6 +596,70 @@ function packsContaining(subjectId){ return (state.catalog.packs||[]).filter(p=>
 
 const alive = () => state.students.filter(s => !s.deleted);
 
+/* ============ materias huérfanas (paso 242) ============
+   Residuo del bug de la 2.7.0 que nunca se reparó: alumnos con s.subjectId apuntando a una
+   materia que ya no existe (ni viva en catalog.subjects ni en la papelera, catalog.trash) —
+   s.subject (el nombre, texto plano) sobrevivió porque nunca dependió del id. unitsFor() arma
+   unidades "fantasma" de sólo lectura desde s.topics para que el informe siga mostrando algo, pero
+   eso ESCONDE el daño: filtrar por materia, rentabilidad por materia, packs, grupos de clase y el
+   portal grupal dependen del id real y no encuentran nada. Estas funciones sólo DETECTAN (alimentan
+   el banner del Tablero y el reparador, ver vOrphanSubjectsBanner/vOrphanRepairOverlay en
+   views-tablero.js) — commitOrphanRepair() es la única que toca datos, y sólo cuando el docente
+   confirma. */
+function alumnosMateriaOrfana(){
+  return alive().filter(s => s.subjectId && !subjById(s.subjectId) &&
+    !(state.catalog.trash||[]).some(t => t.type==="subject" && t.subject && t.subject.id===s.subjectId));
+}
+// Unión de los nombres de unidad presentes en s.topics de un grupo de alumnos con el mismo
+// subjectId huérfano, en el orden en que aparecen — s.topics está indexado POR NOMBRE de unidad
+// (ver s.topics[nombre] en unitsFor), así que esto reconstruye la lista real sin adivinar nada.
+function unidadesDetectadasOrfanas(alumnos){
+  const seen=new Set(), out=[];
+  alumnos.forEach(s=>{
+    Object.keys(s.topics||{}).forEach(nombre=>{ if(!seen.has(nombre)){ seen.add(nombre); out.push(nombre); } });
+  });
+  return out;
+}
+function gruposMateriaOrfana(){
+  const map=new Map();
+  alumnosMateriaOrfana().forEach(s=>{
+    if(!map.has(s.subjectId)) map.set(s.subjectId, {subjectId:s.subjectId, nombre:s.subject||"(sin nombre)", alumnos:[]});
+    map.get(s.subjectId).alumnos.push(s);
+  });
+  return [...map.values()].map(g=>({...g, unidades:unidadesDetectadasOrfanas(g.alumnos)}));
+}
+function dismissOrphanSubjects(){ const k=nsKey(ORPHAN_SUBJECTS_DISMISS_KEY); if(k) localStorage.setItem(k, String(Date.now())); }
+function shouldShowOrphanSubjectsBanner(){
+  if(alumnosMateriaOrfana().length===0) return false;
+  const k=nsKey(ORPHAN_SUBJECTS_DISMISS_KEY);
+  const dismissedAt=parseInt((k&&localStorage.getItem(k))||"0",10);
+  if(dismissedAt && (Date.now()-dismissedAt)/86400000 < ORPHAN_SUBJECTS_SNOOZE_DAYS) return false;
+  return true;
+}
+// Aplica de una sola vez las decisiones del reparador (decisions: {[subjectId]: {action, targetId}})
+// — "recrear" da de alta la materia con ESE MISMO id (los alumnos ya apuntan ahí, no hace falta
+// tocarlos) con las unidades detectadas en el orden en que se armaron; "reasignar" mueve a todo el
+// grupo a una materia existente; "ninguna" limpia subjectId conservando s.subject como estaba. Un
+// solo touchCatalog() al final: nunca aplica a medias.
+function commitOrphanRepair(decisions){
+  const grupos=gruposMateriaOrfana();
+  grupos.forEach(g=>{
+    const d=decisions[g.subjectId]; if(!d) return;
+    if(d.action==="recrear"){
+      state.catalog.subjects.push({
+        id:g.subjectId, name:g.nombre, units:g.unidades.map((nombre,i)=>makeUnit(nombre,i)),
+        color:nextSubjectColor(), careerIds:[], updatedAt:Date.now(),
+      });
+    }else if(d.action==="reasignar" && d.targetId){
+      const m=subjById(d.targetId);
+      g.alumnos.forEach(s=>{ s.subjectId=d.targetId; s.subject=m?m.name:s.subject; s.updatedAt=Date.now(); });
+    }else if(d.action==="ninguna"){
+      g.alumnos.forEach(s=>{ s.subjectId=""; s.updatedAt=Date.now(); });
+    }
+  });
+  touchCatalog();
+}
+
 function load(){
   if(IS_DEMO){
     const d=buildDemoData();

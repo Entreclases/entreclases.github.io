@@ -232,7 +232,8 @@ function vFichaResumen(s){
       </div></div>
     <div class="frow">
       <div class="field"><div class="flabel">Materia</div><select data-f="subjectId">
-        <option value="" ${!s.subjectId?"selected":""}>${s.subjectId?"—":esc(s.subject||"—")}</option>
+        <option value="" ${!s.subjectId?"selected":""}>${!s.subjectId ? "—"
+          : (subjById(s.subjectId) ? "—" : esc(s.subject||"(sin nombre)")+" — materia no encontrada")}</option>
         ${state.catalog.subjects.map(m=>`<option value="${m.id}" ${m.id===s.subjectId?"selected":""}>${esc(m.name)}</option>`).join("")}
       </select></div>
       <div class="field"><div class="flabel">Cátedra / universidad</div><input data-f="chair" value="${esc(s.chair)}"></div>

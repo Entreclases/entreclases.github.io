@@ -2287,6 +2287,24 @@ document.addEventListener("click", (e)=>{
   else if(a==="dismiss-reactivacion"){ dismissReactivacion(); }
   else if(a==="reactivacion-open"){ state.reactivacionOpen=true; }
   else if(a==="reactivacion-close"){ state.reactivacionOpen=false; }
+  else if(a==="dismiss-orphan-subjects"){ dismissOrphanSubjects(); }
+  else if(a==="orphan-open"){
+    state.orphanRepairOpen=true;
+    state.orphanRepairDecisions={};
+    gruposMateriaOrfana().forEach(g=>{ state.orphanRepairDecisions[g.subjectId]={action:"recrear", targetId:""}; });
+  }
+  else if(a==="orphan-close"){ state.orphanRepairOpen=false; state.orphanRepairDecisions=null; }
+  else if(a==="orphan-modal-noop"){ return; }
+  else if(a==="orphan-set-action"){
+    const d=state.orphanRepairDecisions && state.orphanRepairDecisions[el.dataset.id];
+    if(d) d.action=el.dataset.f;
+  }
+  else if(a==="orphan-confirm"){
+    if(state.orphanRepairDecisions) commitOrphanRepair(state.orphanRepairDecisions);
+    state.orphanRepairOpen=false; state.orphanRepairDecisions=null;
+    toast("Materias huérfanas reparadas");
+    return;
+  }
   else if(a==="reactivacion-escribi"){
     const id=el.dataset.id;
     marcarReactivacion(id,"escribi");
@@ -2799,6 +2817,12 @@ function handleFormChange(e){
   if(cf && cf.dataset.cf && cf.dataset.cf.startsWith("import-map-") && state.importCsv){
     const field = cf.dataset.cf.slice("import-map-".length);
     state.importCsv.mapping[field] = cf.value===""?null:parseInt(cf.value,10);
+    return;
+  }
+  if(cf && cf.dataset.cf && cf.dataset.cf.startsWith("orphan-target-") && state.orphanRepairDecisions){
+    const subjectId = cf.dataset.cf.slice("orphan-target-".length);
+    const d = state.orphanRepairDecisions[subjectId];
+    if(d) d.targetId = cf.value;
     return;
   }
   const lf=e.target.closest("[data-lf]");

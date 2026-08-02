@@ -44,6 +44,11 @@ const FIN_CUATRIMESTRE_DIAS_SIN_CLASE = 30; // umbral por defecto ("30/60 días"
 const REACTIVACION_DISMISS_KEY = "tutoria-reactivacion-dismissed-at"; // namespaceada por uid
 const REACTIVACION_SNOOZE_DAYS = 14;
 const REACTIVACION_MARCADOS_KEY = "tutoria-reactivacion-marcados"; // namespaceada por uid
+// Materias huérfanas (paso 242): alumnos con subjectId apuntando a una materia que ya no existe
+// en el catálogo (residuo del bug de la 2.7.0) — mismo criterio de descartar/reaparecer que el
+// aviso de respaldo, ver shouldShowOrphanSubjectsBanner()/alumnosMateriaOrfana() en helpers.js.
+const ORPHAN_SUBJECTS_DISMISS_KEY = "tutoria-orphan-subjects-dismissed-at"; // namespaceada por uid
+const ORPHAN_SUBJECTS_SNOOZE_DAYS = 7;
 const LOGIN_ATTEMPTS_KEY = "tutoria-login-attempts"; // {count, lockUntil} — freno local a intentos de login seguidos, aparte del rate-limit propio de Supabase
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCK_MS = 5*60*1000;

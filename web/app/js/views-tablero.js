@@ -53,6 +53,68 @@ function vBackupReminder(){
   </div>`;
 }
 
+// Materias huérfanas (paso 242): banner + reparador para alumnos con subjectId apuntando a una
+// materia que ya no existe en el catálogo (residuo del bug de la 2.7.0) — mismo patrón de
+// descartar/reaparecer que vBackupReminder. El detector/commit vive en helpers.js; acá sólo se
+// pinta y se lee/escribe state.orphanRepairOpen/state.orphanRepairDecisions.
+function vOrphanSubjectsBanner(){
+  if(!shouldShowOrphanSubjectsBanner()) return "";
+  const n = alumnosMateriaOrfana().length;
+  return `<div class="formcard" style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap">
+    <div style="font-size:13px;color:var(--muted)">Hay ${n} alumno${n===1?"":"s"} con una materia que ya no existe en tu catálogo.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+      <button class="chip" data-a="orphan-open">Reparar</button>
+      <button class="del" style="font-size:20px" data-a="dismiss-orphan-subjects" title="Descartar" aria-label="Descartar">×</button>
+    </div>
+  </div>`;
+}
+
+function vOrphanRepairRow(g, decisions){
+  const d = decisions[g.subjectId] || {action:"recrear", targetId:""};
+  const n = g.alumnos.length;
+  return `<div class="log">
+    <div class="body">
+      <b>${esc(g.nombre)}</b>
+      <div class="note">${n} alumno${n===1?"":"s"} · ${g.unidades.length ? g.unidades.length+" unidad"+(g.unidades.length===1?"":"es")+" detectada"+(g.unidades.length===1?"":"s")+": "+g.unidades.map(esc).join(", ") : "sin unidades detectadas (nadie tiene avance cargado)"}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <button class="chip ${d.action==="recrear"?"on":""}" data-a="orphan-set-action" data-id="${g.subjectId}" data-f="recrear">Recrear esta materia</button>
+        <button class="chip ${d.action==="reasignar"?"on":""}" data-a="orphan-set-action" data-id="${g.subjectId}" data-f="reasignar">Reasignar a una materia existente</button>
+        <button class="chip ${d.action==="ninguna"?"on":""}" data-a="orphan-set-action" data-id="${g.subjectId}" data-f="ninguna">Dejar sin materia</button>
+      </div>
+      ${d.action==="reasignar" ? `<div style="margin-top:8px"><select data-cf="orphan-target-${g.subjectId}">
+        <option value="">— elegí una materia —</option>
+        ${state.catalog.subjects.map(m=>`<option value="${m.id}" ${d.targetId===m.id?"selected":""}>${esc(m.name)}</option>`).join("")}
+      </select></div>` : ""}
+    </div>
+  </div>`;
+}
+
+function vOrphanRepairOverlay(){
+  if(!state.orphanRepairOpen) return "";
+  const grupos = gruposMateriaOrfana();
+  const decisions = state.orphanRepairDecisions || {};
+  const totalAlumnos = grupos.reduce((n,g)=>n+g.alumnos.length,0);
+  const faltaElegir = grupos.some(g=>{ const d=decisions[g.subjectId]; return d && d.action==="reasignar" && !d.targetId; });
+  let h = `<div class="overlay no-print" data-a="orphan-close">
+    <div class="modal" data-a="orphan-modal-noop" style="max-width:640px;max-height:86vh;overflow:auto">
+      <div class="ftitle" style="font-size:16px">Materias huérfanas</div>
+      <div class="hint" style="margin-bottom:10px">Estos alumnos tienen cargada una materia que ya no está en tu catálogo — elegí qué hacer con cada una. Nada se aplica hasta que confirmes.</div>`;
+  if(grupos.length===0){
+    h += `<div class="empty">No hay materias huérfanas por ahora.</div>`;
+  }else{
+    h += `<div class="hint" style="margin-bottom:10px"><b>${totalAlumnos}</b> alumno${totalAlumnos===1?"":"s"} en <b>${grupos.length}</b> materia${grupos.length===1?"":"s"} huérfana${grupos.length===1?"":"s"}.</div>`;
+    h += grupos.map(g=>vOrphanRepairRow(g, decisions)).join("");
+    if(faltaElegir) h += `<div class="hint" style="margin-top:8px;color:var(--red)">Elegí una materia para cada grupo que reasignes antes de confirmar.</div>`;
+  }
+  h += `<div style="margin-top:14px;text-align:right;display:flex;justify-content:flex-end;gap:8px">
+    <button class="chip" data-a="orphan-close">Cerrar</button>
+    ${grupos.length ? `<button class="chip on" data-a="orphan-confirm" ${faltaElegir?"disabled":""}>Confirmar cambios</button>` : ""}
+  </div>
+    </div>
+  </div>`;
+  return h;
+}
+
 // Reactivación de temporada (paso 236): contracara del cierre de cuatrimestre — arranca sola en
 // la misma temporada (finCuatrimestreTemporada(), helpers.js) cuando hay algún alumno con clases
 // el período anterior y ninguna en el actual. "Descartar" la posterga REACTIVACION_SNOOZE_DAYS,
@@ -359,6 +421,7 @@ function vTablero(){
   h += vTourResumeBanner();
   h += vFeedbackBanner();
   h += vBackupReminder();
+  h += vOrphanSubjectsBanner();
   h += vReactivacionBanner();
   h += vCumpleanosBanner();
   h += vTuDia();
