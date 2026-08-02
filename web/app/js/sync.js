@@ -46,7 +46,12 @@ function mergeStudents(local,remote,localTomb,remoteTomb){
 const ID_COLLECTIONS = ["careers","tags"];
 // Colecciones con borrado real, mergeadas con mergeConIdYBaja(): "vivo" vs "borrado" es un estado
 // más del ítem (no una lista aparte que sólo crece), así que tanto un borrado real como una
-// restauración posterior se respetan según cuál lado es más nuevo.
+// restauración posterior se respetan según cuál lado es más nuevo. "subjects" NO está acá porque
+// tiene DOS mecanismos, no uno: mientras está en catalog.trash (ventana de TRASH_DAYS) se mergea
+// aparte más abajo contra catalog.subjects (la papelera hace de "borrado", paso 76); una vez que la
+// papelera purga la entrada (load(), helpers.js), catalog.tombstones.subjects (formato {id,
+// deletedAt}, no la lista simple de ids de acá) toma la posta para que el olvido del purge no
+// resucite la materia — ver el comentario junto a tombSubjectsMap en mergeCatalog().
 const TOMBSTONE_COLLECTIONS = ["packs","gruposClase","interesados","packsCatalogo","mensajesPropios"];
 function mergeById(localArr, remoteArr, localWins){
   const lm=new Map((localArr||[]).map(x=>[x.id,x]));
@@ -94,6 +99,28 @@ function mergeCatalog(local, remote){
                                       byId(r.subjects), new Set(remoteTrashByStudent.keys()), localWins);
   catalog.trash = mergeConIdYBaja(localTrashByStudent, new Set((local.subjects||[]).map(s=>s.id)),
                                    remoteTrashByStudent, new Set((r.subjects||[]).map(s=>s.id)), localWins);
+  // tombstones.subjects (paso 241): la unión de arriba sólo cubre mientras la materia sigue en
+  // catalog.trash (ventana de TRASH_DAYS) — pasado ese plazo, load() (helpers.js) purga la entrada
+  // sin dejar rastro EN ESA estructura, así que un id que un lado ya purgó (ni vivo ni en su
+  // papelera) pero el otro nunca sincronizó el borrado (lo tiene vivo de antes) podía resucitar
+  // arriba: para ese lado lKnown/rKnown da "sólo lo conoce un lado" y gana el que sí lo conoce.
+  // catalog.tombstones.subjects (deletedAt por id, puesto por load() al purgar) tapa ese agujero:
+  // unión quedándose con el deletedAt más nuevo, aplicada DESPUÉS de la unión de subjects/trash de
+  // arriba — mismo criterio que mergeStudents(): si la materia sobreviviente es tan vieja o más que
+  // el tombstone, gana el purgado; restoreSubjectFromTrash marca subject.updatedAt al restaurar
+  // para que una restauración real posterior al purge no quede pisoteada por un tombstone viejo.
+  const localTombSubjects=(local.tombstones&&local.tombstones.subjects)||[];
+  const remoteTombSubjects=(r.tombstones&&r.tombstones.subjects)||[];
+  const tombSubjectsMap=new Map();
+  [...localTombSubjects,...remoteTombSubjects].forEach(t=>{
+    const prev=tombSubjectsMap.get(t.id);
+    if(!prev || (t.deletedAt||0)>(prev.deletedAt||0)) tombSubjectsMap.set(t.id,t);
+  });
+  catalog.subjects = catalog.subjects.filter(s=>{
+    const t=tombSubjectsMap.get(s.id);
+    return !(t && (s.updatedAt||0)<=(t.deletedAt||0));
+  });
+  catalog.subjects.forEach(s=>tombSubjectsMap.delete(s.id));
   // tombstones unificados (paso 222): packs/gruposClase/interesados/packsCatalogo/mensajesPropios
   const tombstones={};
   TOMBSTONE_COLLECTIONS.forEach(key=>{
@@ -101,6 +128,7 @@ function mergeCatalog(local, remote){
     catalog[key] = mergeConIdYBaja(byId(local[key]), new Set(localDead), byId(r[key]), new Set(remoteDead), localWins);
     tombstones[key]=[...new Set([...localDead, ...remoteDead])].filter(id=>!catalog[key].some(x=>x.id===id));
   });
+  tombstones.subjects=[...tombSubjectsMap.values()];
   catalog.tombstones=tombstones;
   // careersDeleted (paso 214/219): mismo criterio, aplicado por nombre normalizado en vez de id —
   // ya preexistente (no cambia), se mantiene igual.
@@ -2195,6 +2223,11 @@ async function deleteSubjectAndMaybeMaterials(subjectId){
 function restoreSubjectFromTrash(subjectId){
   const entry=(state.catalog.trash||[]).find(t=>t.type==="subject" && t.subject.id===subjectId); if(!entry) return;
   state.catalog.trash=state.catalog.trash.filter(t=>t!==entry);
+  // updatedAt fresco (paso 241): si esta materia ya tenía un tombstone puesto por otro dispositivo
+  // (purgada ahí y nunca vista viva por éste), mergeCatalog() necesita un updatedAt más nuevo que
+  // ese deletedAt para saber que ESTA es una restauración real posterior, no la resurrección que el
+  // tombstone existe para evitar.
+  entry.subject.updatedAt=Date.now();
   state.catalog.subjects=[...state.catalog.subjects, entry.subject];
   state.catalog.packs=(state.catalog.packs||[]).map(p=>
     entry.packIds.includes(p.id) && !p.subjectIds.includes(subjectId)
@@ -2203,9 +2236,13 @@ function restoreSubjectFromTrash(subjectId){
   toast("Materia restaurada");
 }
 // Elimina definitivamente una materia de la papelera (botón "Eliminar definitivo" en Cuenta) —
-// ya no se puede deshacer.
+// ya no se puede deshacer. Deja el mismo tombstone que el purge automático por vencimiento (paso
+// 241): sin esto, borrar "para siempre" a mano reabría el mismo agujero de inmediato en vez de a
+// los TRASH_DAYS.
 function purgeSubjectFromTrash(subjectId){
+  const entry=(state.catalog.trash||[]).find(t=>t.type==="subject" && t.subject.id===subjectId);
   state.catalog.trash=(state.catalog.trash||[]).filter(t=>!(t.type==="subject" && t.subject.id===subjectId));
+  if(entry) addSubjectTombstone(subjectId, entry.deletedAt||Date.now());
   touchCatalog();
 }
 

@@ -553,6 +553,18 @@ function tombstoneRemove(collection, id){
   const t = state.catalog.tombstones; if(!t || !Array.isArray(t[collection])) return;
   t[collection]=t[collection].filter(x=>x!==id);
 }
+// Tombstone de una materia purgada de catalog.trash (paso 241) — mismo formato {id, deletedAt}
+// que tombstones.students (no la lista simple de ids de tombstoneAdd/tombstoneRemove, porque acá
+// necesitamos comparar contra un updatedAt para distinguir un purge real de una restauración
+// posterior; ver mergeCatalog() en sync.js). Se queda con el deletedAt más nuevo si ya había uno.
+function addSubjectTombstone(id, deletedAt){
+  if(!state.catalog.tombstones) state.catalog.tombstones={};
+  if(!Array.isArray(state.catalog.tombstones.subjects)) state.catalog.tombstones.subjects=[];
+  const tombMap=new Map(state.catalog.tombstones.subjects.map(t=>[t.id,t]));
+  const prev=tombMap.get(id);
+  if(!prev || deletedAt>prev.deletedAt) tombMap.set(id,{id, deletedAt});
+  state.catalog.tombstones.subjects=[...tombMap.values()];
+}
 // Feedback breve y no intrusivo tras una acción (ver .toast-wrap en styles.css) — se apila en
 // state.toasts y se autodescarta solo pasado TOAST_MS (TOAST_UNDO_MS si tiene botón "Deshacer",
 // para dar más tiempo a reaccionar), sin bloquear ni pedir click. Patrón único de borrado (paso
@@ -642,7 +654,19 @@ function load(){
   state.catalog.tombstones.students = state.catalog.tombstones.students.filter(
     t => (Date.now()-(t.deletedAt||0)) <= TOMBSTONE_STUDENTS_DAYS*86400000
   );
-  state.catalog.trash = state.catalog.trash.filter(t => (Date.now()-(t.deletedAt||0)) <= TRASH_DAYS*86400000);
+  // Tombstone de materias purgadas de la papelera (paso 241): mismo problema que arriba pero para
+  // catalog.trash, que hasta ahora se purgaba a los TRASH_DAYS (7 días) sin dejar rastro — bastante
+  // más corto que tombstones.students (180 días) pese a ser el catálogo más valioso. Antes de sacar
+  // una entrada vencida de la papelera, se anota su subject.id en catalog.tombstones.subjects (con
+  // el deletedAt que ya tenía) — mergeCatalog() (sync.js) lo usa para no resucitar la materia salvo
+  // que el otro lado la haya restaurado de verdad después de esa fecha.
+  if(!Array.isArray(state.catalog.tombstones.subjects)) state.catalog.tombstones.subjects=[];
+  const purgarSubjects = state.catalog.trash.filter(t => t.type==="subject" && (Date.now()-(t.deletedAt||0)) > TRASH_DAYS*86400000);
+  purgarSubjects.forEach(t=>{ if(t.subject) addSubjectTombstone(t.subject.id, t.deletedAt||Date.now()); });
+  state.catalog.tombstones.subjects = state.catalog.tombstones.subjects.filter(
+    t => (Date.now()-(t.deletedAt||0)) <= TOMBSTONE_SUBJECTS_DAYS*86400000
+  );
+  state.catalog.trash = state.catalog.trash.filter(t => !purgarSubjects.includes(t));
   // paso 227: calculado ya en load() (no sólo en el próximo save()) para que Cuenta → Respaldos
   // muestre el peso real desde el primer render, sin esperar a que el docente toque algo.
   if(uid_) try{ state.saveSizeBytes = new Blob([JSON.stringify({owner:uid_, students:state.students, catalog:state.catalog})]).size; }catch(e){}
@@ -668,6 +692,9 @@ const TRASH_DAYS = 7;
 // ventana de vida de un tombstone de alumno purgado (paso 226) — bastante mayor que TRASH_DAYS
 // para que un dispositivo apagado varios meses no traiga de vuelta a un alumno ya purgado.
 const TOMBSTONE_STUDENTS_DAYS = 180;
+// idem para materias purgadas de catalog.trash (paso 241) — mismo plazo, catálogo más valioso que
+// una entrada de alumno, no tiene sentido que dure menos.
+const TOMBSTONE_SUBJECTS_DAYS = 180;
 // días restantes antes de que la papelera purgue algo sola, a partir de un ts en ms (deletedAt)
 function trashDaysLeft(deletedAt){ return Math.max(0, TRASH_DAYS - Math.floor((Date.now()-(deletedAt||0))/86400000)); }
 function setDirty(v){ const k=nsKey(DIRTY_KEY); if(!k) return; try{ v ? localStorage.setItem(k,"1") : localStorage.removeItem(k); }catch(e){} }
