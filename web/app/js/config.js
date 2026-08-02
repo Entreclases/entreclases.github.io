@@ -192,6 +192,13 @@ function setDensity(d){ localStorage.setItem(DENSITY_KEY, d); applyDensity(d); }
 applyDensity(getDensity()); // igual que el tema, aplicada de entrada para evitar parpadeo
 const RELEASES_API = "https://api.github.com/repos/entreclases/entreclases.github.io/releases/latest";
 const DOWNLOADS_URL = "https://entreclases.github.io/#usala";
+// Paso 240: en nativo (Tauri/Capacitor) el webview sirve los archivos desde un esquema local
+// (capacitor://localhost, tauri://localhost) — un href relativo como "../terminos.html" no
+// resuelve contra ese esquema. openExternal() (helpers.js) usa PUBLIC_APP_ORIGIN como base para
+// resolver cualquier link relativo antes de abrirlo afuera; TERMS_URL es el caso puntual que
+// además se usa directo en el link de Cuenta (views-cuenta.js).
+const PUBLIC_APP_ORIGIN = "https://entreclases.github.io/app/";
+const TERMS_URL = "https://entreclases.github.io/terminos.html";
 // Mail de contacto institucional (paso 183) — único lugar del que lo lee el app; la landing, el
 // portal y terminos.html no comparten este archivo, así que repiten el mismo string literal.
 const CONTACT_EMAIL = "contacto.entreclases@gmail.com";

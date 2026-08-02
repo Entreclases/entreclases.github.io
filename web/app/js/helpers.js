@@ -4,6 +4,39 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6
 const today = () => new Date().toISOString().slice(0,10);
 const esc = (s) => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
+// Paso 240: puerta única para abrir cualquier link "de afuera" (WhatsApp, link de clase,
+// descargas, términos). En web, sigue siendo window.open target=_blank de siempre. En nativo un
+// target=_blank no alcanza — el link queda atrapado en el webview propio de la app (o, si la
+// ruta es relativa como "../terminos.html", ni resuelve porque el paquete nativo no tiene esa
+// carpeta) — así que acá se resuelve contra PUBLIC_APP_ORIGIN (config.js) y se abre por el canal
+// del sistema operativo. events.js llama a esto en vez de dejar el target=_blank por defecto
+// (intercepta cualquier <a target="_blank">) y en los dos window.open() que quedaban sueltos.
+const WA_ME_RE = /^https:\/\/wa\.me\//i;
+function openExternal(url){
+  if(!url) return;
+  if(!IS_NATIVE){ window.open(url,"_blank","noopener"); return; }
+  const abs = new URL(url, PUBLIC_APP_ORIGIN).href;
+  if(window.Capacitor){
+    // wa.me (y mailto:/tel:, si algún día se suman) ya los resuelve el propio SO como intent
+    // hacia la app correspondiente con sólo navegar — así abre WhatsApp hoy. Pasarlos por
+    // Browser.open() los mete en una Custom Tab y puede tapar ese handoff, así que quedan
+    // afuera; el resto (link de clase, términos, descargas) sí necesita Browser.open(): sin eso
+    // se quedan atrapados en el webview propio de la app.
+    if(WA_ME_RE.test(abs) || /^mailto:|^tel:/i.test(abs)){ location.href = abs; return; }
+    const Browser = window.Capacitor.Plugins && window.Capacitor.Plugins.Browser;
+    if(Browser && Browser.open){ Browser.open({url:abs}).catch(()=>{ location.href = abs; }); return; }
+    location.href = abs;
+    return;
+  }
+  if(window.__TAURI__){
+    const core = window.__TAURI__.core;
+    if(core && core.invoke){ core.invoke("plugin:opener|open_url",{url:abs}).catch(()=>{ location.href = abs; }); return; }
+    location.href = abs;
+    return;
+  }
+  location.href = abs;
+}
+
 // applicationServerKey de PushManager.subscribe() quiere un Uint8Array, no el string base64url
 // que da VAPID_PUBLIC_KEY (config.js) — conversión estándar (paso 108).
 function urlBase64ToUint8Array(base64String){

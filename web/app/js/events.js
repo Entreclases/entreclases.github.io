@@ -355,6 +355,12 @@ document.addEventListener("click", (e)=>{
   // a que el click caiga en algo con data-a (que es lo único que dispara render() más abajo).
   if(state.helpOpen && !e.target.closest(".help-tip-wrap")){ state.helpOpen=null; render(); }
   if(state.fabOpen && !e.target.closest(".fab-wrap")){ state.fabOpen=false; render(); }
+  // Paso 240: puerta única de salida — cualquier <a target="_blank"> (WhatsApp, link de clase,
+  // descargas, términos) pasa por openExternal() en vez del comportamiento por defecto del
+  // navegador, que en nativo deja el link atrapado en el webview propio de la app. Va antes del
+  // corte de abajo por [data-a] porque estos <a> no lo tienen.
+  const extLink = e.target.closest('a[target="_blank"]');
+  if(extLink){ e.preventDefault(); openExternal(extLink.getAttribute("href")); return; }
   const el = e.target.closest("[data-a]"); if(!el) return;
   const a = el.dataset.a, s = sel();
   // Tips periódicos (paso 205): el botón de la sugerencia es el mismo botón de navegación real
@@ -927,6 +933,10 @@ document.addEventListener("click", (e)=>{
     // reconstruye el formulario entero, así que sin esto se perderían si el usuario ya los había
     // tildado a mano.
     captureAuthCheckboxes();
+    // Paso 240: el modal usa un <iframe src="../terminos.html"> que en nativo no carga (esa ruta
+    // no existe en el paquete) — en vez de mostrar un modal vacío, el botón abre la URL publicada
+    // directo por el canal del sistema.
+    if(IS_NATIVE){ openExternal(TERMS_URL); return; }
     state.showTerminosModal=true;
   }
   else if(a==="terminos-close"){ state.showTerminosModal=false; }
@@ -1571,7 +1581,7 @@ document.addEventListener("click", (e)=>{
   else if(a==="wa-free-send" && s){
     const text=(document.getElementById("wa-free-text").value||"").trim();
     if(!text) return;
-    window.open(waLink(s,text),"_blank","noopener");
+    openExternal(waLink(s,text));
     return;
   }
   else if(a==="open-informe" && s){ state.view="informe"; }
@@ -2333,7 +2343,7 @@ document.addEventListener("click", (e)=>{
     const id=el.dataset.id, st=state.students.find(x=>x.id===id); if(!st) return;
     update(id,{status:"dejo"});
     state.finCuatrimestreActed=true; // paso 179
-    if(hasPhone(st)) window.open(waLink(st,waMsgDespedida(st)),"_blank","noopener");
+    if(hasPhone(st)) openExternal(waLink(st,waMsgDespedida(st)));
     toast("Alumno marcado como dejó", "ok", ()=>{
       const st2=state.students.find(x=>x.id===id); if(!st2) return;
       update(id,{status:"activo"});

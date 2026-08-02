@@ -655,7 +655,7 @@ function vCuenta(){
       ${!IS_NATIVE?`<div class="hint" style="margin-bottom:8px">Estás usando la v${esc(APP_VERSION)}${state.swUpdateReady?" — hay una versión nueva esperando arriba de todo, tocá «Actualizar».":"."}</div>
       <button class="chip" data-a="sw-check-update" ${state.swCheckStatus==="checking"?"disabled":""}>${state.swCheckStatus==="checking"?"Buscando…":"Buscar actualización"}</button>`
       :`<div class="hint">Estás usando la v${esc(APP_VERSION)}.</div>`}
-      <div class="hint" style="margin-top:8px"><a href="../terminos.html" target="_blank" rel="noopener">Términos y privacidad</a></div>
+      <div class="hint" style="margin-top:8px"><a href="${IS_NATIVE?TERMS_URL:"../terminos.html"}" target="_blank" rel="noopener">Términos y privacidad</a></div>
     </div>
     ${vCentroAyuda()}
     <div class="formcard"><div class="ftitle">Reportar un problema</div>
