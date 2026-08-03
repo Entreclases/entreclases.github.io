@@ -288,6 +288,7 @@
   .badge{display:inline-block;font-size:11.5px;font-weight:700;padding:6px 14px;border-radius:20px;letter-spacing:.03em}
   .badge-live{background:var(--accent-soft);color:var(--accent-dark)}
   .badge-soon{background:var(--bg-alt);color:var(--text-soft);border:1px solid var(--border)}
+  .badge-match{background:var(--accent-soft);color:var(--accent-dark);margin-left:8px}
   .section-note{margin-top:26px;font-size:12px;color:var(--text-soft);text-align:center}
 
   .platform-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
@@ -295,6 +296,7 @@
   .platform-grid-3 .feature-card p{flex:1}
   .platform-grid-3 .btn{margin-top:14px}
   .platform-grid-3 .badge{margin-top:14px}
+  .dl-meta{font-size:12px;color:var(--text-soft);margin:8px 0 0;width:100%;text-align:center}
 
   /* ============ aviso de cookies (paso 203): barra chica y de una sola vez, se recuerda por
      dispositivo (localStorage) — mismo criterio y misma clave que en la app (COOKIES_OK_KEY,
@@ -524,7 +526,7 @@
   </div>
 </section>
 
-<section id="usala">
+<section id="usala" style="scroll-margin-top:80px">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">USALA DONDE QUIERAS</span>
@@ -540,6 +542,7 @@
         <p>Se abre directo en el navegador, en la compu o el celular. No requiere instalación, funciona con o sin conexión, y sincroniza sola entre tus dispositivos.</p>
         <a class="btn btn-primary btn-block" href="./app/index.html">Abrir la aplicación</a>
         <span class="badge badge-live">● Disponible</span>
+        <p style="margin-top:10px"><a href="./instalar.html#ios" style="font-size:13px;font-weight:600">¿iPhone o Mac? Agregala a tu pantalla de inicio →</a></p>
       </div>
 
       <div class="feature-card fc-blue">
@@ -548,6 +551,8 @@
         </span>
         <h3>App móvil</h3>
         <p>Versión para Android, para tenerla como una app instalada más, sin pasar por el navegador.</p>
+        <a class="btn btn-primary btn-block" id="dl-android" href="https://github.com/Entreclases/entreclases.github.io/releases/latest/download/Entreclases.apk">Descargar para Android</a>
+        <p class="dl-meta">Versión 2.8.0 · ~4,8 MB<span id="dl-android-match"></span></p>
         <span class="badge badge-live">● Disponible</span>
         <p style="margin-top:10px"><a href="./instalar.html#android" style="font-size:13px;font-weight:600">Cómo se instala →</a></p>
       </div>
@@ -558,6 +563,8 @@
         </span>
         <h3>App de escritorio</h3>
         <p>Versión para Windows, instalable como un programa más de tu compu.</p>
+        <a class="btn btn-primary btn-block" id="dl-windows" href="https://github.com/Entreclases/entreclases.github.io/releases/latest/download/Entreclases-Setup.exe">Descargar para Windows</a>
+        <p class="dl-meta">Versión 2.8.0 · ~3,4 MB<span id="dl-windows-match"></span></p>
         <span class="badge badge-live">● Disponible</span>
         <p style="margin-top:10px"><a href="./instalar.html#windows" style="font-size:13px;font-weight:600">Cómo se instala →</a></p>
       </div>
@@ -604,29 +611,38 @@
   })();
 </script>
 <script>
-  // Botón "Descargar la app" (paso 230): detección simple por user agent — ofrece el instalador
-  // de Windows o el APK de Android según el visitante, y una tarjeta sin botón para el resto
-  // (iPhone, Mac, etc). Instaladores publicados desde el paso 232/233 (release v2.7.3 en este
-  // mismo repo) — DOWNLOAD_URL_* apunta al asset versionado; hay que actualizar el número de
-  // versión acá a mano en cada release nueva (el nombre del asset lo incluye).
+  // Botón "Descargar la app" (paso 230, actualizado paso 244): las URL de descarga usan el
+  // alias /releases/latest/download/<nombre-estable> de GitHub (Entreclases-Setup.exe /
+  // Entreclases.apk) — no hace falta tocar este archivo en cada release, sólo publicar esos
+  // nombres estables además de los assets versionados (ver README de cuaderno-desktop). La
+  // detección de user agent acá sólo decide qué botón mostrar en el hero y cuál resaltar en
+  // las tarjetas de "Usala donde quieras" — los dos botones de las tarjetas están siempre
+  // visibles, nunca se esconden.
   (function(){
-    var DOWNLOAD_URL_WINDOWS = "https://github.com/Entreclases/entreclases.github.io/releases/download/v2.8.0/Entreclases-Setup-2.8.0.exe";
-    var DOWNLOAD_URL_ANDROID = "https://github.com/Entreclases/entreclases.github.io/releases/download/v2.8.0/Entreclases-2.8.0.apk";
-    var el = document.getElementById("download-cta");
-    if(!el) return;
+    var DOWNLOAD_URL_WINDOWS = "https://github.com/Entreclases/entreclases.github.io/releases/latest/download/Entreclases-Setup.exe";
+    var DOWNLOAD_URL_ANDROID = "https://github.com/Entreclases/entreclases.github.io/releases/latest/download/Entreclases.apk";
     var ua = navigator.userAgent||"";
     var isAndroid = /Android/i.test(ua);
     var isWindows = !isAndroid && /Windows/i.test(ua);
+
+    var el = document.getElementById("download-cta");
+    if(el){
+      if(isWindows){
+        el.innerHTML = '<a href="'+DOWNLOAD_URL_WINDOWS+'" class="btn btn-secondary">Descargar para Windows</a>';
+      } else if(isAndroid){
+        el.innerHTML = '<a href="'+DOWNLOAD_URL_ANDROID+'" class="btn btn-secondary">Descargar el APK</a>';
+      } else {
+        el.remove();
+      }
+    }
+
+    var matchBadge = ' <span class="badge badge-match">Tu equipo</span>';
     if(isWindows){
-      el.innerHTML = DOWNLOAD_URL_WINDOWS
-        ? '<a href="'+DOWNLOAD_URL_WINDOWS+'" class="btn btn-secondary">Descargar para Windows</a>'
-        : '<a href="./instalar.html#windows" class="btn btn-secondary">App de escritorio: muy pronto →</a>';
+      var wm = document.getElementById("dl-windows-match");
+      if(wm) wm.innerHTML = matchBadge;
     } else if(isAndroid){
-      el.innerHTML = DOWNLOAD_URL_ANDROID
-        ? '<a href="'+DOWNLOAD_URL_ANDROID+'" class="btn btn-secondary">Descargar el APK</a>'
-        : '<a href="./instalar.html#android" class="btn btn-secondary">App para Android: muy pronto →</a>';
-    } else {
-      el.outerHTML = '<span class="badge badge-soon">Próximamente en iPhone y Mac</span>';
+      var am = document.getElementById("dl-android-match");
+      if(am) am.innerHTML = matchBadge;
     }
   })();
 </script>
