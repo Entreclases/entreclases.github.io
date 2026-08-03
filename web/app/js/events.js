@@ -2823,7 +2823,7 @@ function handleFormChange(e){
     const subjectId = cf.dataset.cf.slice("orphan-target-".length);
     const d = state.orphanRepairDecisions[subjectId];
     if(d) d.targetId = cf.value;
-    return;
+    render(); return;
   }
   const lf=e.target.closest("[data-lf]");
   if(lf){
