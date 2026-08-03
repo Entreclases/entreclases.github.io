@@ -1,4 +1,6 @@
 release-v*/
+node_modules/
+tools/browser-check/screenshots/
 
 # Claves/certificados y config de entorno — defensa en profundidad por si
 # alguna vez se crea o copia un archivo así en este repo (el empaquetado
