@@ -128,7 +128,7 @@
     color:var(--ink);cursor:pointer;padding:0;transition:transform .12s ease,border-color .12s ease}
   .theme-toggle:hover{border-color:var(--ink);transform:translateY(-1px)}
   .theme-toggle svg{display:block}
-  .back-link{font-size:14px;font-weight:600;color:var(--text-soft)}
+  .back-link{display:inline-flex;align-items:center;min-height:44px;font-size:14px;font-weight:600;color:var(--text-soft)}
   .back-link:hover{color:var(--ink)}
 
   main{padding:44px 20px 60px}
@@ -137,21 +137,32 @@
   h1{font-size:30px;line-height:1.2;font-weight:800;color:var(--ink);margin-bottom:10px;letter-spacing:-.01em}
   .lead{font-size:14.5px;color:var(--text-soft);line-height:1.6;margin-bottom:8px}
   .toc{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 8px}
-  .toc a{font-size:13.5px;font-weight:700;background:var(--card);border:1px solid var(--border);
-    border-radius:20px;padding:8px 16px;color:var(--ink)}
+  .toc a{display:inline-flex;align-items:center;gap:8px;min-height:44px;
+    font-size:14.5px;font-weight:700;background:var(--card);border:1.5px solid var(--border);
+    border-radius:14px;padding:10px 18px;color:var(--ink)}
   .toc a:hover{border-color:var(--accent);color:var(--accent-dark)}
 
   article section{margin-top:40px;padding-top:24px;border-top:1px solid var(--border)}
   article h2{font-size:21px;color:var(--ink);margin-bottom:14px;letter-spacing:-.005em}
   article p, article li{font-size:14.5px;line-height:1.7;color:var(--text)}
   article p{margin-bottom:12px}
-  article ol{margin:0 0 16px 20px}
-  article li{margin-bottom:14px}
+  article > section > p{margin-bottom:16px}
   article strong{color:var(--ink)}
 
-  .shot{border:1.5px dashed var(--border);border-radius:12px;background:var(--bg-alt);
-    color:var(--text-soft);font-size:12.5px;font-weight:600;text-align:center;
-    padding:26px 12px;margin-top:8px}
+  ol.steps{list-style:none;margin:0 0 16px;padding:0;counter-reset:step}
+  ol.steps > li{position:relative;counter-increment:step;padding:2px 0 2px 46px;margin-bottom:20px;min-height:34px}
+  ol.steps > li::before{content:counter(step);position:absolute;left:0;top:0;
+    width:34px;height:34px;border-radius:50%;background:var(--accent-strong);color:#fff;
+    font-family:var(--display);font-weight:700;font-size:15px;line-height:34px;text-align:center}
+
+  .shot{display:block;width:100%;height:auto;border-radius:12px;border:1px solid var(--border);
+    margin-top:10px;background:var(--bg-alt)}
+
+  .btn-download{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    min-height:44px;background:var(--accent-strong);color:#fff;font-weight:700;font-size:14.5px;
+    border-radius:11px;padding:11px 20px;text-decoration:none;margin-top:10px;
+    box-shadow:0 8px 20px -6px rgba(20,184,166,.5)}
+  .btn-download:hover{box-shadow:0 10px 24px -6px rgba(20,184,166,.6)}
 
   .warn{background:var(--amberbg);color:var(--ink);border-radius:12px;padding:14px 16px;
     font-size:14px;line-height:1.6;margin:16px 0}
@@ -167,6 +178,9 @@
     main{padding:32px 16px 48px}
     h1{font-size:25px}
     .theme-toggle{width:44px;height:44px}
+    .toc{flex-direction:column}
+    .toc a{width:100%;justify-content:center}
+    .btn-download{width:100%}
   }
 </style>
 </head>
@@ -197,27 +211,29 @@
       <a href="#android">📱 Instalar en Android</a>
       <a href="#windows">🖥️ Instalar en Windows</a>
       <a href="#ios">🍎 Instalar en iPhone o Mac</a>
+      <a href="#actualizar">🔄 Cómo se actualiza</a>
     </div>
 
     <article>
       <section id="android">
         <h2>Instalar en Android</h2>
-        <ol>
+        <ol class="steps">
           <li>
-            Descargá el APK desde el botón de la <a href="./index.html">página principal</a>. El navegador puede avisarte que es un archivo poco frecuente — elegí <strong>"Descargar de todas formas"</strong> si aparece esa opción.
-            <div class="shot">[Captura pendiente: aviso de descarga del navegador]</div>
+            Descargá el APK. El navegador puede avisarte que es un archivo poco frecuente — elegí <strong>"Descargar de todas formas"</strong> si aparece esa opción.
+            <div><a class="btn-download" href="https://github.com/Entreclases/entreclases.github.io/releases/latest/download/Entreclases.apk">Descargar para Android</a></div>
+            <img class="shot" src="img/instalar/android-1-descarga.webp" width="393" height="200" alt="Aviso del navegador Chrome preguntando si querés descargar el archivo Entreclases.apk" onerror="this.remove()">
           </li>
           <li>
             Al abrir el archivo descargado, Android va a bloquear la instalación con un mensaje del estilo <strong>"No se permite instalar apps desconocidas"</strong>. Tocá <strong>Ajustes</strong> en ese mismo aviso.
-            <div class="shot">[Captura pendiente: bloqueo "app desconocida" con botón Ajustes]</div>
+            <img class="shot" src="img/instalar/android-2-bloqueo.webp" width="393" height="640" alt="Pantalla de Android bloqueando la instalación con el botón Ajustes destacado" loading="lazy" onerror="this.remove()">
           </li>
           <li>
             Activá el interruptor <strong>"Permitir de esta fuente"</strong> (el nombre exacto varía según la versión de Android y el navegador que uses) y volvé atrás.
-            <div class="shot">[Captura pendiente: interruptor "Permitir de esta fuente" activado]</div>
+            <img class="shot" src="img/instalar/android-3-permitir.webp" width="393" height="640" alt="Pantalla de ajustes de Android con el interruptor Permitir de esta fuente activado" loading="lazy" onerror="this.remove()">
           </li>
           <li>
             Volvé a abrir el instalador. Si aparece <strong>Google Play Protect</strong> escaneando la app, dejalo terminar — es un chequeo automático de seguridad, no un bloqueo. Si igualmente muestra una advertencia, tocá <strong>"Instalar de todos modos"</strong>.
-            <div class="shot">[Captura pendiente: pantalla de Play Protect escaneando]</div>
+            <img class="shot" src="img/instalar/android-4-play-protect.webp" width="393" height="640" alt="Pantalla de Google Play Protect escaneando la app antes de instalarla" loading="lazy" onerror="this.remove()">
           </li>
           <li>Tocá <strong>Instalar</strong> y esperá a que termine. Listo — Entreclases queda como cualquier otra app en tu Android.</li>
         </ol>
@@ -228,51 +244,59 @@
 
       <section id="windows">
         <h2>Instalar en Windows</h2>
-        <ol>
+        <ol class="steps">
           <li>
-            Descargá el instalador desde el botón de la <a href="./index.html">página principal</a> y abrilo.
-            <div class="shot">[Captura pendiente: archivo descargado en la carpeta de Descargas]</div>
+            Descargá el instalador y abrilo.
+            <div><a class="btn-download" href="https://github.com/Entreclases/entreclases.github.io/releases/latest/download/Entreclases-Setup.exe">Descargar para Windows</a></div>
+            <img class="shot" src="img/instalar/windows-1-descarga.webp" width="960" height="200" alt="Archivo Entreclases-Setup.exe en la carpeta de Descargas de Windows" loading="lazy" onerror="this.remove()">
           </li>
           <li>
             Windows Defender SmartScreen puede mostrar una pantalla azul <strong>"Windows protegió su PC"</strong>, porque el instalador todavía no tiene tantas descargas acumuladas como para que Microsoft lo reconozca automáticamente (no significa que tenga un virus).
-            <div class="shot">[Captura pendiente: pantalla azul de SmartScreen]</div>
+            <img class="shot" src="img/instalar/windows-2-smartscreen.webp" width="960" height="600" alt="Pantalla azul de SmartScreen: Windows protegió su PC" loading="lazy" onerror="this.remove()">
           </li>
           <li>
             Tocá <strong>"Más información"</strong> (aparece chico, abajo a la izquierda del mensaje) — ahí va a aparecer un botón nuevo.
-            <div class="shot">[Captura pendiente: "Más información" señalado]</div>
+            <img class="shot" src="img/instalar/windows-3-mas-informacion.webp" width="960" height="600" alt="Enlace Más información destacado dentro de la pantalla de SmartScreen" loading="lazy" onerror="this.remove()">
           </li>
           <li>
             Tocá <strong>"Ejecutar de todas formas"</strong> para continuar con la instalación.
-            <div class="shot">[Captura pendiente: botón "Ejecutar de todas formas"]</div>
+            <img class="shot" src="img/instalar/windows-4-ejecutar.webp" width="960" height="600" alt="Botón Ejecutar de todas formas dentro de la pantalla de SmartScreen" loading="lazy" onerror="this.remove()">
           </li>
           <li>Seguí los pasos del instalador (siguiente, siguiente, instalar). Al terminar, Entreclases queda en el menú Inicio como cualquier otro programa.</li>
         </ol>
         <div class="warn">
-          <strong>¿Por qué pasa esto?</strong> Ver el paso 232 del changelog para la explicación técnica (firma de código) — en criollo: firmar un instalador para que Windows lo reconozca de entrada tiene un costo anual, y todavía no lo pagamos. El instalador es el mismo que compilamos nosotros, no un intermediario.
+          <strong>¿Por qué pasa esto?</strong> En criollo: para que Windows reconozca un instalador de entrada, hay que pagar todos los años un certificado de firma digital, y todavía no lo pagamos. El instalador es exactamente el mismo que compilamos nosotros, no pasa por ningún intermediario — SmartScreen sólo está siendo prudente con un programa nuevo.
         </div>
       </section>
 
       <section id="ios">
         <h2>Instalar en iPhone o Mac</h2>
-        <p>Todavía no hay una app nativa para iPhone/iPad ni para Mac — pero la versión web funciona igual y podés agregarla a tu pantalla de inicio para tenerla como una app más, con su propio ícono y sin la barra del navegador.</p>
-        <ol>
+        <p>Todavía no hay una app nativa para iPhone/iPad ni para Mac — pero la versión web funciona igual y podés agregarla a tu pantalla de inicio para tenerla como una app más, con su propio ícono y sin la barra del navegador. Funciona igual de bien que la app nativa, salvo por los avisos (las notificaciones push todavía no llegan por este camino).</p>
+        <ol class="steps">
           <li>
             Abrí <a href="./app/index.html">Entreclases</a> en Safari (tiene que ser Safari, no Chrome — es el único navegador de iPhone/iPad que permite este paso).
-            <div class="shot">[Captura pendiente: Entreclases abierta en Safari]</div>
+            <img class="shot" src="img/instalar/ios-1-safari.webp" width="393" height="640" alt="Entreclases abierta en Safari en un iPhone" loading="lazy" onerror="this.remove()">
           </li>
           <li>
             Tocá el ícono de <strong>Compartir</strong> (el cuadrado con la flecha hacia arriba) en la barra inferior.
-            <div class="shot">[Captura pendiente: ícono de Compartir señalado]</div>
+            <img class="shot" src="img/instalar/ios-2-compartir.webp" width="393" height="640" alt="Ícono de Compartir de Safari señalado en la barra inferior" loading="lazy" onerror="this.remove()">
           </li>
           <li>
             Elegí <strong>"Agregar a inicio"</strong> en la lista de opciones y confirmá arriba a la derecha.
-            <div class="shot">[Captura pendiente: opción "Agregar a inicio"]</div>
+            <img class="shot" src="img/instalar/ios-3-agregar.webp" width="393" height="640" alt="Menú de Compartir de Safari con la opción Agregar a inicio destacada" loading="lazy" onerror="this.remove()">
           </li>
           <li>Listo — el ícono de Entreclases queda en tu pantalla de inicio como cualquier otra app, y sigue funcionando sin conexión.</li>
         </ol>
         <div class="warn">
           <strong>¿Y en Mac?</strong> Safari también permite agregar la web como app (menú <strong>Archivo → Agregar al Dock</strong> en versiones recientes de macOS). Si no aparece esa opción, usá el acceso directo del navegador — la app funciona igual, sólo cambia si tiene ícono propio en el Dock.
         </div>
+      </section>
+
+      <section id="actualizar">
+        <h2>Cómo se actualiza</h2>
+        <p><strong>En Android:</strong> cuando salga una versión nueva, descargá el APK nuevo desde el mismo botón de esta página y abrilo — se instala arriba de la que ya tenés, sin desinstalar nada y sin perder ningún dato. Android puede volver a pedirte el mismo permiso de "fuentes desconocidas" la primera vez.</p>
+        <p><strong>En Windows:</strong> no hace falta hacer nada — la app se fija sola si hay una versión nueva y te avisa para actualizarse. No hace falta volver a esta página ni descargar nada a mano.</p>
+        <p><strong>En la web (PWA):</strong> el navegador se actualiza solo; si no ves los cambios, esperá el aviso de "nueva versión disponible" o recargá forzando el refresco (Ctrl+Shift+R en la computadora).</p>
       </section>
     </article>
 
