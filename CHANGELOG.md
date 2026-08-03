@@ -23,6 +23,9 @@ pausa.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
+## [Sin publicar]
+- Paso 243 (Entreclases: nombre e ícono en las apps nativas): unificado el nombre visible a "Entreclases" en Android (`app_name`, `title_activity_main`, `appName` de Capacitor) y en Windows (`productName` y título de ventana de Tauri) sin tocar `applicationId`/`identifier` ni el keystore. Un solo logo (el cuadrado verde agua `#14B8A6` con tilde blanco, antes convivían tres: el azul marino de la PWA, el semáforo del ícono de Tauri y el ícono default de Capacitor) regenerado en `icon-192/512.png`, ícono adaptativo de Android (foreground + fondo de color), `.ico`/`.icns`/PNGs de Tauri y el ícono del instalador NSIS. Los assets de instalador pasan a llamarse `Entreclases-Setup-<version>.exe`/`Entreclases-<version>.apk`.
+
 ## [2.8.1] - 2026-08-03
 - Todo lo que abre "afuera" (WhatsApp, link de clase, descargas, términos) ahora pasa por una única función `openExternal()` que en nativo usa el opener del sistema (Tauri) o `@capacitor/browser` (Android) en vez de quedar atrapado en el webview propio de la app; el modal de Términos en nativo abre directo la URL publicada en vez de un iframe roto.
 - Paso 241 (Tombstone real para materias borradas): la papelera de materias (`catalog.trash`) se purgaba sola a los 7 días sin dejar rastro, así que un dispositivo que no sincronizaba hacía tiempo podía "resucitar" una materia ya borrada en el otro. Ahora, al purgar (automático o con "Eliminar definitivo"), queda un tombstone en `catalog.tombstones.subjects` (mismo criterio que el de alumnos, 180 días) que `mergeCatalog()` usa para no revivirla salvo que haya sido restaurada de verdad después del borrado.
