@@ -23,7 +23,7 @@ pausa.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/), adaptado
 a una sola sección de viñetas por versión (sin subcategorías Added/Fixed/etc.).
 
-## [Sin publicar]
+## [2.8.1] - 2026-08-03
 - Todo lo que abre "afuera" (WhatsApp, link de clase, descargas, términos) ahora pasa por una única función `openExternal()` que en nativo usa el opener del sistema (Tauri) o `@capacitor/browser` (Android) en vez de quedar atrapado en el webview propio de la app; el modal de Términos en nativo abre directo la URL publicada en vez de un iframe roto.
 - Paso 241 (Tombstone real para materias borradas): la papelera de materias (`catalog.trash`) se purgaba sola a los 7 días sin dejar rastro, así que un dispositivo que no sincronizaba hacía tiempo podía "resucitar" una materia ya borrada en el otro. Ahora, al purgar (automático o con "Eliminar definitivo"), queda un tombstone en `catalog.tombstones.subjects` (mismo criterio que el de alumnos, 180 días) que `mergeCatalog()` usa para no revivirla salvo que haya sido restaurada de verdad después del borrado.
 - Paso 242 (Reparador de materias huérfanas): banner nuevo en el Tablero cuando hay alumnos con `subjectId` apuntando a una materia que ya no existe en el catálogo (residuo del bug de la 2.7.0) — abre un reparador que agrupa a los alumnos por materia huérfana, muestra las unidades detectadas a partir de su avance real, y deja elegir por grupo: recrear la materia (con el mismo id, para reenganchar a los alumnos sin tocarlos), reasignar a una materia existente, o dejarlos sin materia. Todo se aplica junto en un solo guardado al confirmar. El selector de materia en la ficha del alumno ahora muestra el nombre huérfano con la marca "— materia no encontrada" en vez de un guión pelado.
