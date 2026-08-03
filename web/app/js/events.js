@@ -3051,12 +3051,21 @@ if(!_recovery){
   if(_navRestore) applyNavSnapshot(_navRestore);
 }
 render();
-syncNow();
-checkForNewVersion();
-checkTauriUpdate();
-maybeNotifyCobros();
-checkRachaDiaria();
-adoptNativeStorage(); // paso 231: espejo/recuperación hacia el almacenamiento del contenedor (no-op fuera de apps nativas)
+// Paso 246: en nativo, adoptNativeStorage() (espejo/recuperación hacia el almacenamiento del
+// contenedor, paso 231) tiene que terminar ANTES de que arranque cualquier cosa que lea o toque
+// students/catalog — si syncNow() arrancaba en paralelo, podía mergear con el estado vacío de
+// ANTES de la recuperación y, al volver de la red, pisar en localStorage lo que adoptNativeStorage
+// acababa de restaurar (la carrera que perdía una semana entera de trabajo offline si el sistema
+// limpiaba el WebView). awaitear una async function que arranca con "if(!IS_NATIVE) return" no
+// demora nada en web (se resuelve en el mismo tick, sin ningún await de por medio).
+(async ()=>{
+  await adoptNativeStorage();
+  syncNow();
+  checkForNewVersion();
+  checkTauriUpdate();
+  maybeNotifyCobros();
+  checkRachaDiaria();
+})();
 
 /* PWA: registrar el service worker cuando la app está publicada (no en file://
    ni dentro de un contenedor nativo como Tauri o Capacitor, que ya resuelven

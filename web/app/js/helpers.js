@@ -660,12 +660,23 @@ function commitOrphanRepair(decisions){
   touchCatalog();
 }
 
+// Contador de generación del estado (paso 246): se incrementa cada vez que students/catalog se
+// REEMPLAZAN por completo (load(), logout, restaurar respaldo, importar JSON) — a diferencia de
+// una edición normal de un alumno/materia, que no lo toca. syncNow() (sync.js) guarda el valor
+// justo antes de mergear con la nube y lo vuelve a chequear antes de escribir el resultado: si
+// cambió mientras esperaba la red, algo más nuevo que el merge en curso ya reemplazó el estado
+// (por ejemplo adoptNativeStorage() recuperando el contenedor nativo) y gana ese reemplazo, no el
+// merge que quedó basado en la copia vieja.
+let _stateGen = 0;
+function bumpStateGen(){ _stateGen++; }
+
 function load(){
   if(IS_DEMO){
     const d=buildDemoData();
     state.students=d.students; state.catalog=d.catalog;
     state.portal=d.portal; state.portalLoaded=true; state.portalError="";
     state.solicitudesClase=d.solicitudesClase;
+    bumpStateGen();
     return;
   }
   const uid_ = sesUid();
@@ -734,6 +745,7 @@ function load(){
   // paso 227: calculado ya en load() (no sólo en el próximo save()) para que Cuenta → Respaldos
   // muestre el peso real desde el primer render, sin esperar a que el docente toque algo.
   if(uid_) try{ state.saveSizeBytes = new Blob([JSON.stringify({owner:uid_, students:state.students, catalog:state.catalog})]).size; }catch(e){}
+  bumpStateGen();
 }
 // Paso 229: lee (sin tocar `state` ni marcar nada dirty) el cuaderno guardado del último uid que
 // usó este dispositivo (LAST_UID_KEY, sobrevive al logout a propósito) — lo usa render() cuando
@@ -3258,6 +3270,7 @@ function refreshStateFromLocalStorage(uid_){
 // cacheadas por vista (reportes/usuarios/actividad/backups/materiales/portal) para que la cuenta
 // nueva no vea ni por un instante algo de la vieja mientras recarga cada una a demanda.
 function clearAccountState(){
+  bumpStateGen();
   state.students=[]; state.catalog=defaultCatalog(); state.ownerUid=null;
   state.selId=null; state.fichaDraft=null; state.fichaError="";
   state.view="tablero"; state.tab="temas";

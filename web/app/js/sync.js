@@ -201,6 +201,11 @@ async function syncNow(force){
     // que haya guardado localStorage — puede ser más fresco que la copia en memoria de ESTA
     // pestaña si otra pestaña guardó algo mientras tanto (ver refreshStateFromLocalStorage()).
     refreshStateFromLocalStorage(uid_);
+    // Paso 246: generación del estado justo después de ponerse al día — si cambia antes de llegar
+    // a la asignación final de más abajo, algo reemplazó por completo students/catalog mientras
+    // este ciclo esperaba la red (adoptNativeStorage recuperando el contenedor nativo, un logout,
+    // restaurar un respaldo, importar un JSON) y ese reemplazo es más nuevo que este merge.
+    const genAlEmpezar = _stateGen;
     const h={apikey:SUPA_ANON_KEY, Authorization:"Bearer "+s.access, "Content-Type":"application/json"};
     maybeHeartbeat(uid_, s);
     const dirty=isDirty();
@@ -294,24 +299,34 @@ async function syncNow(force){
       clearDeliberateRemovals(uid_);
     }
 
-    state.students=merged; state.catalog=catalog;
-    try{ localStorage.setItem(nsKey(KEY,uid_), JSON.stringify({owner:uid_, students:merged, catalog:catalog})); }catch(e){}
-    if(remoteUpdatedAt) localStorage.setItem(nsKey(LAST_REMOTE_KEY,uid_), remoteUpdatedAt);
+    if(_stateGen!==genAlEmpezar){
+      // Paso 246: algo reemplazó por completo students/catalog mientras este ciclo esperaba la red
+      // (adoptNativeStorage recuperando el contenedor nativo, un logout, restaurar un respaldo,
+      // importar un JSON) — ese reemplazo es más nuevo que este merge, así que no se pisa acá. Si
+      // ya se subió (needsWrite), lo subido no se pierde: al no actualizar LAST_REMOTE_KEY, el
+      // próximo sync vuelve a bajar y mergear contra el estado post-reemplazo, y el merge por
+      // updatedAt de cada item resuelve cualquier diferencia igual.
+      console.warn("syncNow: el estado cambió por completo durante el ciclo — se descarta el merge de este ciclo, se reintenta en el próximo");
+    }else{
+      state.students=merged; state.catalog=catalog;
+      try{ localStorage.setItem(nsKey(KEY,uid_), JSON.stringify({owner:uid_, students:merged, catalog:catalog})); }catch(e){}
+      if(remoteUpdatedAt) localStorage.setItem(nsKey(LAST_REMOTE_KEY,uid_), remoteUpdatedAt);
+      if(firstSyncEver){
+        // Paso 223: recién ahora state.catalog refleja la cuenta real (antes era sólo lo que dejó
+        // load()) — recién acá tiene sentido reevaluar checkTourAutoStart()/checkRachaDiaria(), que
+        // ya se habían llamado desde el render() de arranque pero se autobloquearon (ver el guard
+        // primerSyncHecho() en cada una). Si esta es una cuenta realmente nueva (sin row remota
+        // todavía), primerSyncHecho() ya queda true igual apenas se sube el JSON vacío arriba —
+        // el tour arranca igual, sólo demorado los segundos que tardó este primer ciclo.
+        checkTourAutoStart();
+        checkRachaDiaria();
+      }
+      // re-dibujar solo si la nube trajo cambios (para no interrumpir si estás escribiendo)
+      if((firstSyncEver || JSON.stringify({a:state.students,b:state.catalog})!==before) && state.view!=="cuenta" && state.view!=="catalog") render();
+    }
     state.lastSync=Date.now();
     setStatus("ok");
     pendingSyncs++;
-    if(firstSyncEver){
-      // Paso 223: recién ahora state.catalog refleja la cuenta real (antes era sólo lo que dejó
-      // load()) — recién acá tiene sentido reevaluar checkTourAutoStart()/checkRachaDiaria(), que
-      // ya se habían llamado desde el render() de arranque pero se autobloquearon (ver el guard
-      // primerSyncHecho() en cada una). Si esta es una cuenta realmente nueva (sin row remota
-      // todavía), primerSyncHecho() ya queda true igual apenas se sube el JSON vacío arriba —
-      // el tour arranca igual, sólo demorado los segundos que tardó este primer ciclo.
-      checkTourAutoStart();
-      checkRachaDiaria();
-    }
-    // re-dibujar solo si la nube trajo cambios (para no interrumpir si estás escribiendo)
-    if((firstSyncEver || JSON.stringify({a:state.students,b:state.catalog})!==before) && state.view!=="cuenta" && state.view!=="catalog") render();
     maybeSnapshotBackup(uid_, s);
     maybeRenewPortalLibrary(uid_, s);
     maybeSyncHuecosPortal(uid_, s);
@@ -638,6 +653,7 @@ async function restoreBackup(id, scope){
     // updatedAt fresco: es el campo que decide el merge en syncNow, así el restore
     // gana la próxima sincronización en vez de que el estado remoto (más reciente) lo pise.
     const now=Date.now();
+    bumpStateGen(); // paso 246: reemplazo completo de students/catalog — que un syncNow() en vuelo no lo pise con un merge basado en la copia previa
     if(scope==="alumnos"){
       state.students=(b.data.students||[]).map(x=>({...x, updatedAt:now}));
     }else if(scope==="catalogo"){

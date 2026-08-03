@@ -1241,6 +1241,7 @@ function render(){
         const p = JSON.parse(r.result);
         if(Array.isArray(p.students)){
           const now=Date.now();
+          bumpStateGen(); // paso 246: reemplazo completo de students — que un syncNow() en vuelo no lo pise con un merge basado en la copia previa
           state.students = p.students.map(x=>({...x, updatedAt:x.updatedAt||now}));
           save(); render();
         }
